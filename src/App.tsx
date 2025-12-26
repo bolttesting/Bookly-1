@@ -21,6 +21,7 @@ import Staff from "./pages/Staff";
 import Team from "./pages/Team";
 import SuperAdmin from "./pages/SuperAdmin";
 import Settings from "./pages/Settings";
+import Analytics from "./pages/Analytics";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import PublicBooking from "./pages/PublicBooking";
@@ -62,6 +63,7 @@ function AppRoutes() {
               <Route path="/customers" element={<Customers />} />
               <Route path="/staff" element={<Staff />} />
               <Route path="/team" element={<Team />} />
+              <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
           </Route>

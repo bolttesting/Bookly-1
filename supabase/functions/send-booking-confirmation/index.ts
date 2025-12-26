@@ -24,6 +24,18 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Check if API key is configured
+  if (!RESEND_API_KEY) {
+    console.error("RESEND_API_KEY not configured");
+    return new Response(
+      JSON.stringify({ success: false, error: "Email service not configured. RESEND_API_KEY is missing." }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      }
+    );
+  }
+
   try {
     const {
       customerEmail,
@@ -35,6 +47,7 @@ const handler = async (req: Request): Promise<Response> => {
     }: BookingConfirmationRequest = await req.json();
 
     console.log("Sending confirmation to:", customerEmail);
+    console.log("API Key present:", RESEND_API_KEY ? "Yes" : "No");
 
     const formattedDate = new Date(startTime).toLocaleDateString("en-US", {
       weekday: "long",
@@ -116,7 +129,7 @@ const handler = async (req: Request): Promise<Response> => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: `${businessName} <onboarding@resend.dev>`,
+        from: `Bookly <bookly@logixcontact.site>`,
         to: [customerEmail],
         subject: `Appointment Confirmed - ${serviceName}`,
         html: htmlContent,

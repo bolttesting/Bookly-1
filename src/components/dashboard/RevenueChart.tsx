@@ -1,5 +1,7 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrencySimple } from "@/lib/currency";
+import { useBusiness } from "@/hooks/useBusiness";
 
 interface RevenueData {
   name: string;
@@ -12,6 +14,9 @@ interface RevenueChartProps {
 }
 
 export function RevenueChart({ data, loading }: RevenueChartProps) {
+  const { business } = useBusiness();
+  const currency = business?.currency || 'USD';
+
   if (loading) {
     return (
       <div className="glass-card p-5">
@@ -45,14 +50,14 @@ export function RevenueChart({ data, loading }: RevenueChartProps) {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(240, 5%, 17%)" />
               <XAxis dataKey="name" stroke="hsl(240, 5%, 65%)" fontSize={12} />
-              <YAxis stroke="hsl(240, 5%, 65%)" fontSize={12} tickFormatter={(v) => `$${v}`} />
+              <YAxis stroke="hsl(240, 5%, 65%)" fontSize={12} tickFormatter={(v) => formatCurrencySimple(v, currency)} />
               <Tooltip 
                 contentStyle={{ 
                   background: "hsl(240, 10%, 6%)", 
                   border: "1px solid hsl(240, 5%, 17%)", 
                   borderRadius: "8px" 
                 }} 
-                formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']}
+                formatter={(value: number) => [formatCurrencySimple(value, currency), 'Revenue']}
               />
               <Area 
                 type="monotone" 

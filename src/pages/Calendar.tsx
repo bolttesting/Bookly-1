@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
-import { Plus, ChevronLeft, ChevronRight, Loader2, CalendarDays, Edit, Trash2 } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Loader2, CalendarDays, Edit, Trash2, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -9,10 +9,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useAppointments, Appointment, AppointmentFormData } from '@/hooks/useAppointments';
 import { AppointmentDialog } from '@/components/appointments/AppointmentDialog';
 import { DeleteAppointmentDialog } from '@/components/appointments/DeleteAppointmentDialog';
+import { RescheduleRequestsPanel } from '@/components/appointments/RescheduleRequestsPanel';
+import { RecurringSeriesManager } from '@/components/recurring/RecurringSeriesManager';
 
 const Calendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -128,7 +131,24 @@ const Calendar = () => {
         </Button>
       </div>
 
-      {/* Calendar Controls */}
+      {/* Reschedule Requests */}
+      <RescheduleRequestsPanel />
+
+      {/* Tabs for Calendar and Recurring Series */}
+      <Tabs defaultValue="calendar" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="calendar" className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />
+            Calendar
+          </TabsTrigger>
+          <TabsTrigger value="recurring" className="flex items-center gap-2">
+            <Repeat className="h-4 w-4" />
+            Recurring Series
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="calendar" className="space-y-4">
+          {/* Calendar Controls */}
       <div className="glass-card p-3 sm:p-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3">
@@ -303,6 +323,12 @@ const Calendar = () => {
           </Button>
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="recurring" className="space-y-4">
+          <RecurringSeriesManager />
+        </TabsContent>
+      </Tabs>
 
       {/* Dialogs */}
       <AppointmentDialog

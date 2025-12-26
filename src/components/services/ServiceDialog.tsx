@@ -217,6 +217,9 @@ export function ServiceDialog({
                     <FormControl>
                       <Input type="number" min={0} step={0.01} {...field} />
                     </FormControl>
+                    <FormDescription className="text-xs">
+                      Payment settings (advance/on-spot/partial) are configured in Settings → Payments
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

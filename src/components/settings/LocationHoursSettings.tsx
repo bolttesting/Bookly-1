@@ -12,6 +12,7 @@ import { useBusinessHours } from '@/hooks/useBusinessHours';
 import { useLocations } from '@/hooks/useLocations';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { OffDaysManager } from './OffDaysManager';
+import { SplitHoursEditor } from './SplitHoursEditor';
 
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   const hours = Math.floor(i / 2);
@@ -233,7 +234,7 @@ export function LocationHoursSettings() {
             </div>
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-3 sm:pt-4 px-2 sm:px-4 space-y-6">
-            <HoursEditor locationId={null} />
+            <SplitHoursEditor locationId={null} />
             <div className="border-t border-border pt-4">
               <OffDaysManager locationId={null} locationName="Default" />
             </div>
@@ -262,7 +263,7 @@ export function LocationHoursSettings() {
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="pt-3 sm:pt-4 px-2 sm:px-4 space-y-6">
-              <HoursEditor locationId={location.id} locationName={location.name} />
+              <SplitHoursEditor locationId={location.id} locationName={location.name} />
               <div className="border-t border-border pt-4">
                 <OffDaysManager locationId={location.id} locationName={location.name} />
               </div>

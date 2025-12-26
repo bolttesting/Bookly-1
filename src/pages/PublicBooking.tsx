@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { format, addMinutes, setHours, setMinutes, startOfDay, isBefore, isAfter, addDays } from 'date-fns';
-import { Calendar, Clock, User, Mail, Phone, ArrowRight, ArrowLeft, CheckCircle, Loader2, Users, LogIn, MapPin, Eye, EyeOff } from 'lucide-react';
+import { Calendar, Clock, User, Mail, Phone, ArrowRight, ArrowLeft, CheckCircle, Loader2, Users, LogIn, MapPin, Eye, EyeOff, Tag, Repeat, CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,8 +12,16 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
+import { PaymentForm } from '@/components/payment/PaymentForm';
+import { useAppointmentReminders } from '@/hooks/useReminders';
+import { notifyBusinessUsers } from '@/lib/notifications';
+import { cn } from '@/lib/utils';
 
 interface Business {
   id: string;
@@ -25,6 +33,8 @@ interface Business {
   address: string | null;
   city: string | null;
   currency: string | null;
+  require_payment?: boolean;
+  stripe_connected?: boolean;
 }
 
 interface Service {
@@ -99,8 +109,18 @@ export default function PublicBooking() {
   const [appointments, setAppointments] = useState<{ start_time: string; service_id: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrencePattern, setRecurrencePattern] = useState<'weekly' | 'monthly'>('weekly');
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState(1);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | null>(null);
+  const [recurrenceMaxOccurrences, setRecurrenceMaxOccurrences] = useState<number | null>(null);
+  const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'date' | 'occurrences'>('never');
   const [step, setStep] = useState(1);
   const [bookingComplete, setBookingComplete] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [createdAppointmentId, setCreatedAppointmentId] = useState<string | null>(null);
+  const [createdCustomerId, setCreatedCustomerId] = useState<string | null>(null);
+  const { createReminders } = useAppointmentReminders();
 
   // Auth state
   const [authMode, setAuthMode] = useState<'guest' | 'login' | 'signup'>('guest');
@@ -121,6 +141,12 @@ export default function PublicBooking() {
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
+  
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; discountType: 'percentage' | 'fixed' } | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   // Check for logged in user
   useEffect(() => {
@@ -171,7 +197,24 @@ export default function PublicBooking() {
           .eq('status', 'active')
           .order('name');
 
-        setServices(servicesData || []);
+        // Fetch active service cancellations
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const { data: cancellationsData } = await supabase
+          .from('service_cancellations')
+          .select('service_id, cancelled_date')
+          .eq('business_id', businessData.id)
+          .lte('cancelled_date', today);
+
+        const cancelledServiceIds = new Set(
+          (cancellationsData || []).map(c => c.service_id)
+        );
+
+        // Filter out cancelled services
+        const activeServices = (servicesData || []).filter(
+          service => !cancelledServiceIds.has(service.id)
+        );
+
+        setServices(activeServices);
 
         // Fetch staff
         const { data: staffData } = await supabase
@@ -444,7 +487,25 @@ export default function PublicBooking() {
   };
 
   const handleSubmit = async () => {
-    if (!business || !selectedService || !selectedDate || !selectedTime) return;
+    console.log('🚀 BOOKING SUBMITTED - Starting booking process');
+    console.log('Form state:', {
+      business: !!business,
+      selectedService: !!selectedService,
+      selectedDate: !!selectedDate,
+      selectedTime: !!selectedTime,
+      customerName,
+      customerEmail,
+    });
+    
+    if (!business || !selectedService || !selectedDate || !selectedTime) {
+      console.error('❌ Missing required fields:', {
+        business: !business,
+        selectedService: !selectedService,
+        selectedDate: !selectedDate,
+        selectedTime: !selectedTime,
+      });
+      return;
+    }
 
     const validation = customerSchema.safeParse({
       name: customerName,
@@ -454,10 +515,12 @@ export default function PublicBooking() {
     });
 
     if (!validation.success) {
+      console.error('❌ Validation failed:', validation.error.errors);
       toast.error(validation.error.errors[0].message);
       return;
     }
 
+    console.log('✅ Validation passed, starting booking...');
     setSubmitting(true);
     try {
       // Create or find customer
@@ -495,12 +558,12 @@ export default function PublicBooking() {
         });
 
         const customerData = {
-          business_id: business.id,
-          name: customerName,
-          email: customerEmail,
-          phone: customerPhone || null,
-          notes: customerNotes || null,
-          user_id: loggedInUser?.id || null,
+            business_id: business.id,
+            name: customerName,
+            email: customerEmail,
+            phone: customerPhone || null,
+            notes: customerNotes || null,
+            user_id: loggedInUser?.id || null,
         };
         
         console.log('Attempting to create customer with data:', customerData);
@@ -518,6 +581,17 @@ export default function PublicBooking() {
         newCustomer = insertResult.data;
         customerError = insertResult.error;
 
+        console.log('Customer insert result:', {
+          success: !!newCustomer,
+          customerId: newCustomer?.id,
+          error: customerError ? {
+            code: customerError.code,
+            message: customerError.message,
+            details: customerError.details,
+            hint: customerError.hint,
+          } : null,
+        });
+
         // If direct insert fails with RLS error, try using RPC function as fallback
         if (customerError && (customerError.code === '42501' || customerError.message?.includes('row-level security'))) {
           console.log('Direct insert failed with RLS error, trying RPC function...');
@@ -531,6 +605,16 @@ export default function PublicBooking() {
             p_user_id: loggedInUser?.id || null,
           });
 
+          console.log('RPC function result:', {
+            success: !rpcResult.error,
+            data: rpcResult.data,
+            error: rpcResult.error ? {
+              code: rpcResult.error.code,
+              message: rpcResult.error.message,
+              details: rpcResult.error.details,
+            } : null,
+          });
+
           if (rpcResult.error) {
             console.error('RPC function also failed:', rpcResult.error);
             customerError = rpcResult.error;
@@ -539,21 +623,49 @@ export default function PublicBooking() {
             customerId = rpcResult.data;
             newCustomer = { id: rpcResult.data };
             customerError = null;
+            console.log('✅ Customer created via RPC, ID:', customerId);
           }
         }
 
         if (customerError) {
-          console.error('Customer creation error details:', {
+          console.error('❌ Customer creation error details:', {
             message: customerError.message,
             details: customerError.details,
             hint: customerError.hint,
             code: customerError.code,
-            fullError: customerError,
+            fullError: JSON.stringify(customerError, null, 2),
           });
           throw customerError;
         }
         
+        if (newCustomer?.id) {
         customerId = newCustomer.id;
+          console.log('✅ Customer created successfully, ID:', customerId);
+          
+          // Create notification for business owners/admins about new customer
+          try {
+            await notifyBusinessUsers(business.id, {
+              title: 'New Customer Registered',
+              message: `New customer ${customerName} has registered and booked an appointment`,
+              type: 'user',
+              link: '/customers',
+            });
+          } catch (notifError) {
+            console.error('Failed to create customer notification:', notifError);
+            // Don't fail booking if notification fails
+          }
+        } else {
+          console.error('❌ Customer creation succeeded but no ID returned!', newCustomer);
+          throw new Error('Customer creation failed: No ID returned');
+        }
+      }
+
+      console.log('✅ Customer ID obtained:', customerId);
+      console.log('Customer ID is valid:', !!customerId && customerId !== 'undefined' && customerId !== 'null');
+
+      if (!customerId) {
+        console.error('❌ Customer ID is missing! Cannot create appointment.');
+        throw new Error('Failed to create or find customer');
       }
 
       // Create appointment
@@ -561,9 +673,124 @@ export default function PublicBooking() {
       const startTime = setMinutes(setHours(selectedDate, hours), minutes);
       const endTime = addMinutes(startTime, selectedService.duration);
 
-      const { data: appointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .insert({
+      console.log('📅 Appointment timing:', {
+        selectedDate: selectedDate.toISOString(),
+        selectedTime,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        duration: selectedService.duration,
+      });
+
+      // Calculate final price with coupon discount
+      const servicePrice = Number(selectedService.price) || 0;
+      let finalPrice = servicePrice;
+      
+      if (appliedCoupon) {
+        if (appliedCoupon.discountType === 'percentage') {
+          finalPrice = servicePrice - (servicePrice * appliedCoupon.discount / 100);
+        } else {
+          finalPrice = Math.max(0, servicePrice - appliedCoupon.discount);
+        }
+      }
+      
+      // Check payment requirements based on payment timing
+      const hasStripe = business.stripe_connected;
+      const paymentTiming = business.payment_timing || 'advance';
+      const requiresPayment = business.require_payment && hasStripe && finalPrice > 0;
+      
+      console.log('=== BOOKING DEBUG ===');
+      console.log('Payment check:', {
+        require_payment: business.require_payment,
+        stripe_connected: hasStripe,
+        servicePrice,
+        paymentTiming,
+        requiresPayment,
+      });
+      
+      // Determine payment status based on timing
+      let paymentStatus: 'pending' | 'paid' | 'partial' = 'paid';
+      let requiresAdvancePayment = false;
+      let advanceAmount = 0;
+
+      if (requiresPayment) {
+        if (paymentTiming === 'advance') {
+          paymentStatus = 'pending';
+          requiresAdvancePayment = true;
+          advanceAmount = finalPrice;
+        } else if (paymentTiming === 'on_spot') {
+          paymentStatus = 'pending'; // Will be paid on-the-spot
+          requiresAdvancePayment = false;
+        } else if (paymentTiming === 'partial') {
+          const partialPercentage = business.partial_payment_percentage || 50;
+          advanceAmount = (finalPrice * partialPercentage) / 100;
+          paymentStatus = 'partial';
+          requiresAdvancePayment = true;
+        }
+      }
+      
+      console.log('Payment decision:', {
+        paymentStatus,
+        requiresAdvancePayment,
+        advanceAmount,
+        willShowPayment: requiresAdvancePayment,
+      });
+
+      // If recurring, create a series instead of a single appointment
+      if (isRecurring) {
+        console.log('📅 Creating recurring appointment series...');
+        try {
+          // Create recurring series directly
+          const { data: newSeries, error: seriesError } = await supabase
+            .from('recurring_appointment_series')
+            .insert({
+              business_id: business.id,
+              customer_id: customerId,
+              service_id: selectedService.id,
+              staff_id: selectedStaff?.id || null,
+              location_id: selectedLocation?.id || null,
+              recurrence_pattern: recurrencePattern,
+              recurrence_frequency: recurrenceFrequency,
+              start_date: format(selectedDate, 'yyyy-MM-dd'),
+              end_date: recurrenceEndType === 'date' && recurrenceEndDate ? format(recurrenceEndDate, 'yyyy-MM-dd') : null,
+              max_occurrences: recurrenceEndType === 'occurrences' ? recurrenceMaxOccurrences : null,
+              time_of_day: selectedTime,
+              notes: customerNotes || null,
+              price: finalPrice,
+              status: 'active',
+            })
+            .select()
+            .single();
+
+          if (seriesError) throw seriesError;
+
+          // Generate initial appointments
+          const generateUntilDate = recurrenceEndType === 'date' && recurrenceEndDate
+            ? format(recurrenceEndDate, 'yyyy-MM-dd')
+            : format(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'); // 3 months ahead
+
+          const { error: generateError } = await supabase.rpc('generate_recurring_appointments', {
+            series_id: newSeries.id,
+            generate_until_date: generateUntilDate,
+          });
+
+          if (generateError) {
+            console.error('Error generating initial appointments:', generateError);
+            toast.warning('Series created but some appointments could not be generated. Please check availability.');
+          }
+          
+          toast.success('Recurring appointment series created successfully!');
+          setBookingComplete(true);
+          setSubmitting(false);
+          return;
+        } catch (seriesError: any) {
+          console.error('❌ Recurring series creation error:', seriesError);
+          toast.error(seriesError.message || 'Failed to create recurring series');
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      const appointmentData = {
           business_id: business.id,
           customer_id: customerId,
           service_id: selectedService.id,
@@ -571,21 +798,127 @@ export default function PublicBooking() {
           location_id: selectedLocation?.id || null,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          price: Number(selectedService.price) || 0,
+          price: finalPrice,
           status: 'pending',
+          payment_status: paymentStatus,
           notes: customerNotes || null,
-        })
+      };
+      
+      console.log('📝 Attempting to create appointment with data:', appointmentData);
+      console.log('Customer ID:', customerId);
+      console.log('Customer ID type:', typeof customerId);
+      console.log('Customer ID value:', customerId);
+
+      const { data: appointment, error: appointmentError } = await supabase
+        .from('appointments')
+        .insert(appointmentData)
         .select('id')
         .single();
 
       if (appointmentError) {
-        console.error('Appointment creation error:', appointmentError);
+        console.error('❌ Appointment creation error:', appointmentError);
+        console.error('Error code:', appointmentError.code);
+        console.error('Error message:', appointmentError.message);
+        console.error('Error details:', appointmentError.details);
+        console.error('Error hint:', appointmentError.hint);
+        console.error('Full error object:', JSON.stringify(appointmentError, null, 2));
         throw appointmentError;
       }
 
-      // Send confirmation email
+      console.log('✅ Appointment created successfully:', appointment.id);
+
+      if (requiresAdvancePayment) {
+        console.log('💰 Payment required - showing payment screen');
+        // Store appointment and customer IDs for payment
+        setCreatedAppointmentId(appointment.id);
+        setCreatedCustomerId(customerId);
+        setShowPayment(true);
+        return; // Don't complete booking yet, wait for payment
+      }
+
+      console.log('📧 No payment required - proceeding to send email');
+
+      // Check if this is customer's first booking and send welcome email
       try {
-        await supabase.functions.invoke('send-booking-confirmation', {
+        const { data: previousAppointments } = await supabase
+          .from('appointments')
+          .select('id')
+          .eq('customer_id', customerId)
+          .eq('business_id', business.id)
+          .neq('id', appointment.id)
+          .limit(1);
+
+        const isFirstBooking = !previousAppointments || previousAppointments.length === 0;
+
+        if (isFirstBooking) {
+          // Check if welcome email is enabled
+          const { data: emailSettings } = await supabase
+            .from('reminder_settings')
+            .select('send_welcome_email')
+            .eq('business_id', business.id)
+            .maybeSingle();
+
+          if (emailSettings?.send_welcome_email === true) {
+            try {
+              await supabase.functions.invoke('send-welcome-email', {
+                body: {
+                  customerEmail,
+                  customerName,
+                  businessName: business.name,
+                  businessPhone: business.phone,
+                  businessAddress: business.address ? `${business.address}${business.city ? `, ${business.city}` : ''}` : null,
+                  bookingUrl: `${window.location.origin}/book/${business.slug}`,
+                },
+              });
+              console.log('✅ Welcome email sent to new customer');
+            } catch (welcomeEmailError) {
+              console.error('Failed to send welcome email:', welcomeEmailError);
+              // Don't fail the booking if welcome email fails
+            }
+          }
+        }
+      } catch (welcomeCheckError) {
+        console.error('Failed to check for welcome email:', welcomeCheckError);
+        // Don't fail the booking if welcome check fails
+      }
+
+      // Create appointment reminders
+      try {
+        await createReminders.mutateAsync(appointment.id);
+      } catch (reminderError) {
+        console.error('Failed to create reminders:', reminderError);
+        // Don't fail the booking if reminders fail
+      }
+
+      // Send confirmation email (if enabled)
+      try {
+        // Check if booking confirmation emails are enabled
+        const { data: emailSettings } = await supabase
+          .from('reminder_settings')
+          .select('send_booking_confirmation')
+          .eq('business_id', business.id)
+          .maybeSingle();
+
+        const shouldSendEmail = emailSettings?.send_booking_confirmation !== false; // Default to true if not set
+
+        if (!shouldSendEmail) {
+          console.log('📧 Booking confirmation email is disabled in settings');
+          // Don't send email, but continue with booking
+        } else {
+          console.log('=== EMAIL DEBUG START ===');
+          console.log('Attempting to send confirmation email to:', customerEmail);
+          console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+          console.log('Function payload:', {
+            appointmentId: appointment.id,
+            customerEmail,
+            customerName,
+            serviceName: selectedService.name,
+            businessName: business.name,
+            startTime: startTime.toISOString(),
+            staffName: selectedStaff?.name,
+          });
+          
+          const emailResult = await supabase.functions.invoke('send-booking-confirmation', {
           body: {
             appointmentId: appointment.id,
             customerEmail,
@@ -596,9 +929,65 @@ export default function PublicBooking() {
             staffName: selectedStaff?.name,
           },
         });
-      } catch (emailError) {
-        console.error('Failed to send confirmation email:', emailError);
+          
+          console.log('=== EMAIL FUNCTION RESULT ===');
+          console.log('Full result:', emailResult);
+          console.log('Data:', emailResult.data);
+          console.log('Error:', emailResult.error);
+          console.log('Error details:', emailResult.error ? {
+            message: emailResult.error.message,
+            status: emailResult.error.status,
+            context: emailResult.error.context,
+            fullError: emailResult.error,
+          } : 'No error');
+          
+          if (emailResult.error) {
+            console.error('❌ Email function error:', emailResult.error);
+            toast.error(`Email failed: ${emailResult.error.message || 'Unknown error'}`);
+          } else {
+            console.log('✅ Email function success:', emailResult.data);
+            if (emailResult.data?.success) {
+              console.log('✅ Email sent successfully!');
+            } else {
+              console.warn('⚠️ Function returned but success is false:', emailResult.data);
+            }
+          }
+          console.log('=== EMAIL DEBUG END ===');
+        }
+      } catch (emailError: any) {
+        console.error('=== EMAIL EXCEPTION ===');
+        console.error('Exception type:', emailError?.constructor?.name);
+        console.error('Exception message:', emailError?.message);
+        console.error('Exception stack:', emailError?.stack);
+        console.error('Full exception:', emailError);
+        toast.error(`Email exception: ${emailError?.message || 'Unknown error'}`);
         // Don't fail the booking if email fails
+      }
+
+      // Create notification for business owners/admins about new booking
+      try {
+        const appointmentDate = new Date(startTime);
+        const formattedDate = appointmentDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        });
+        const formattedTime = appointmentDate.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+
+        await notifyBusinessUsers(business.id, {
+          title: 'New Appointment Booked',
+          message: `${customerName} booked ${selectedService.name} on ${formattedDate} at ${formattedTime}`,
+          type: 'appointment',
+          link: '/calendar',
+        });
+      } catch (notifError) {
+        console.error('Failed to create notification:', notifError);
+        // Don't fail the booking if notification fails
       }
 
       setBookingComplete(true);
@@ -637,6 +1026,158 @@ export default function PublicBooking() {
             </Button>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  // Handle payment success
+  const handlePaymentSuccess = async (paymentId: string) => {
+    if (!createdAppointmentId) return;
+
+    try {
+      // Create appointment reminders
+      try {
+        await createReminders.mutateAsync(createdAppointmentId);
+      } catch (reminderError) {
+        console.error('Failed to create reminders:', reminderError);
+      }
+
+      // Send confirmation email
+      try {
+        console.log('=== EMAIL DEBUG START (PAYMENT SUCCESS) ===');
+        console.log('Attempting to send confirmation email to:', customerEmail);
+        console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+        console.log('Function payload:', {
+          appointmentId: createdAppointmentId,
+          customerEmail,
+          customerName,
+          serviceName: selectedService?.name || '',
+          businessName: business?.name || '',
+          startTime: selectedDate && selectedTime 
+            ? setMinutes(setHours(selectedDate, parseInt(selectedTime.split(':')[0])), parseInt(selectedTime.split(':')[1])).toISOString()
+            : new Date().toISOString(),
+          staffName: selectedStaff?.name,
+        });
+        
+        const emailResult = await supabase.functions.invoke('send-booking-confirmation', {
+          body: {
+            appointmentId: createdAppointmentId,
+            customerEmail,
+            customerName,
+            serviceName: selectedService?.name || '',
+            businessName: business?.name || '',
+            startTime: selectedDate && selectedTime 
+              ? setMinutes(setHours(selectedDate, parseInt(selectedTime.split(':')[0])), parseInt(selectedTime.split(':')[1])).toISOString()
+              : new Date().toISOString(),
+            staffName: selectedStaff?.name,
+          },
+        });
+        
+        console.log('=== EMAIL FUNCTION RESULT (PAYMENT SUCCESS) ===');
+        console.log('Full result:', emailResult);
+        console.log('Data:', emailResult.data);
+        console.log('Error:', emailResult.error);
+        
+        if (emailResult.error) {
+          console.error('❌ Email function error:', emailResult.error);
+          toast.error(`Email failed: ${emailResult.error.message || 'Unknown error'}`);
+        } else {
+          console.log('✅ Email function success:', emailResult.data);
+          if (emailResult.data?.success) {
+            console.log('✅ Email sent successfully!');
+          }
+        }
+        console.log('=== EMAIL DEBUG END (PAYMENT SUCCESS) ===');
+      } catch (emailError: any) {
+        console.error('=== EMAIL EXCEPTION (PAYMENT SUCCESS) ===');
+        console.error('Exception:', emailError);
+        toast.error(`Email exception: ${emailError?.message || 'Unknown error'}`);
+      }
+
+      setShowPayment(false);
+      setBookingComplete(true);
+      toast.success('Payment successful! Appointment booked.');
+    } catch (error) {
+      console.error('Error completing booking:', error);
+      toast.error('Payment successful but failed to complete booking. Please contact support.');
+    }
+  };
+
+  const handlePaymentCancel = () => {
+    // Cancel appointment if payment is cancelled
+    if (createdAppointmentId) {
+      supabase
+        .from('appointments')
+        .delete()
+        .eq('id', createdAppointmentId)
+        .then(() => {
+          setShowPayment(false);
+          setCreatedAppointmentId(null);
+          setCreatedCustomerId(null);
+          toast.info('Booking cancelled. You can try again.');
+        });
+    }
+  };
+
+  if (showPayment && createdAppointmentId && business && selectedService) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl space-y-6">
+          <div className="text-center">
+            <h1 className="text-2xl sm:text-3xl font-display font-bold mb-2">
+              Complete Your Booking
+            </h1>
+            <p className="text-muted-foreground">
+              Please complete payment to confirm your appointment
+            </p>
+          </div>
+          
+          <PaymentForm
+            businessId={business.id}
+            appointmentId={createdAppointmentId}
+            amount={(() => {
+              const basePrice = Number(selectedService.price);
+              let finalPrice = basePrice;
+              if (appliedCoupon) {
+                if (appliedCoupon.discountType === 'percentage') {
+                  finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
+                } else {
+                  finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
+                }
+              }
+              return finalPrice;
+            })()}
+            currency={business.currency || 'USD'}
+            customerEmail={customerEmail}
+            customerName={customerName}
+            onSuccess={handlePaymentSuccess}
+            onCancel={handlePaymentCancel}
+          />
+
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-lg">Booking Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Service</span>
+                <span className="font-medium">{selectedService.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Date</span>
+                <span className="font-medium">
+                  {selectedDate && format(selectedDate, 'MMM d, yyyy')}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Time</span>
+                <span className="font-medium">
+                  {selectedTime && format(new Date(`2000-01-01T${selectedTime}`), 'h:mm a')}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -1163,12 +1704,12 @@ export default function PublicBooking() {
                       <div className="space-y-2">
                         <Label htmlFor="signup-password">Password</Label>
                         <div className="relative">
-                          <Input
-                            id="signup-password"
+                        <Input
+                          id="signup-password"
                             type={showSignupPassword ? "text" : "password"}
-                            placeholder="••••••••"
-                            value={signupPassword}
-                            onChange={(e) => setSignupPassword(e.target.value)}
+                          placeholder="••••••••"
+                          value={signupPassword}
+                          onChange={(e) => setSignupPassword(e.target.value)}
                             className="pr-10"
                           />
                           <Button
@@ -1292,12 +1833,233 @@ export default function PublicBooking() {
                         {selectedTime && format(new Date(`2000-01-01T${selectedTime}`), 'h:mm a')}
                       </span>
                     </div>
+                    {appliedCoupon && (
+                      <div className="flex justify-between py-2 border-b border-border">
+                        <span className="text-muted-foreground">Discount ({appliedCoupon.code})</span>
+                        <span className="font-medium text-green-600">
+                          -{appliedCoupon.discountType === 'percentage' 
+                            ? `${appliedCoupon.discount}%` 
+                            : formatCurrencySimple(appliedCoupon.discount, business?.currency || 'USD')}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between py-2 text-lg">
                       <span className="font-semibold">Total</span>
                       <span className="font-bold text-primary">
-                        {selectedService ? formatCurrencySimple(Number(selectedService.price), business?.currency || 'USD') : '$0.00'}
+                        {selectedService ? (() => {
+                          const basePrice = Number(selectedService.price);
+                          let finalPrice = basePrice;
+                          if (appliedCoupon) {
+                            if (appliedCoupon.discountType === 'percentage') {
+                              finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
+                            } else {
+                              finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
+                            }
+                          }
+                          return formatCurrencySimple(finalPrice, business?.currency || 'USD');
+                        })() : '$0.00'}
                       </span>
                     </div>
+                  </div>
+                  
+                  {/* Coupon Code Input */}
+                  <div className="space-y-2 pt-4 border-t border-border">
+                    {appliedCoupon ? (
+                      <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                            Coupon {appliedCoupon.code} applied
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setAppliedCoupon(null);
+                            setCouponCode('');
+                            setCouponError('');
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label htmlFor="coupon-code">Have a coupon code?</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="coupon-code"
+                            placeholder="Enter coupon code"
+                            value={couponCode}
+                            onChange={(e) => {
+                              setCouponCode(e.target.value.toUpperCase());
+                              setCouponError('');
+                            }}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={async () => {
+                              if (!couponCode.trim() || !selectedService || !business) return;
+                              
+                              setIsApplyingCoupon(true);
+                              setCouponError('');
+                              
+                              try {
+                                const { data, error } = await supabase.rpc('validate_coupon', {
+                                  _coupon_code: couponCode.trim(),
+                                  _business_id: business.id,
+                                  _purchase_amount: Number(selectedService.price),
+                                  _service_id: selectedService.id,
+                                  _package_template_id: null,
+                                });
+                                
+                                if (error) throw error;
+                                
+                                if (data && data.length > 0 && data[0].is_valid) {
+                                  const result = data[0];
+                                  setAppliedCoupon({
+                                    code: couponCode.trim(),
+                                    discount: Number(result.discount_amount),
+                                    discountType: result.coupon_data?.discount_type === 'percentage' ? 'percentage' : 'fixed',
+                                  });
+                                  toast.success('Coupon applied successfully!');
+                                } else {
+                                  setCouponError(data?.[0]?.message || 'Invalid coupon code');
+                                }
+                              } catch (error: any) {
+                                setCouponError(error.message || 'Failed to apply coupon');
+                                toast.error(error.message || 'Failed to apply coupon');
+                              } finally {
+                                setIsApplyingCoupon(false);
+                              }
+                            }}
+                            disabled={isApplyingCoupon || !couponCode.trim()}
+                          >
+                            {isApplyingCoupon ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              'Apply'
+                            )}
+                          </Button>
+                        </div>
+                        {couponError && (
+                          <p className="text-sm text-red-600 dark:text-red-400">{couponError}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                    
+                  {/* Recurring Appointment Options */}
+                  <div className="space-y-4 pt-4 border-t border-border">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Repeat className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Make this recurring</span>
+                        </div>
+                        <Switch
+                          checked={isRecurring}
+                          onCheckedChange={setIsRecurring}
+                        />
+                      </div>
+                      
+                      {isRecurring && (
+                        <Collapsible open={isRecurring} className="space-y-4">
+                          <CollapsibleContent className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-sm">Pattern</Label>
+                                <Select
+                                  value={recurrencePattern}
+                                  onValueChange={(value: 'weekly' | 'monthly') => setRecurrencePattern(value)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="weekly">Weekly</SelectItem>
+                                    <SelectItem value="monthly">Monthly</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-sm">
+                                  Every {recurrencePattern === 'weekly' ? 'Week(s)' : 'Month(s)'}
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={recurrenceFrequency}
+                                  onChange={(e) => setRecurrenceFrequency(parseInt(e.target.value) || 1)}
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label className="text-sm">End Date</Label>
+                              <Select
+                                value={recurrenceEndType}
+                                onValueChange={(value: 'never' | 'date' | 'occurrences') => setRecurrenceEndType(value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="never">Never</SelectItem>
+                                  <SelectItem value="date">On Date</SelectItem>
+                                  <SelectItem value="occurrences">After Occurrences</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            {recurrenceEndType === 'date' && (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      'w-full justify-start text-left font-normal',
+                                      !recurrenceEndDate && 'text-muted-foreground'
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {recurrenceEndDate ? (
+                                      format(recurrenceEndDate, 'PPP')
+                                    ) : (
+                                      <span>Pick an end date</span>
+                                    )}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <CalendarComponent
+                                    mode="single"
+                                    selected={recurrenceEndDate || undefined}
+                                    onSelect={(date) => setRecurrenceEndDate(date || null)}
+                                    disabled={(date) => date < (selectedDate || new Date())}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            )}
+                            
+                            {recurrenceEndType === 'occurrences' && (
+                              <div className="space-y-2">
+                                <Label className="text-sm">Number of Occurrences</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={recurrenceMaxOccurrences || ''}
+                                  onChange={(e) => setRecurrenceMaxOccurrences(parseInt(e.target.value) || null)}
+                                  placeholder="e.g., 10"
+                                />
+                              </div>
+                            )}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      )}
                   </div>
                 </CardContent>
               </Card>

@@ -9,6 +9,7 @@ import {
   Shield,
   Package,
   Tag,
+  BarChart3,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -24,6 +25,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import { useBusinessSubscription } from "@/hooks/useBusinessSubscription";
+import { Badge } from "@/components/ui/badge";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -34,6 +37,7 @@ const navItems = [
   { title: "Customers", url: "/customers", icon: Users },
   { title: "Staff", url: "/staff", icon: UserCircle },
   { title: "Team", url: "/team", icon: Shield },
+  { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
@@ -42,6 +46,11 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
+  const { subscription, isLoading: subscriptionLoading } = useBusinessSubscription();
+  
+  // Only show upgrade button if on free plan (price = 0)
+  // Default to showing upgrade button if subscription data isn't loaded yet or plan is null
+  const isFreePlan = !subscription?.plan || (subscription.plan?.price ?? 0) === 0;
 
   return (
     <Sidebar
@@ -66,7 +75,7 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-2">
+      <SidebarContent className="px-2 flex-1 min-h-0">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -100,18 +109,33 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="p-4 shrink-0 border-t border-sidebar-border">
         {!collapsed && (
           <div className="glass-card p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-2">
-              Upgrade to Pro for more features
-            </p>
-            <button 
-              onClick={() => navigate("/settings?tab=payments")}
-              className="w-full py-2 px-4 rounded-lg text-sm font-medium animated-gradient text-primary-foreground transition-all hover:opacity-90"
-            >
-              Upgrade Now
-            </button>
+            {subscriptionLoading ? (
+              <div className="text-xs text-muted-foreground">Loading...</div>
+            ) : isFreePlan ? (
+              <>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Upgrade to Pro for more features
+                </p>
+                <button 
+                  onClick={() => navigate("/settings?tab=payments")}
+                  className="w-full py-2 px-4 rounded-lg text-sm font-medium animated-gradient text-primary-foreground transition-all hover:opacity-90"
+                >
+                  Upgrade Now
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Current Plan
+                </p>
+                <Badge variant="outline" className="w-full justify-center py-2 text-sm font-medium">
+                  {subscription.plan?.name || 'Pro'}
+                </Badge>
+              </>
+            )}
           </div>
         )}
       </SidebarFooter>

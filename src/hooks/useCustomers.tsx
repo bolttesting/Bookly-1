@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from './useBusiness';
 import { toast } from 'sonner';
+import { notifyBusinessUsers } from '@/lib/notifications';
 
 export interface Customer {
   id: string;
@@ -65,10 +66,20 @@ export function useCustomers() {
         .single();
 
       if (error) throw error;
+
+      // Create notification for business owners/admins about new customer
+      await notifyBusinessUsers(business.id, {
+        title: 'New Customer Added',
+        message: `New customer ${customerData.name} has been added to your business`,
+        type: 'user',
+        link: '/customers',
+      });
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers', business?.id] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Customer added successfully');
     },
     onError: (error) => {

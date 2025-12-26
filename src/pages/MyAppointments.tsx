@@ -32,15 +32,23 @@ import {
   Settings,
   Eye,
   EyeOff,
-  Camera
+  Camera,
+  CalendarClock,
+  Repeat,
+  CalendarIcon
 } from 'lucide-react';
-import { format, isPast, isFuture, isToday, addMinutes, setHours, setMinutes, startOfDay, isBefore, isAfter, addDays } from 'date-fns';
+import { format, isPast, isFuture, isToday, addMinutes, setHours, setMinutes, startOfDay, isBefore, isAfter, addDays, differenceInHours } from 'date-fns';
+import { Switch } from '@/components/ui/switch';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/useCurrency';
 import { formatCurrencySimple } from '@/lib/currency';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { RescheduleRequestDialog } from '@/components/appointments/RescheduleRequestDialog';
 
 interface Business {
   id: string;
@@ -95,6 +103,14 @@ export default function MyAppointments() {
   const { profile, loading: profileLoading, uploadAvatar, updateProfile, isUploading } = useProfile();
   const [activeTab, setActiveTab] = useState('appointments');
   const [searchQuery, setSearchQuery] = useState('');
+  const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
+  const [selectedAppointmentForReschedule, setSelectedAppointmentForReschedule] = useState<{
+    id: string;
+    start_time: string;
+    end_time: string;
+    service?: { name: string; duration: number } | null;
+    businessDeadlineHours?: number | null;
+  } | null>(null);
   
   // Profile editing state
   const [firstName, setFirstName] = useState('');
@@ -131,6 +147,12 @@ export default function MyAppointments() {
   const [isBooking, setIsBooking] = useState(false);
   const [businessSearchQuery, setBusinessSearchQuery] = useState('');
   const [showBusinessSelector, setShowBusinessSelector] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrencePattern, setRecurrencePattern] = useState<'weekly' | 'monthly'>('weekly');
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState(1);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | null>(null);
+  const [recurrenceMaxOccurrences, setRecurrenceMaxOccurrences] = useState<number | null>(null);
+  const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'date' | 'occurrences'>('never');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -279,7 +301,7 @@ export default function MyAppointments() {
         staffIds.length > 0 
           ? supabase.from('staff_members').select('id, name').in('id', staffIds)
           : Promise.resolve({ data: [] }),
-        supabase.from('businesses').select('id, name, address, city').in('id', businessIds),
+        supabase.from('businesses').select('id, name, address, city, reschedule_deadline_hours').in('id', businessIds),
       ]);
 
       const services = servicesRes.data || [];
@@ -603,7 +625,50 @@ export default function MyAppointments() {
         customer = newCustomer;
       }
 
-      // Create appointment
+      // If recurring, create a series instead of a single appointment
+      if (isRecurring) {
+        // Create recurring series
+        const { data: newSeries, error: seriesError } = await supabase
+          .from('recurring_appointment_series')
+          .insert({
+            business_id: selectedBusiness.id,
+            customer_id: customer.id,
+            service_id: selectedService.id,
+            staff_id: selectedStaff?.id || null,
+            recurrence_pattern: recurrencePattern,
+            recurrence_frequency: recurrenceFrequency,
+            start_date: format(selectedDate, 'yyyy-MM-dd'),
+            end_date: recurrenceEndType === 'date' && recurrenceEndDate ? format(recurrenceEndDate, 'yyyy-MM-dd') : null,
+            max_occurrences: recurrenceEndType === 'occurrences' ? recurrenceMaxOccurrences : null,
+            time_of_day: selectedTime,
+            notes: bookingNotes || null,
+            price: Number(selectedService.price),
+            status: 'active',
+          })
+          .select()
+          .single();
+
+        if (seriesError) throw seriesError;
+
+        // Generate initial appointments
+        const generateUntilDate = recurrenceEndType === 'date' && recurrenceEndDate
+          ? format(recurrenceEndDate, 'yyyy-MM-dd')
+          : format(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'); // 3 months ahead
+
+        const { error: generateError } = await supabase.rpc('generate_recurring_appointments', {
+          series_id: newSeries.id,
+          generate_until_date: generateUntilDate,
+        });
+
+        if (generateError) {
+          console.error('Error generating initial appointments:', generateError);
+          // Don't fail, just warn
+        }
+
+        return { id: newSeries.id, isRecurring: true };
+      }
+
+      // Create single appointment
       const [hours, minutes] = selectedTime.split(':').map(Number);
       const startTime = setMinutes(setHours(selectedDate, hours), minutes);
       const endTime = addMinutes(startTime, selectedService.duration);
@@ -627,15 +692,25 @@ export default function MyAppointments() {
       if (error) throw error;
       return appointment;
     },
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ['my-appointments'] });
       queryClient.invalidateQueries({ queryKey: ['appointments-availability'] });
-      toast.success('Appointment booked successfully!');
+      if (result?.isRecurring) {
+        toast.success('Recurring appointment series created successfully!');
+      } else {
+        toast.success('Appointment booked successfully!');
+      }
       setSelectedService(null);
       setSelectedStaff(null);
       setSelectedDate(undefined);
       setSelectedTime(null);
       setBookingNotes('');
+      setIsRecurring(false);
+      setRecurrencePattern('weekly');
+      setRecurrenceFrequency(1);
+      setRecurrenceEndDate(null);
+      setRecurrenceMaxOccurrences(null);
+      setRecurrenceEndType('never');
       setIsBooking(false);
       setActiveTab('appointments');
     },
@@ -804,10 +879,10 @@ export default function MyAppointments() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Button variant="ghost" onClick={handleSignOut} className="gap-2">
-              <LogOut className="h-4 w-4" />
-              Sign Out
-            </Button>
+          <Button variant="ghost" onClick={handleSignOut} className="gap-2">
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </Button>
           </div>
         </div>
       </header>
@@ -863,42 +938,81 @@ export default function MyAppointments() {
                   {upcomingAppointments.map((apt) => (
                     <Card key={apt.id} className="glass-card hover:shadow-md transition-shadow">
                       <CardContent className="p-4 sm:p-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-                          <div className="space-y-2 min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold text-base sm:text-lg truncate">{apt.service?.name || 'Service'}</h3>
+                        <div className="flex flex-col gap-3 sm:gap-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                            <div className="space-y-2 min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-semibold text-base sm:text-lg truncate">{apt.service?.name || 'Service'}</h3>
                               <Badge className={getStatusColor(apt.status)}>
                                 {apt.status}
                               </Badge>
                             </div>
-                            <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                              <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                               <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                                <span className="truncate">{format(new Date(apt.start_time), 'EEEE, MMMM d, yyyy')}</span>
+                                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                  <span className="truncate">{format(new Date(apt.start_time), 'EEEE, MMMM d, yyyy')}</span>
                               </span>
                               <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                                 {format(new Date(apt.start_time), 'h:mm a')}
                               </span>
-                                  {(apt as any).totalPeopleInSlot > 1 && (
-                                    <span className="flex items-center gap-1 text-primary">
-                                      <Users className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                                      {((apt as any).totalPeopleInSlot - 1)} {((apt as any).totalPeopleInSlot - 1) === 1 ? 'person' : 'people'} joining
-                                    </span>
-                                  )}
-                            </div>
+                                    {(apt as any).totalPeopleInSlot > 1 && (
+                                      <span className="flex items-center gap-1 text-primary">
+                                        <Users className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                        {((apt as any).totalPeopleInSlot - 1)} {((apt as any).totalPeopleInSlot - 1) === 1 ? 'person' : 'people'} joining
+                                      </span>
+                                    )}
+                              </div>
                             {apt.business && (
-                              <p className="text-xs sm:text-sm flex items-center gap-1 text-muted-foreground truncate">
-                                <MapPin className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                <p className="text-xs sm:text-sm flex items-center gap-1 text-muted-foreground truncate">
+                                  <MapPin className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                                 {apt.business.name}
                               </p>
                             )}
                           </div>
                           {apt.price && (
-                            <div className="text-left sm:text-right shrink-0">
-                                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-primary">{formatCurrency(Number(apt.price))}</p>
+                              <div className="text-left sm:text-right shrink-0">
+                                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-primary">{formatCurrency(Number(apt.price))}</p>
                             </div>
                           )}
+                          </div>
+                          <div className="flex gap-2">
+                            {(() => {
+                              const deadlineHours = apt.business?.reschedule_deadline_hours ?? 24;
+                              const now = new Date();
+                              const hoursUntilAppointment = differenceInHours(new Date(apt.start_time), now);
+                              const isDeadlinePassed = deadlineHours > 0 && hoursUntilAppointment < deadlineHours;
+                              
+                              return (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex-1 sm:flex-initial"
+                                  disabled={isDeadlinePassed}
+                                  onClick={() => {
+                                    if (isDeadlinePassed) {
+                                      toast.error(
+                                        `Reschedule requests must be made at least ${deadlineHours} hours before the appointment. The deadline has passed.`
+                                      );
+                                      return;
+                                    }
+                                    setSelectedAppointmentForReschedule({
+                                      id: apt.id,
+                                      start_time: apt.start_time,
+                                      end_time: apt.end_time,
+                                      service: apt.service ? { name: apt.service.name, duration: apt.service.duration } : null,
+                                      businessDeadlineHours: apt.business?.reschedule_deadline_hours,
+                                    });
+                                    setRescheduleDialogOpen(true);
+                                  }}
+                                  title={isDeadlinePassed ? `Reschedule deadline has passed. Must request at least ${deadlineHours} hours before appointment.` : undefined}
+                                >
+                                  <CalendarClock className="h-4 w-4 mr-2" />
+                                  Request Reschedule
+                                </Button>
+                              );
+                            })()}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -967,9 +1081,9 @@ export default function MyAppointments() {
                               className="cursor-pointer hover:border-primary/50 transition-all"
                               onClick={() => linkToBusiness.mutate(business.id)}
                             >
-                              <CardContent className="p-4">
-                                <div className="flex items-center justify-between">
-                                  <div>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
                                     <p className="font-semibold">{business.name}</p>
                                     <p className="text-sm text-muted-foreground">/{business.slug}</p>
                                   </div>
@@ -999,7 +1113,7 @@ export default function MyAppointments() {
                       >
                         Cancel
                       </Button>
-                    </div>
+                          </div>
                   )}
                 </CardContent>
               </Card>
@@ -1055,12 +1169,12 @@ export default function MyAppointments() {
                                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                   <Clock className="h-4 w-4" />
                                   <span>{service.duration} min</span>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
                         </div>
-                      </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
                     ))}
 
                     {filteredServices.length === 0 && (
@@ -1086,7 +1200,7 @@ export default function MyAppointments() {
                         Back
                       </Button>
                       <h2 className="text-lg sm:text-xl font-semibold truncate">Book {selectedService?.name}</h2>
-                    </div>
+          </div>
 
                     <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
                       <Card className="glass-card">
@@ -1198,6 +1312,120 @@ export default function MyAppointments() {
                       </CardContent>
                     </Card>
 
+                    {/* Recurring Appointment Options */}
+                    <Card className="glass-card">
+                      <CardHeader>
+                        <CardTitle>Recurring Appointment</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Repeat className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">Make this recurring</span>
+                          </div>
+                          <Switch
+                            checked={isRecurring}
+                            onCheckedChange={setIsRecurring}
+                          />
+                        </div>
+                        
+                        {isRecurring && (
+                          <Collapsible open={isRecurring} className="space-y-4">
+                            <CollapsibleContent className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label className="text-sm">Pattern</Label>
+                                  <Select
+                                    value={recurrencePattern}
+                                    onValueChange={(value: 'weekly' | 'monthly') => setRecurrencePattern(value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="weekly">Weekly</SelectItem>
+                                      <SelectItem value="monthly">Monthly</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-sm">
+                                    Every {recurrencePattern === 'weekly' ? 'Week(s)' : 'Month(s)'}
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={recurrenceFrequency}
+                                    onChange={(e) => setRecurrenceFrequency(parseInt(e.target.value) || 1)}
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label className="text-sm">End Date</Label>
+                                <Select
+                                  value={recurrenceEndType}
+                                  onValueChange={(value: 'never' | 'date' | 'occurrences') => setRecurrenceEndType(value)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="never">Never</SelectItem>
+                                    <SelectItem value="date">On Date</SelectItem>
+                                    <SelectItem value="occurrences">After Occurrences</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              {recurrenceEndType === 'date' && (
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className={cn(
+                                        'w-full justify-start text-left font-normal',
+                                        !recurrenceEndDate && 'text-muted-foreground'
+                                      )}
+                                    >
+                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      {recurrenceEndDate ? (
+                                        format(recurrenceEndDate, 'PPP')
+                                      ) : (
+                                        <span>Pick an end date</span>
+                                      )}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <CalendarComponent
+                                      mode="single"
+                                      selected={recurrenceEndDate || undefined}
+                                      onSelect={(date) => setRecurrenceEndDate(date || null)}
+                                      disabled={(date) => date < (selectedDate || new Date())}
+                                      initialFocus
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              )}
+                              
+                              {recurrenceEndType === 'occurrences' && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm">Number of Occurrences</Label>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={recurrenceMaxOccurrences || ''}
+                                    onChange={(e) => setRecurrenceMaxOccurrences(parseInt(e.target.value) || null)}
+                                    placeholder="e.g., 10"
+                                  />
+                                </div>
+                              )}
+                            </CollapsibleContent>
+                          </Collapsible>
+                        )}
+                      </CardContent>
+                    </Card>
+
                     <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
                       <Button variant="outline" onClick={() => setIsBooking(false)}>
                         Cancel
@@ -1209,11 +1437,11 @@ export default function MyAppointments() {
                         {handleBooking.isPending ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Booking...
+                            {isRecurring ? 'Creating Series...' : 'Booking...'}
                           </>
                         ) : (
                           <>
-                            Confirm Booking
+                            {isRecurring ? 'Create Recurring Series' : 'Confirm Booking'}
                             <CheckCircle className="ml-2 h-4 w-4" />
                           </>
                         )}
@@ -1737,6 +1965,15 @@ export default function MyAppointments() {
           </TabsContent>
         </Tabs>
       </main>
+
+        {selectedAppointmentForReschedule && (
+          <RescheduleRequestDialog
+            open={rescheduleDialogOpen}
+            onOpenChange={setRescheduleDialogOpen}
+            appointment={selectedAppointmentForReschedule}
+            rescheduleDeadlineHours={selectedAppointmentForReschedule.businessDeadlineHours}
+          />
+        )}
     </div>
   );
 }

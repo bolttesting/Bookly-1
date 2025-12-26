@@ -14,9 +14,16 @@ interface Business {
   timezone: string | null;
   logo_url: string | null;
   currency: string | null;
+  subscription_plan_id: string | null;
   stripe_account_id: string | null;
   stripe_connected: boolean | null;
   stripe_onboarding_complete: boolean | null;
+  require_payment?: boolean | null;
+  payment_timing?: 'advance' | 'on_spot' | 'partial' | null;
+  payment_due_before_hours?: number | null;
+  allow_partial_payment?: boolean | null;
+  partial_payment_percentage?: number | null;
+  reschedule_deadline_hours?: number | null;
 }
 
 export function useBusiness() {
@@ -145,6 +152,15 @@ export function useBusiness() {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
 
+    // Get the default free plan (Starter)
+    const { data: defaultPlan } = await supabase
+      .from('subscription_plans')
+      .select('id')
+      .eq('name', 'Starter')
+      .eq('price', 0)
+      .eq('is_active', true)
+      .maybeSingle();
+
     // Insert the business
     const { data: newBusiness, error: businessError } = await supabase
       .from('businesses')
@@ -157,6 +173,7 @@ export function useBusiness() {
         address: businessData.address || null,
         city: businessData.city || null,
         currency: businessData.currency || 'USD',
+        subscription_plan_id: defaultPlan?.id || null,
       })
       .select()
       .single();

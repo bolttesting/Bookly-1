@@ -813,22 +813,26 @@ const Landing = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-6">
+      <section className="py-12 sm:py-16 md:py-20 px-4 sm:px-6">
         <div className="container mx-auto max-w-4xl">
-          <div className="glass-card p-12 rounded-2xl text-center relative overflow-hidden hover:scale-[1.02] transition-transform duration-500">
+          <div className="glass-card p-6 sm:p-8 md:p-12 rounded-2xl text-center relative overflow-hidden hover:scale-[1.02] transition-transform duration-500">
             <div className="absolute inset-0 animated-gradient opacity-10" />
             
-            <div className="relative space-y-6">
-              <h2 className="text-4xl font-display font-bold animate-pulse-glow">
+            <div className="relative space-y-4 sm:space-y-6">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold animate-pulse-glow">
                 Ready to transform your booking experience?
               </h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-2">
                 Join thousands of businesses already using Bookly to manage their appointments
               </p>
-              <Button size="lg" className="glow text-lg px-8 py-6 hover:scale-105 transition-transform duration-300" asChild>
-                <Link to="/auth">
+              <Button 
+                size="lg" 
+                className="glow text-sm sm:text-base md:text-lg px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-6 w-full sm:w-auto hover:scale-105 transition-transform duration-300" 
+                asChild
+              >
+                <Link to="/auth" className="flex items-center justify-center gap-2">
                   Start Your Free Trial
-                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>
             </div>

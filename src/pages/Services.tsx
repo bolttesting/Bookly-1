@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Clock, DollarSign, Edit, Trash2, MoreVertical, Loader2 } from "lucide-react";
+import { Plus, Search, Clock, DollarSign, Edit, Trash2, MoreVertical, Loader2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -8,11 +8,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useServices, Service, ServiceFormData } from '@/hooks/useServices';
 import { useCurrency } from '@/hooks/useCurrency';
 import { ServiceDialog } from '@/components/services/ServiceDialog';
 import { DeleteServiceDialog } from '@/components/services/DeleteServiceDialog';
+import { CancelServiceDialog } from '@/components/services/CancelServiceDialog';
 
 const Services = () => {
   const { services, isLoading, createService, updateService, deleteService } = useServices();
@@ -20,6 +22,7 @@ const Services = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -42,6 +45,11 @@ const Services = () => {
   const handleDeleteService = (service: Service) => {
     setSelectedService(service);
     setDeleteDialogOpen(true);
+  };
+
+  const handleCancelService = (service: Service) => {
+    setSelectedService(service);
+    setCancelDialogOpen(true);
   };
 
   const handleSubmit = async (data: ServiceFormData) => {
@@ -169,6 +177,14 @@ const Services = () => {
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem
+                      className="text-orange-600 dark:text-orange-400"
+                      onClick={() => handleCancelService(service)}
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Cancel Service
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
                       className="text-destructive"
                       onClick={() => handleDeleteService(service)}
                     >
@@ -218,6 +234,18 @@ const Services = () => {
         onConfirm={handleConfirmDelete}
         isLoading={isSubmitting}
       />
+
+      {selectedService && (
+        <CancelServiceDialog
+          open={cancelDialogOpen}
+          onOpenChange={setCancelDialogOpen}
+          service={{
+            id: selectedService.id,
+            name: selectedService.name,
+            business_id: selectedService.business_id,
+          }}
+        />
+      )}
     </div>
   );
 };
