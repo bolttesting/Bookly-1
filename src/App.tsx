@@ -29,6 +29,7 @@ import CustomerAuth from "./pages/CustomerAuth";
 import UnifiedAuth from "./pages/UnifiedAuth";
 import MyAppointments from "./pages/MyAppointments";
 import NotFound from "./pages/NotFound";
+import MovingLanding from "./pages/MovingLanding";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ function AppRoutes() {
     <PageTransition key={location.pathname}>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/moving-demo" element={<MovingLanding />} />
         <Route path="/auth" element={<UnifiedAuth />} />
         <Route path="/business-auth" element={<Auth />} />
         <Route path="/customer-login" element={<CustomerAuth />} />

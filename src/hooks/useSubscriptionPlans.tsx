@@ -39,15 +39,28 @@ export function useSubscriptionPlans() {
   const { data: plans = [], isLoading, error } = useQuery({
     queryKey: ['subscription-plans'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('subscription_plans')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
+      // Check if Supabase is configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+        console.warn('Supabase not configured. Returning empty plans array.');
+        return [] as SubscriptionPlan[];
+      }
 
-      if (error) throw error;
-      return (data || []) as SubscriptionPlan[];
+      try {
+        const { data, error } = await (supabase as any)
+          .from('subscription_plans')
+          .select('*')
+          .eq('is_active', true)
+          .order('display_order', { ascending: true });
+
+        if (error) throw error;
+        return (data || []) as SubscriptionPlan[];
+      } catch (err) {
+        console.error('Error fetching subscription plans:', err);
+        return [] as SubscriptionPlan[];
+      }
     },
+    retry: false, // Don't retry if Supabase isn't configured
   });
 
   const createPlan = useMutation({

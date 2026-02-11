@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { config } from 'dotenv';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import readline from 'readline';
@@ -7,7 +7,14 @@ import readline from 'readline';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-config({ path: join(__dirname, '.env') });
+try {
+  const envPath = join(dirname(__dirname), '.env');
+  const env = readFileSync(envPath, 'utf8');
+  for (const line of env.split(/\r?\n/)) {
+    const m = line.match(/^\s*([^#=]+)=(.*)$/);
+    if (m) process.env[m[1].trim()] = m[2].trim().replace(/^["']|["']$/g, '').replace(/\r$/, '');
+  }
+} catch (_) {}
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -121,7 +128,7 @@ async function setupSuperAdmin() {
       console.log('📋 Login Credentials:');
       console.log(`   Email: ${email}`);
       console.log(`   Password: ${password}\n`);
-      console.log('🔗 Login at: http://localhost:8080/super-admin');
+      console.log('🔗 Login at: http://localhost:8081/super-admin');
     }
 
   } catch (err) {

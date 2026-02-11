@@ -31,8 +31,18 @@ import {
   Check,
   Plus,
   Pencil,
-  Trash2
+  Trash2,
+  KeyRound
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { formatCurrencySimple, CURRENCIES } from '@/lib/currency';
 import { SubscriptionPlanDialog } from '@/components/subscriptions/SubscriptionPlanDialog';
@@ -63,6 +73,11 @@ export default function SuperAdmin() {
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any>(null);
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   
   // For SuperAdmin, use USD as default since it shows aggregated data across all businesses
   const formatCurrency = (amount: number) => formatCurrencySimple(amount, 'USD');
@@ -71,6 +86,20 @@ export default function SuperAdmin() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [sendingReset, setSendingReset] = useState(false);
+  const [resetLinkSent, setResetLinkSent] = useState(false);
+  const [isRecovery, setIsRecovery] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const h = window.location.hash;
+    if (!h) return false;
+    const params = new URLSearchParams(h.slice(1));
+    return params.get('type') === 'recovery';
+  });
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [settingResetPassword, setSettingResetPassword] = useState(false);
 
   useEffect(() => {
     if (!checkingAdmin && !isSuperAdmin && user) {
@@ -101,6 +130,76 @@ export default function SuperAdmin() {
       toast.success('Login successful!');
       // The component will re-render and check if user is super admin
     }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setChangingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setChangingPassword(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success('Password updated. Use your new password next time you sign in.');
+    setChangePasswordOpen(false);
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
+  const resetRedirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/super-admin` : '';
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail?.trim()) {
+      toast.error('Enter your email address');
+      return;
+    }
+    setSendingReset(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+      redirectTo: resetRedirectUrl,
+    });
+    setSendingReset(false);
+    if (error) {
+      const msg = error.message.toLowerCase().includes('rate limit')
+        ? 'Too many emails sent. Please wait an hour and try again, or use the "Change password" script if you have access.'
+        : error.message;
+      toast.error(msg);
+      return;
+    }
+    setResetLinkSent(true);
+  };
+
+  const handleSetPasswordFromRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (resetNewPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (resetNewPassword !== resetConfirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setSettingResetPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: resetNewPassword });
+    setSettingResetPassword(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success('Password updated. You can now sign in with your new password.');
+    setIsRecovery(false);
+    setResetNewPassword('');
+    setResetConfirmPassword('');
+    window.history.replaceState(null, '', window.location.pathname);
   };
 
   // Show login form if not authenticated
@@ -174,6 +273,17 @@ export default function SuperAdmin() {
                   'Sign In'
                 )}
               </Button>
+              <div className="text-center">
+                <Button
+                  type="button"
+                  variant="link"
+                  className="text-muted-foreground text-sm"
+                  onClick={() => setForgotPasswordOpen(true)}
+                  disabled={isLoggingIn}
+                >
+                  Forgot password?
+                </Button>
+              </div>
             </form>
             <div className="mt-4">
               <Button variant="outline" className="w-full" asChild>
@@ -185,6 +295,74 @@ export default function SuperAdmin() {
             </div>
           </CardContent>
         </Card>
+
+        <Dialog
+          open={forgotPasswordOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setResetLinkSent(false);
+              setResetEmail('');
+            }
+            setForgotPasswordOpen(open);
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reset password</DialogTitle>
+              <DialogDescription>
+                {resetLinkSent
+                  ? 'If the email doesn’t arrive, add the URL below in Supabase and check spam.'
+                  : 'Enter your Super Admin email. We’ll send you a link to set a new password.'}
+              </DialogDescription>
+            </DialogHeader>
+            {resetLinkSent ? (
+              <div className="space-y-4">
+                <div className="rounded-lg bg-muted p-3 text-sm">
+                  <p className="font-medium mb-1">Add this in Supabase:</p>
+                  <p className="text-muted-foreground mb-2">
+                    Dashboard → Authentication → URL Configuration → Redirect URLs
+                  </p>
+                  <code className="block break-all text-xs bg-background px-2 py-1.5 rounded border">
+                    {resetRedirectUrl}
+                  </code>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Check your spam folder. The link opens this app so you can set a new password.
+                </p>
+                <DialogFooter>
+                  <Button onClick={() => setForgotPasswordOpen(false)}>Done</Button>
+                </DialogFooter>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">Email</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    placeholder="admin@example.com"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    disabled={sendingReset}
+                    autoComplete="email"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  The reset link will open: <span className="font-mono text-foreground">{resetRedirectUrl || '(this page)'}</span>. Add this URL in Supabase redirect list if emails don’t arrive.
+                </p>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setForgotPasswordOpen(false)} disabled={sendingReset}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={sendingReset}>
+                    {sendingReset ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {sendingReset ? ' Sending...' : 'Send reset link'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -221,6 +399,59 @@ export default function SuperAdmin() {
     );
   }
 
+  if (isRecovery) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-6">
+        <Card className="glass-card max-w-md w-full">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="h-16 w-16 rounded-xl bg-primary flex items-center justify-center glow">
+                <KeyRound className="h-8 w-8 text-primary-foreground" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-display">Set new password</CardTitle>
+            <CardDescription>
+              You opened the reset link. Choose a new password for your Super Admin account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSetPasswordFromRecovery} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="recovery-new-password">New password</Label>
+                <Input
+                  id="recovery-new-password"
+                  type="password"
+                  value={resetNewPassword}
+                  onChange={(e) => setResetNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  minLength={6}
+                  disabled={settingResetPassword}
+                />
+                <p className="text-xs text-muted-foreground">At least 6 characters</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="recovery-confirm-password">Confirm password</Label>
+                <Input
+                  id="recovery-confirm-password"
+                  type="password"
+                  value={resetConfirmPassword}
+                  onChange={(e) => setResetConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  minLength={6}
+                  disabled={settingResetPassword}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={settingResetPassword}>
+                {settingResetPassword ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {settingResetPassword ? ' Updating...' : 'Set password'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -242,18 +473,88 @@ export default function SuperAdmin() {
               </p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            onClick={async () => {
-              await signOut();
-              navigate('/auth');
-            }}
-            className="flex items-center gap-2 shrink-0 w-full sm:w-auto"
-          >
-            <LogOut className="h-4 w-4" />
-            Logout
-          </Button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setChangePasswordOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <KeyRound className="h-4 w-4" />
+              Change password
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                await signOut();
+                navigate('/auth');
+              }}
+              className="flex items-center gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </Button>
+          </div>
         </div>
+
+        <Dialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Change password</DialogTitle>
+              <DialogDescription>
+                Enter a new password. You'll use it the next time you sign in to Super Admin.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New password</Label>
+                <div className="relative">
+                  <Input
+                    id="new-password"
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="••••••••"
+                    minLength={6}
+                    disabled={changingPassword}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">At least 6 characters</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  minLength={6}
+                  disabled={changingPassword}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setChangePasswordOpen(false)} disabled={changingPassword}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={changingPassword}>
+                  {changingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {changingPassword ? ' Updating...' : 'Update password'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">

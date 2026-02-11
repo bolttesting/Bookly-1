@@ -56,8 +56,8 @@ serve(async (req) => {
     // Create an account link for onboarding
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: `${Deno.env.get("SITE_URL") || "http://localhost:8080"}/settings?stripe_refresh=true`,
-      return_url: `${Deno.env.get("SITE_URL") || "http://localhost:8080"}/settings?stripe_success=true`,
+      refresh_url: `${Deno.env.get("SITE_URL") || "http://localhost:8081"}/settings?stripe_refresh=true`,
+      return_url: `${Deno.env.get("SITE_URL") || "http://localhost:8081"}/settings?stripe_success=true`,
       type: "account_onboarding",
     });
 

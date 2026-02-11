@@ -9,7 +9,9 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "setup-super-admin": "node setup-super-admin.js"
+    "setup-super-admin": "node _unwanted/setup-super-admin.js",
+    "change-super-admin-password": "node _unwanted/change-super-admin-password.js",
+    "create-super-admin": "node _unwanted/create-super-admin-user.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -70,6 +72,7 @@
     "@types/node": "^22.16.5",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^5.1.3",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.32.0",
