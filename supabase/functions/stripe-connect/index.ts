@@ -1,7 +1,9 @@
 // Supabase Edge Function for Stripe Connect
 // Creates a Stripe Connect account for a business and returns onboarding URL
 // Deploy: supabase functions deploy stripe-connect
-// Set STRIPE_SECRET_KEY and SITE_URL in Supabase Dashboard > Edge Functions > Secrets
+// Set in Supabase Dashboard > Project Settings > Edge Functions > Secrets:
+//   STRIPE_SECRET_KEY - your Stripe secret key
+//   SITE_URL - your app URL (e.g. https://your-app.vercel.app) for Stripe redirects
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
@@ -33,13 +35,13 @@ serve(async (req) => {
   }
 
   try {
-    let body: { business_id?: string; email?: string };
+    let body: { business_id?: string; email?: string; user_id?: string };
     try {
       body = await req.json();
     } catch {
       return jsonResponse({ error: "Invalid JSON body" }, 400);
     }
-    const { business_id, email: bodyEmail } = body || {};
+    const { business_id, email: bodyEmail, user_id: bodyUserId } = body || {};
 
     if (!business_id) {
       return jsonResponse({ error: "business_id is required" }, 400);
@@ -53,6 +55,9 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const siteUrl = Deno.env.get("SITE_URL") || "http://localhost:8081";
+    if (siteUrl.includes("localhost") && Deno.env.get("SITE_URL") === undefined) {
+      console.warn("SITE_URL not set. Add your production URL (e.g. https://your-app.vercel.app) in Supabase Edge Function Secrets.");
+    }
 
     let ownerEmail = (typeof bodyEmail === "string" && bodyEmail.trim()) ? bodyEmail.trim() : null;
 
@@ -74,6 +79,10 @@ serve(async (req) => {
         return jsonResponse({ account_id: biz.stripe_account_id, url: accountLink.url });
       }
       if (!ownerEmail && biz?.email) ownerEmail = biz.email;
+      if (!ownerEmail && bodyUserId) {
+        const { data: { user: authUser } } = await supabase.auth.admin.getUserById(bodyUserId);
+        if (authUser?.email) ownerEmail = authUser.email;
+      }
       if (!ownerEmail) {
         const { data: ownerRole } = await supabase
           .from("user_roles")
@@ -81,21 +90,26 @@ serve(async (req) => {
           .eq("business_id", business_id)
           .eq("role", "owner")
           .limit(1)
-          .single();
+          .maybeSingle();
         if (ownerRole?.user_id) {
           const { data: profile } = await supabase
             .from("profiles")
             .select("email")
             .eq("id", ownerRole.user_id)
-            .single();
+            .maybeSingle();
           if (profile?.email) ownerEmail = profile.email;
+          if (!ownerEmail) {
+            const { data: { user: authUser } } = await supabase.auth.admin.getUserById(ownerRole.user_id);
+            if (authUser?.email) ownerEmail = authUser.email;
+          }
         }
       }
     }
 
-    if (!ownerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!ownerEmail || !emailRegex.test(ownerEmail)) {
       return jsonResponse({
-        error: "Valid email is required. Add your email in Profile settings or pass it when connecting.",
+        error: "Valid email is required. Enter your email in the form above or add it in Profile or Business settings.",
       }, 400);
     }
 

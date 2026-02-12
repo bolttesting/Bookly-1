@@ -39,7 +39,14 @@ const Settings = () => {
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [stripeConnectEmail, setStripeConnectEmail] = useState('');
   const qrRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!stripeConnectEmail && (user?.email || business?.email)) {
+      setStripeConnectEmail(user?.email || business?.email || '');
+    }
+  }, [user?.email, business?.email]);
   
   // Get active tab from URL params, default to 'booking'
   const activeTab = searchParams.get('tab') || 'booking';
@@ -1070,8 +1077,22 @@ const Settings = () => {
               <div className="space-y-4">
                 <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
                   <p className="text-sm text-muted-foreground mb-4">
-                    Connect your Stripe account to start accepting payments. You'll be redirected to Stripe to complete the connection.
+                    Connect your Stripe account to start accepting payments. You'll be redirected to Stripe to complete the connection. Stripe requires a valid email for your account.
                   </p>
+                  <div className="space-y-2 mb-4">
+                    <Label htmlFor="stripe-connect-email">Email for Stripe account</Label>
+                    <Input
+                      id="stripe-connect-email"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={stripeConnectEmail}
+                      onChange={(e) => setStripeConnectEmail(e.target.value)}
+                      className="bg-background"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Used for Stripe onboarding. Add or update if empty.
+                    </p>
+                  </div>
                   <Button
                     onClick={async () => {
                       try {
@@ -1079,10 +1100,15 @@ const Settings = () => {
                           toast.error('Business not found');
                           return;
                         }
+                        const emailToUse = stripeConnectEmail?.trim() || user?.email || business?.email;
+                        if (!emailToUse) {
+                          toast.error('Please enter your email above. Stripe requires a valid email.');
+                          return;
+                        }
 
                         // Call Supabase Edge Function for Stripe Connect
                         const { data, error: functionError } = await supabase.functions.invoke('stripe-connect', {
-                          body: { business_id: business.id, email: user?.email },
+                          body: { business_id: business.id, email: emailToUse, user_id: user?.id },
                         });
 
                         if (functionError) {
