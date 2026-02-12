@@ -16,12 +16,14 @@ import { AppointmentDialog } from '@/components/appointments/AppointmentDialog';
 import { DeleteAppointmentDialog } from '@/components/appointments/DeleteAppointmentDialog';
 import { RescheduleRequestsPanel } from '@/components/appointments/RescheduleRequestsPanel';
 import { RecurringSeriesManager } from '@/components/recurring/RecurringSeriesManager';
+import { BlockSlotDialog } from '@/components/services/BlockSlotDialog';
 
 const Calendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"day" | "week">("week");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [blockSlotDialogOpen, setBlockSlotDialogOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -125,10 +127,15 @@ const Calendar = () => {
             Manage your appointments and schedule
           </p>
         </div>
-        <Button className="animated-gradient text-primary-foreground shrink-0 w-full sm:w-auto" onClick={() => handleAddAppointment()}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Appointment
-        </Button>
+        <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+          <Button variant="outline" size="sm" onClick={() => setBlockSlotDialogOpen(true)}>
+            Block Slot
+          </Button>
+          <Button className="animated-gradient text-primary-foreground" onClick={() => handleAddAppointment()}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Appointment
+          </Button>
+        </div>
       </div>
 
       {/* Reschedule Requests */}
@@ -347,6 +354,11 @@ const Calendar = () => {
         serviceName={selectedAppointment?.service?.name || ''}
         onConfirm={handleConfirmDelete}
         isLoading={isSubmitting}
+      />
+
+      <BlockSlotDialog
+        open={blockSlotDialogOpen}
+        onOpenChange={setBlockSlotDialogOpen}
       />
     </div>
   );

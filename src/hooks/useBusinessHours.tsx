@@ -79,10 +79,27 @@ export function useBusinessHours(businessId?: string, locationId?: string | null
     mutationFn: async (hoursData: BusinessHoursFormData[]) => {
       if (!targetBusinessId) throw new Error('No business found');
 
-      // Upsert all hours with location_id
-      const { error } = await supabase
+      // Delete existing hours for this business+location first (handles NULL location_id correctly;
+      // PostgreSQL unique constraint treats NULL != NULL so upsert fails for default hours)
+      let deleteQuery = supabase
         .from('business_hours')
-        .upsert(
+        .delete()
+        .eq('business_id', targetBusinessId);
+
+      if (locationId) {
+        deleteQuery = deleteQuery.eq('location_id', locationId);
+      } else {
+        deleteQuery = deleteQuery.is('location_id', null);
+      }
+
+      const { error: deleteError } = await deleteQuery;
+
+      if (deleteError) throw deleteError;
+
+      // Insert new hours
+      const { error: insertError } = await supabase
+        .from('business_hours')
+        .insert(
           hoursData.map(h => ({
             business_id: targetBusinessId,
             location_id: locationId || null,
@@ -90,11 +107,10 @@ export function useBusinessHours(businessId?: string, locationId?: string | null
             open_time: h.open_time,
             close_time: h.close_time,
             is_closed: h.is_closed,
-          })),
-          { onConflict: 'business_id,location_id,day_of_week' }
+          }))
         );
 
-      if (error) throw error;
+      if (insertError) throw insertError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['business-hours', targetBusinessId, locationId] });

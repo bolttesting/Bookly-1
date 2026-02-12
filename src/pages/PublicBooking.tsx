@@ -63,11 +63,17 @@ interface StaffMember {
 }
 
 interface BusinessHours {
+  id?: string;
   day_of_week: number;
   open_time: string;
   close_time: string;
   is_closed: boolean;
   location_id: string | null;
+}
+
+interface TimeRange {
+  start_time: string;
+  end_time: string;
 }
 
 interface Location {
@@ -126,6 +132,8 @@ export default function PublicBooking() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [businessHours, setBusinessHours] = useState<BusinessHours[]>([]);
+  const [hourRangesByBhId, setHourRangesByBhId] = useState<Record<string, TimeRange[]>>({});
+  const [slotBlocks, setSlotBlocks] = useState<{ service_id: string; blocked_date: string; start_time: string }[]>([]);
   const [appointments, setAppointments] = useState<{ start_time: string; service_id: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -303,6 +311,27 @@ export default function PublicBooking() {
 
         setBusinessHours(hoursData || []);
 
+        // Fetch split hour ranges (e.g. 9 AM–1 PM and 5 PM–10 PM)
+        const bhIds = (hoursData || []).filter((h: BusinessHours) => h.id).map((h: BusinessHours) => h.id!);
+        const rangesMap: Record<string, TimeRange[]> = {};
+        if (bhIds.length > 0) {
+          const { data: rangesData } = await supabase
+            .from('business_hour_ranges')
+            .select('business_hours_id, start_time, end_time')
+            .in('business_hours_id', bhIds)
+            .order('display_order', { ascending: true })
+            .order('start_time', { ascending: true });
+          for (const r of rangesData || []) {
+            const bid = (r as any).business_hours_id;
+            if (!rangesMap[bid]) rangesMap[bid] = [];
+            rangesMap[bid].push({
+              start_time: (r as any).start_time?.slice(0, 5) || '09:00',
+              end_time: (r as any).end_time?.slice(0, 5) || '18:00',
+            });
+          }
+        }
+        setHourRangesByBhId(rangesMap);
+
         // Fetch appointments for the next 30 days
         const { data: appointmentsData } = await supabase
           .from('appointments')
@@ -313,6 +342,21 @@ export default function PublicBooking() {
           .in('status', ['confirmed', 'pending']);
 
         setAppointments(appointmentsData || []);
+
+        // Fetch blocked slots for next 30 days
+        const rangeStart = new Date();
+        const rangeEnd = addDays(new Date(), 30);
+        const { data: blocksData } = await supabase
+          .from('slot_blocks')
+          .select('service_id, blocked_date, start_time')
+          .eq('business_id', businessData.id)
+          .gte('blocked_date', format(rangeStart, 'yyyy-MM-dd'))
+          .lte('blocked_date', format(rangeEnd, 'yyyy-MM-dd'));
+        setSlotBlocks((blocksData || []).map(b => ({
+          service_id: b.service_id,
+          blocked_date: b.blocked_date,
+          start_time: typeof b.start_time === 'string' ? b.start_time.slice(0, 5) : '00:00',
+        })));
       } catch (error) {
         console.error('Error fetching business:', error);
         toast.error('Failed to load booking page');
@@ -352,44 +396,47 @@ export default function PublicBooking() {
     if (isClosed) return [];
 
     const slots: SlotAvailability[] = [];
-    const [openHours, openMinutes] = openTime.split(':').map(Number);
-    const [closeHours, closeMinutes] = closeTime.split(':').map(Number);
-    
-    // Calculate slot interval: duration + buffer time
     const slotInterval = effectiveService.duration + (effectiveService.buffer_time || 0);
     const capacity = effectiveService.slot_capacity || 1;
-
-    let current = setMinutes(setHours(startOfDay(selectedDate), openHours), openMinutes);
-    const end = setMinutes(setHours(startOfDay(selectedDate), closeHours), closeMinutes);
     const now = new Date();
 
-    while (isBefore(current, end)) {
-      // Check if the appointment would fit before closing time
-      const appointmentEnd = addMinutes(current, effectiveService.duration);
-      if (isAfter(appointmentEnd, end)) break;
-      
-      // Don't show past times for today
-      if (!isBefore(current, now)) {
-        const timeStr = format(current, 'HH:mm');
-        
-        // Count how many appointments are booked for this time slot and service
-        const booked = appointments.filter(apt => {
-          const aptDate = new Date(apt.start_time);
-          return format(aptDate, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') &&
-                 format(aptDate, 'HH:mm') === timeStr &&
-                 apt.service_id === effectiveService.id;
-        }).length;
+    // Support split hours (e.g. 9 AM–1 PM and 5 PM–10 PM)
+    const ranges: TimeRange[] = dayHours?.id && hourRangesByBhId[dayHours.id]?.length
+      ? hourRangesByBhId[dayHours.id]
+      : [{ start_time: openTime, end_time: closeTime }];
 
-        const available = capacity - booked;
-        
-        slots.push({
-          time: timeStr,
-          booked,
-          capacity,
-          available: Math.max(0, available)
-        });
+    for (const range of ranges) {
+      const [openH, openM] = range.start_time.split(':').map(Number);
+      const [closeH, closeM] = range.end_time.split(':').map(Number);
+      let current = setMinutes(setHours(startOfDay(selectedDate), openH), openM);
+      const end = setMinutes(setHours(startOfDay(selectedDate), closeH), closeM);
+
+      while (isBefore(current, end)) {
+        const appointmentEnd = addMinutes(current, effectiveService.duration);
+        if (isAfter(appointmentEnd, end)) break;
+
+        if (!isBefore(current, now)) {
+          const timeStr = format(current, 'HH:mm');
+          const dateStr = format(selectedDate, 'yyyy-MM-dd');
+          const isBlocked = slotBlocks.some(b =>
+            b.service_id === effectiveService.id && b.blocked_date === dateStr && b.start_time === timeStr
+          );
+          if (isBlocked) {
+            current = addMinutes(current, slotInterval);
+            continue;
+          }
+          const booked = appointments.filter(apt => {
+            const aptDate = new Date(apt.start_time);
+            return format(aptDate, 'yyyy-MM-dd') === dateStr &&
+                   format(aptDate, 'HH:mm') === timeStr &&
+                   apt.service_id === effectiveService.id;
+          }).length;
+
+          const available = capacity - booked;
+          slots.push({ time: timeStr, booked, capacity, available: Math.max(0, available) });
+        }
+        current = addMinutes(current, slotInterval);
       }
-      current = addMinutes(current, slotInterval);
     }
 
     return slots;

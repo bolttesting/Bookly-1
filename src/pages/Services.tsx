@@ -15,6 +15,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { ServiceDialog } from '@/components/services/ServiceDialog';
 import { DeleteServiceDialog } from '@/components/services/DeleteServiceDialog';
 import { CancelServiceDialog } from '@/components/services/CancelServiceDialog';
+import { BlockSlotDialog } from '@/components/services/BlockSlotDialog';
 
 const Services = () => {
   const { services, isLoading, createService, updateService, deleteService } = useServices();
@@ -23,6 +24,8 @@ const Services = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [blockSlotDialogOpen, setBlockSlotDialogOpen] = useState(false);
+  const [blockSlotService, setBlockSlotService] = useState<Service | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -50,6 +53,11 @@ const Services = () => {
   const handleCancelService = (service: Service) => {
     setSelectedService(service);
     setCancelDialogOpen(true);
+  };
+
+  const handleBlockSlot = (service: Service) => {
+    setBlockSlotService(service);
+    setBlockSlotDialogOpen(true);
   };
 
   const handleSubmit = async (data: ServiceFormData) => {
@@ -183,6 +191,9 @@ const Services = () => {
                       <XCircle className="h-4 w-4 mr-2" />
                       Cancel Service
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleBlockSlot(service)}>
+                      Block Slot
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
@@ -246,6 +257,15 @@ const Services = () => {
           }}
         />
       )}
+
+      <BlockSlotDialog
+        open={blockSlotDialogOpen}
+        onOpenChange={(open) => {
+          setBlockSlotDialogOpen(open);
+          if (!open) setBlockSlotService(null);
+        }}
+        defaultServiceId={blockSlotService?.id}
+      />
     </div>
   );
 };
