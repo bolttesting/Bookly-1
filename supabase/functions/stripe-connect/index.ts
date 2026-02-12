@@ -33,13 +33,13 @@ serve(async (req) => {
   }
 
   try {
-    let body: { business_id?: string };
+    let body: { business_id?: string; email?: string };
     try {
       body = await req.json();
     } catch {
       return jsonResponse({ error: "Invalid JSON body" }, 400);
     }
-    const { business_id } = body || {};
+    const { business_id, email: bodyEmail } = body || {};
 
     if (!business_id) {
       return jsonResponse({ error: "business_id is required" }, 400);
@@ -54,12 +54,14 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const siteUrl = Deno.env.get("SITE_URL") || "http://localhost:8081";
 
-    // Check if business already has Stripe account
+    let ownerEmail = (typeof bodyEmail === "string" && bodyEmail.trim()) ? bodyEmail.trim() : null;
+
+    // Check if business already has Stripe account, and fetch email if needed
     if (supabaseServiceKey) {
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
       const { data: biz } = await supabase
         .from("businesses")
-        .select("stripe_account_id")
+        .select("stripe_account_id, email")
         .eq("id", business_id)
         .single();
       if (biz?.stripe_account_id) {
@@ -71,12 +73,36 @@ serve(async (req) => {
         });
         return jsonResponse({ account_id: biz.stripe_account_id, url: accountLink.url });
       }
+      if (!ownerEmail && biz?.email) ownerEmail = biz.email;
+      if (!ownerEmail) {
+        const { data: ownerRole } = await supabase
+          .from("user_roles")
+          .select("user_id")
+          .eq("business_id", business_id)
+          .eq("role", "owner")
+          .limit(1)
+          .single();
+        if (ownerRole?.user_id) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("email")
+            .eq("id", ownerRole.user_id)
+            .single();
+          if (profile?.email) ownerEmail = profile.email;
+        }
+      }
+    }
+
+    if (!ownerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) {
+      return jsonResponse({
+        error: "Valid email is required. Add your email in Profile settings or pass it when connecting.",
+      }, 400);
     }
 
     const account = await stripe.accounts.create({
       type: "express",
-      country: "US", // Change to your default country
-      email: "", // You can get this from the business record
+      country: "US",
+      email: ownerEmail,
       capabilities: {
         card_payments: { requested: true },
         transfers: { requested: true },

@@ -32,7 +32,8 @@ import {
   Plus,
   Pencil,
   Trash2,
-  KeyRound
+  KeyRound,
+  ExternalLink
 } from 'lucide-react';
 import {
   Dialog,
@@ -74,6 +75,9 @@ export default function SuperAdmin() {
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any>(null);
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
+  const [adminTab, setAdminTab] = useState('businesses');
+  const [stripeAdminConnected, setStripeAdminConnected] = useState<boolean | null>(null);
+  const [stripeAdminMode, setStripeAdminMode] = useState<string | null>(null);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -82,6 +86,23 @@ export default function SuperAdmin() {
   
   // For SuperAdmin, use USD as default since it shows aggregated data across all businesses
   const formatCurrency = (amount: number) => formatCurrencySimple(amount, 'USD');
+
+  // Check Stripe admin connection status when Stripe tab is selected
+  useEffect(() => {
+    if (adminTab !== 'stripe') return;
+    let cancelled = false;
+    setStripeAdminConnected(null);
+    supabase.functions.invoke('stripe-admin-connect', { body: {} }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (!error && data?.connected) {
+        setStripeAdminConnected(true);
+        setStripeAdminMode(data.mode || 'test');
+      } else {
+        setStripeAdminConnected(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [adminTab]);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -645,7 +666,7 @@ export default function SuperAdmin() {
         </div>
 
         {/* Data Tabs */}
-        <Tabs defaultValue="businesses" className="space-y-3 sm:space-y-4">
+        <Tabs value={adminTab} onValueChange={setAdminTab} className="space-y-3 sm:space-y-4">
           <div className="glass-card p-2 w-full overflow-x-auto">
             <TabsList className="inline-flex w-full min-w-max bg-transparent gap-1 text-xs sm:text-sm">
               <TabsTrigger value="businesses" className="whitespace-nowrap px-3 sm:px-4 shrink-0">
@@ -875,61 +896,95 @@ export default function SuperAdmin() {
               <CardContent className="space-y-4 sm:space-y-6">
                 {/* Stripe Connection Status */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Stripe Account</h3>
-                  {/* TODO: Fetch super admin settings from database */}
-                  <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Connect your Stripe account to start collecting subscription payments. You'll be redirected to Stripe to complete the connection.
-                    </p>
-                    <Button
-                      onClick={async () => {
-                        try {
-                          const { data, error: functionError } = await supabase.functions.invoke('stripe-admin-connect', {
-                            body: {},
-                          });
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    Stripe Account
+                    {stripeAdminConnected === true && (
+                      <Badge variant="default" className="bg-green-600 gap-1">
+                        <Check className="h-3 w-3" />
+                        Connected ({stripeAdminMode || 'test'} mode)
+                      </Badge>
+                    )}
+                    {stripeAdminConnected === false && (
+                      <Badge variant="secondary">Not configured</Badge>
+                    )}
+                    {stripeAdminConnected === null && adminTab === 'stripe' && (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </h3>
+                  {stripeAdminConnected === true ? (
+                    <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Your Stripe account is connected. STRIPE_SECRET_KEY is configured and verified. You can open the Stripe dashboard to manage payments.
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const mode = stripeAdminMode === 'live' ? '' : '/test';
+                          window.open(`https://dashboard.stripe.com${mode}`, '_blank');
+                        }}
+                        className="gap-2"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Open Stripe Dashboard
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Add STRIPE_SECRET_KEY to Supabase Dashboard → Project Settings → Edge Functions → Secrets. Then click below to verify and open your Stripe dashboard.
+                      </p>
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const { data, error: functionError } = await supabase.functions.invoke('stripe-admin-connect', {
+                              body: {},
+                            });
 
-                          if (functionError) {
-                            let msg = functionError.message || 'Unknown error';
-                            if (functionError instanceof FunctionsHttpError && functionError.context) {
-                              try {
-                                const body = await functionError.context.json();
-                                if (body?.error) msg = body.error;
-                              } catch {}
+                            if (functionError) {
+                              let msg = functionError.message || 'Unknown error';
+                              if (functionError instanceof FunctionsHttpError && functionError.context) {
+                                try {
+                                  const body = await functionError.context.json();
+                                  if (body?.error) msg = body.error;
+                                } catch {}
+                              }
+                              if (msg.includes('fetch') || msg.includes('Failed to send') || msg.includes('network')) {
+                                toast.error(
+                                  'Cannot reach Stripe service. Deploy: "supabase functions deploy stripe-admin-connect" and add STRIPE_SECRET_KEY in Supabase Dashboard > Edge Functions > Secrets.',
+                                  { duration: 8000 }
+                                );
+                              } else if (msg.includes('not found') || msg.includes('404')) {
+                                toast.info('Deploy the function: supabase functions deploy stripe-admin-connect', { duration: 6000 });
+                              } else {
+                                toast.error(msg);
+                              }
+                              return;
                             }
-                            if (msg.includes('fetch') || msg.includes('Failed to send') || msg.includes('network')) {
-                              toast.error(
-                                'Cannot reach Stripe service. Deploy: "supabase functions deploy stripe-admin-connect" and add STRIPE_SECRET_KEY in Supabase Dashboard > Edge Functions > Secrets.',
-                                { duration: 8000 }
-                              );
-                            } else if (msg.includes('not found') || msg.includes('404')) {
-                              toast.info('Deploy the function: supabase functions deploy stripe-admin-connect', { duration: 6000 });
+
+                            if (data?.error) {
+                              toast.error(data.error);
+                              return;
+                            }
+
+                            if (data?.connected && data?.dashboard_url) {
+                              setStripeAdminConnected(true);
+                              setStripeAdminMode(data.mode || 'test');
+                              toast.success(`Stripe connected (${data.mode || 'test'} mode). Opening dashboard...`);
+                              window.open(data.dashboard_url, '_blank');
                             } else {
-                              toast.error(msg);
+                              toast.error('Stripe verification failed');
                             }
-                            return;
+                          } catch (error: any) {
+                            toast.error(error.message || 'Failed to verify Stripe connection.');
                           }
-
-                          if (data?.error) {
-                            toast.error(data.error);
-                            return;
-                          }
-
-                          if (data?.connected && data?.dashboard_url) {
-                            toast.success(`Stripe connected (${data.mode || 'test'} mode). Opening dashboard...`);
-                            window.open(data.dashboard_url, '_blank');
-                          } else {
-                            toast.error('Stripe verification failed');
-                          }
-                        } catch (error: any) {
-                          toast.error(error.message || 'Failed to verify Stripe connection.');
-                        }
-                      }}
-                      className="gap-2"
-                    >
-                      <CreditCard className="h-4 w-4" />
-                      Connect Stripe Account
-                    </Button>
-                  </div>
+                        }}
+                        className="gap-2"
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        Verify & Connect Stripe
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <Separator />

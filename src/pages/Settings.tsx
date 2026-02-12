@@ -1082,7 +1082,7 @@ const Settings = () => {
 
                         // Call Supabase Edge Function for Stripe Connect
                         const { data, error: functionError } = await supabase.functions.invoke('stripe-connect', {
-                          body: { business_id: business.id },
+                          body: { business_id: business.id, email: user?.email },
                         });
 
                         if (functionError) {
