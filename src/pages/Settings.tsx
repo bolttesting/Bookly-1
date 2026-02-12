@@ -17,7 +17,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 import { useBusinessSubscription } from '@/hooks/useBusinessSubscription';
-import { useStripeConnection } from '@/hooks/useStripeConnection';
 import { useReminderSettings } from '@/hooks/useReminders';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,7 +32,6 @@ const Settings = () => {
   const { currencyCode, currencies } = useCurrency();
   const { plans: subscriptionPlans, isLoading: plansLoading } = useSubscriptionPlans();
   const { subscription, isLoading: subscriptionLoading, updateSubscription } = useBusinessSubscription();
-  const { stripeConnected } = useStripeConnection();
   const { settings: reminderSettings, isLoading: reminderSettingsLoading, updateSettings: updateReminderSettings } = useReminderSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [copied, setCopied] = useState(false);
@@ -47,6 +45,45 @@ const Settings = () => {
       setStripeConnectEmail(user?.email || business?.email || '');
     }
   }, [user?.email, business?.email]);
+
+  // Handle subscription checkout redirect from Stripe
+  const processedCheckoutRef = useRef<string | null>(null);
+  useEffect(() => {
+    const checkout = searchParams.get('checkout');
+    const sessionId = searchParams.get('session_id');
+
+    if (checkout === 'cancelled') {
+      toast.info('Checkout was cancelled');
+      setSearchParams((p) => {
+        p.delete('checkout');
+        p.delete('session_id');
+        return p;
+      });
+      return;
+    }
+
+    if (checkout !== 'success' || !sessionId || processedCheckoutRef.current === sessionId) return;
+    processedCheckoutRef.current = sessionId;
+
+    (async () => {
+      const { data, error } = await supabase.functions.invoke('complete-subscription-checkout', {
+        body: { session_id: sessionId },
+      });
+      if (error || data?.error) {
+        toast.error(data?.error || error?.message || 'Failed to complete subscription');
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['business-subscription'] });
+        queryClient.invalidateQueries({ queryKey: ['business'] });
+        refetchBusiness();
+        toast.success('Subscription upgraded successfully!');
+      }
+      setSearchParams((p) => {
+        p.delete('checkout');
+        p.delete('session_id');
+        return p;
+      });
+    })();
+  }, [searchParams, queryClient, setSearchParams, refetchBusiness]);
   
   // Get active tab from URL params, default to 'booking'
   const activeTab = searchParams.get('tab') || 'booking';
@@ -1288,18 +1325,6 @@ const Settings = () => {
                             disabled={isCurrentPlan || updateSubscription.isPending}
                             onClick={() => {
                               if (isCurrentPlan) return;
-                              
-                              // Check if payment is required
-                              const requiresPayment = stripeConnected && plan.price > 0 && isUpgrade;
-                              
-                              if (requiresPayment) {
-                                toast.info(
-                                  'Payment required for this upgrade. Stripe integration is active. Please contact support or complete payment to upgrade.',
-                                  { duration: 5000 }
-                                );
-                                return;
-                              }
-                              
                               updateSubscription.mutate(plan.id);
                             }}
                           >
@@ -1310,8 +1335,8 @@ const Settings = () => {
                               </>
                             ) : isCurrentPlan ? (
                               'Current Plan'
-                            ) : stripeConnected && plan.price > 0 && isUpgrade ? (
-                              'Payment Required'
+                            ) : isUpgrade && plan.price > 0 ? (
+                              'Upgrade & Pay'
                             ) : isUpgrade ? (
                               'Upgrade Now'
                             ) : isDowngrade ? (
@@ -1320,9 +1345,9 @@ const Settings = () => {
                               'Select Plan'
                             )}
                           </Button>
-                          {stripeConnected && plan.price > 0 && isUpgrade && !isCurrentPlan && (
+                          {plan.price > 0 && isUpgrade && !isCurrentPlan && (
                             <p className="text-xs text-muted-foreground text-center mt-2">
-                              Payment required - Stripe is connected
+                              You'll be redirected to Stripe to complete payment
                             </p>
                           )}
                         </CardContent>

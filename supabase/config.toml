@@ -35,3 +35,9 @@ verify_jwt = false
 
 [functions.stripe-admin-connect]
 verify_jwt = false
+
+[functions.create-subscription-checkout]
+verify_jwt = false
+
+[functions.complete-subscription-checkout]
+verify_jwt = false

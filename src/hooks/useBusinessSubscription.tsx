@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { useBusiness } from './useBusiness';
 import { useSubscriptionPlans } from './useSubscriptionPlans';
-import { useStripeConnection } from './useStripeConnection';
 import { toast } from 'sonner';
 
 export interface BusinessSubscription {
@@ -26,7 +26,6 @@ export interface BusinessSubscription {
 export function useBusinessSubscription() {
   const { business } = useBusiness();
   const { plans } = useSubscriptionPlans();
-  const { stripeConnected } = useStripeConnection();
   const queryClient = useQueryClient();
 
   // Get current subscription details
@@ -116,17 +115,32 @@ export function useBusinessSubscription() {
         canDowngrade: false,
       };
 
-      // Check if payment is required
+      // Check if payment is required (paid upgrade)
       const isUpgrade = !currentSubscription.plan || plan.price > (currentSubscription.plan.price || 0);
-      const requiresPayment = stripeConnected && plan.price > 0 && isUpgrade;
+      const requiresPayment = plan.price > 0 && isUpgrade;
 
-      // If Stripe is connected and plan requires payment, redirect to payment
+      // If paid upgrade, redirect to Stripe Checkout
       if (requiresPayment) {
-        // TODO: Implement Stripe Checkout redirect
-        // For now, throw an error to prevent free upgrade
-        throw new Error(
-          'Payment required. Stripe integration is active. Please contact support to complete your subscription upgrade.'
-        );
+        const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        const { data, error } = await supabase.functions.invoke('create-subscription-checkout', {
+          body: {
+            business_id: business.id,
+            plan_id: planId,
+            success_url: `${siteUrl}/settings?tab=payments&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${siteUrl}/settings?tab=payments&checkout=cancelled`,
+          },
+        });
+        let errMsg = data?.error || error?.message || 'Failed to create checkout';
+        if (error instanceof FunctionsHttpError && error.context) {
+          try {
+            const body = await error.context.json();
+            if (body?.error) errMsg = body.error;
+          } catch {}
+        }
+        if (error) throw new Error(errMsg);
+        if (!data?.url) throw new Error('Payment not configured. Add STRIPE_SECRET_KEY in Supabase Edge Function Secrets.');
+        window.location.href = data.url;
+        return; // Redirect in progress
       }
 
       // Validate limits if downgrading
