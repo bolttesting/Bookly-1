@@ -13,6 +13,7 @@ import { usePackages, PackageTemplate } from '@/hooks/usePackages';
 import { useCurrency } from '@/hooks/useCurrency';
 import { PackageDialog } from '@/components/packages/PackageDialog';
 import { DeletePackageDialog } from '@/components/packages/DeletePackageDialog';
+import { ImageSlideshow } from '@/components/ImageSlideshow';
 
 const Packages = () => {
   const { packages, services, isLoading, createPackage, updatePackage, deletePackage } = usePackages();
@@ -138,8 +139,14 @@ const Packages = () => {
           {filteredPackages.map((pkg) => (
             <div
               key={pkg.id}
-              className="glass-card p-5 hover-lift group"
+              className="glass-card overflow-hidden p-0 hover-lift group"
             >
+              <ImageSlideshow
+                imageUrls={pkg.image_urls}
+                alt={pkg.name}
+                className="rounded-t-lg"
+              />
+              <div className="p-5">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -210,7 +217,7 @@ const Packages = () => {
                   <div className="mt-4 pt-4 border-t border-border">
                     <p className="text-xs text-muted-foreground mb-2">Includes:</p>
                     <div className="flex flex-wrap gap-1">
-                      {pkg.services.slice(0, 3).map((service) => (
+                      {(pkg.services as { id: string; name: string }[]).slice(0, 3).map((service) => (
                         <Badge key={service.id} variant="outline" className="text-xs">
                           {service.name}
                         </Badge>
@@ -223,6 +230,7 @@ const Packages = () => {
                     </div>
                   </div>
                 )}
+              </div>
               </div>
             </div>
           ))}

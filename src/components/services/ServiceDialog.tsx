@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -31,6 +31,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { Service, ServiceFormData } from '@/hooks/useServices';
+import { ImageUploadField } from '@/components/ImageUploadField';
+import { useBusinessImageUpload } from '@/hooks/useBusinessImageUpload';
 
 const serviceSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name is too long'),
@@ -72,6 +74,8 @@ export function ServiceDialog({
   isLoading,
 }: ServiceDialogProps) {
   const isEditing = !!service;
+  const { uploadImages, isUploading } = useBusinessImageUpload();
+  const [imageItems, setImageItems] = useState<(string | File)[]>([]);
 
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceSchema),
@@ -113,7 +117,25 @@ export function ServiceDialog({
     }
   }, [service, form]);
 
+  // Reset images when service changes
+  useEffect(() => {
+    if (!service) {
+      setImageItems([]);
+    } else if ((service as { image_urls?: string[] }).image_urls?.length) {
+      setImageItems((service as { image_urls?: string[] }).image_urls || []);
+    } else {
+      setImageItems([]);
+    }
+  }, [service?.id, open]);
+
   const handleSubmit = async (values: ServiceFormValues) => {
+    const existingUrls = imageItems.filter((x): x is string => typeof x === 'string');
+    const files = imageItems.filter((x): x is File => x instanceof File);
+    let imageUrls = [...existingUrls];
+    if (files.length > 0) {
+      const uploaded = await uploadImages(files);
+      imageUrls = [...existingUrls, ...uploaded];
+    }
     await onSubmit({
       name: values.name,
       description: values.description,
@@ -123,7 +145,9 @@ export function ServiceDialog({
       status: values.status,
       buffer_time: values.buffer_time,
       slot_capacity: values.slot_capacity,
+      image_urls: imageUrls,
     });
+    setImageItems([]);
   };
 
   return (
@@ -173,6 +197,18 @@ export function ServiceDialog({
                 </FormItem>
               )}
             />
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Images</label>
+              <ImageUploadField
+                value={imageItems}
+                onChange={setImageItems}
+                disabled={isLoading}
+              />
+              <p className="text-xs text-muted-foreground">
+                Multiple images will show as a slideshow in the booking widget.
+              </p>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -301,8 +337,8 @@ export function ServiceDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? (
+              <Button type="submit" disabled={isLoading || isUploading}>
+                {isLoading || isUploading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {isEditing ? 'Saving...' : 'Creating...'}

@@ -50,6 +50,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { RescheduleRequestDialog } from '@/components/appointments/RescheduleRequestDialog';
+import { ImageSlideshow } from '@/components/ImageSlideshow';
 
 interface Business {
   id: string;
@@ -1349,7 +1350,7 @@ export default function MyAppointments() {
                           {businessServices.map((service) => (
                             <Card
                               key={service.id}
-                              className="glass-card cursor-pointer hover:border-primary/50 transition-all"
+                              className="glass-card cursor-pointer hover:border-primary/50 transition-all overflow-hidden"
                               onClick={() => {
                                 setSelectedBusiness(business);
                                 setSelectedService(service);
@@ -1360,6 +1361,11 @@ export default function MyAppointments() {
                                 setIsBooking(true);
                               }}
                             >
+                              <ImageSlideshow
+                                imageUrls={(service as { image_urls?: string[] }).image_urls}
+                                alt={service.name}
+                                className="rounded-none"
+                              />
                               <CardHeader>
                                 <div className="flex justify-between items-start gap-2">
                                   <CardTitle className="text-base sm:text-lg truncate flex-1">{service.name}</CardTitle>
@@ -1918,7 +1924,12 @@ export default function MyAppointments() {
                     <h3 className="text-base sm:text-lg font-semibold">{business.name}</h3>
                     <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                       {businessPackages.map((pkg) => (
-                        <Card key={pkg.id} className="glass-card">
+                        <Card key={pkg.id} className="glass-card overflow-hidden">
+                          <ImageSlideshow
+                            imageUrls={(pkg as { image_urls?: string[] }).image_urls}
+                            alt={pkg.name}
+                            className="rounded-none"
+                          />
                           <CardHeader>
                             <CardTitle>{pkg.name}</CardTitle>
                             {pkg.description && (

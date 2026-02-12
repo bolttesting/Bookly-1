@@ -29,6 +29,7 @@ import { PaymentForm } from '@/components/payment/PaymentForm';
 import { useAppointmentReminders } from '@/hooks/useReminders';
 import { notifyBusinessUsers } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
+import { ImageSlideshow } from '@/components/ImageSlideshow';
 
 interface Business {
   id: string;
@@ -54,6 +55,7 @@ interface Service {
   category: string | null;
   buffer_time: number;
   slot_capacity: number;
+  image_urls?: string[] | null;
 }
 
 interface StaffMember {
@@ -1744,11 +1746,16 @@ export default function PublicBooking() {
                     {services.map((service) => (
                       <Card
                         key={service.id}
-                        className={`glass-card cursor-pointer transition-all hover:border-primary/50 ${
+                        className={`glass-card cursor-pointer transition-all hover:border-primary/50 overflow-hidden ${
                           effectiveService?.id === service.id ? 'border-primary ring-2 ring-primary/20' : ''
                         }`}
                         onClick={() => { setSelectedService(service); setSelectedPackage(null); }}
                       >
+                        <ImageSlideshow
+                          imageUrls={(service as { image_urls?: string[] }).image_urls}
+                          alt={service.name}
+                          className="rounded-none"
+                        />
                         <CardHeader className="pb-2">
                           <div className="flex justify-between items-start">
                             <CardTitle className="text-lg">{service.name}</CardTitle>
@@ -1785,11 +1792,16 @@ export default function PublicBooking() {
                     {packages.map((pkg) => (
                       <Card
                         key={pkg.id}
-                        className={`glass-card cursor-pointer transition-all hover:border-primary/50 ${
+                        className={`glass-card cursor-pointer transition-all hover:border-primary/50 overflow-hidden ${
                           selectedPackage?.id === pkg.id ? 'border-primary ring-2 ring-primary/20' : ''
                         }`}
                         onClick={() => { setSelectedPackage(pkg); setSelectedService(null); }}
                       >
+                        <ImageSlideshow
+                          imageUrls={(pkg as { image_urls?: string[] }).image_urls}
+                          alt={pkg.name}
+                          className="rounded-none"
+                        />
                         <CardHeader className="pb-2">
                           <div className="flex justify-between items-start">
                             <CardTitle className="text-lg">{pkg.name}</CardTitle>

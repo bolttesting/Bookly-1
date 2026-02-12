@@ -16,6 +16,7 @@ import { ServiceDialog } from '@/components/services/ServiceDialog';
 import { DeleteServiceDialog } from '@/components/services/DeleteServiceDialog';
 import { CancelServiceDialog } from '@/components/services/CancelServiceDialog';
 import { BlockSlotDialog } from '@/components/services/BlockSlotDialog';
+import { ImageSlideshow } from '@/components/ImageSlideshow';
 
 const Services = () => {
   const { services, isLoading, createService, updateService, deleteService } = useServices();
@@ -148,8 +149,14 @@ const Services = () => {
           {filteredServices.map((service) => (
             <div
               key={service.id}
-              className="glass-card p-4 sm:p-5 hover-lift group"
+              className="glass-card overflow-hidden p-0 hover-lift group"
             >
+              <ImageSlideshow
+                imageUrls={service.image_urls}
+                alt={service.name}
+                className="rounded-t-lg"
+              />
+              <div className="p-4 sm:p-5">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -224,6 +231,7 @@ const Services = () => {
                   </Badge>
                 </div>
               )}
+              </div>
             </div>
           ))}
         </div>

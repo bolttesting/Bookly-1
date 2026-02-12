@@ -14,6 +14,7 @@ export interface Service {
   status: string;
   buffer_time: number;
   slot_capacity: number;
+  image_urls?: string[] | null;
   business_id: string;
   created_at: string;
   updated_at: string;
@@ -28,6 +29,7 @@ export interface ServiceFormData {
   status: string;
   buffer_time: number;
   slot_capacity: number;
+  image_urls?: string[];
 }
 
 export function useServices() {
@@ -67,6 +69,7 @@ export function useServices() {
           status: serviceData.status,
           buffer_time: serviceData.buffer_time,
           slot_capacity: serviceData.slot_capacity,
+          image_urls: serviceData.image_urls?.length ? serviceData.image_urls : [],
         })
         .select()
         .single();
@@ -96,6 +99,7 @@ export function useServices() {
           status: serviceData.status,
           buffer_time: serviceData.buffer_time,
           slot_capacity: serviceData.slot_capacity,
+          image_urls: serviceData.image_urls?.length ? serviceData.image_urls : [],
         })
         .eq('id', id)
         .select()

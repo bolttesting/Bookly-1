@@ -13,6 +13,7 @@ export interface PackageTemplate {
   duration_type: 'days' | 'weeks' | 'months' | 'years';
   duration_value: number;
   status: 'active' | 'inactive';
+  image_urls?: string[] | null;
   created_at: string;
   updated_at: string;
   services?: { id: string; name: string }[];
@@ -27,6 +28,7 @@ export interface PackageFormData {
   duration_value: number;
   status: 'active' | 'inactive';
   service_ids: string[];
+  image_urls?: string[];
 }
 
 export function usePackages() {
@@ -100,6 +102,7 @@ export function usePackages() {
           duration_type: data.duration_type,
           duration_value: data.duration_value,
           status: data.status,
+          image_urls: data.image_urls?.length ? data.image_urls : [],
         })
         .select()
         .single();
@@ -147,6 +150,7 @@ export function usePackages() {
           duration_type: data.duration_type,
           duration_value: data.duration_value,
           status: data.status,
+          image_urls: data.image_urls?.length ? data.image_urls : [],
         })
         .eq('id', id)
         .eq('business_id', business.id);
