@@ -110,7 +110,7 @@ const Settings = () => {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 animate-fade-in max-w-4xl px-2 sm:px-0">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in w-full px-2 sm:px-0">
       {/* Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">Settings</h1>
@@ -1085,25 +1085,31 @@ const Settings = () => {
                         });
 
                         if (functionError) {
-                          // If function doesn't exist, show helpful message
-                          if (functionError.message?.includes('not found') || functionError.message?.includes('404')) {
+                          const msg = functionError.message || 'Unknown error';
+                          if (msg.includes('fetch') || msg.includes('Failed to send') || msg.includes('network')) {
+                            toast.error(
+                              'Cannot reach Stripe service. Deploy the Edge Function: run "supabase functions deploy stripe-connect" and add STRIPE_SECRET_KEY in Supabase Dashboard > Edge Functions > Secrets.',
+                              { duration: 8000 }
+                            );
+                          } else if (msg.includes('not found') || msg.includes('404')) {
                             toast.info(
-                              'Stripe Connect function not deployed yet. Please deploy the Supabase Edge Function at supabase/functions/stripe-connect. See the README for instructions.',
+                              'Deploy the stripe-connect function: run "supabase functions deploy stripe-connect"',
                               { duration: 8000 }
                             );
                           } else {
-                            throw functionError;
+                            toast.error(msg);
                           }
                           return;
                         }
 
+                        if (data?.error) {
+                          toast.error(data.error);
+                          return;
+                        }
                         if (data?.url) {
-                          // Redirect to Stripe onboarding
                           window.location.href = data.url;
-                        } else if (data?.error) {
-                          throw new Error(data.error);
                         } else {
-                          throw new Error('No redirect URL received from server');
+                          toast.error(data?.error || 'No redirect URL received');
                         }
                       } catch (error: any) {
                         toast.error(error.message || 'Failed to create Stripe connection. Please check your backend setup.');

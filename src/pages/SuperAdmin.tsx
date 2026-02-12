@@ -883,36 +883,38 @@ export default function SuperAdmin() {
                     <Button
                       onClick={async () => {
                         try {
-                          // Create Stripe Connect account link for super admin
-                          // This requires a backend API endpoint (Supabase Edge Function or your own backend)
-                          // The endpoint should create a Stripe Connect account for the platform and return an onboarding URL
-                          
-                          toast.info(
-                            'Stripe integration requires backend setup. You need to create a Supabase Edge Function or API endpoint at /api/stripe/admin/connect that handles Stripe Connect account creation for the platform.',
-                            { duration: 6000 }
-                          );
-                          
-                          // Uncomment this when you have the backend endpoint ready:
-                          /*
-                          const response = await fetch('/api/stripe/admin/connect', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                          const { data, error: functionError } = await supabase.functions.invoke('stripe-admin-connect', {
+                            body: {},
                           });
-                          
-                          if (!response.ok) {
-                            const error = await response.json().catch(() => ({ message: 'Failed to create Stripe connection' }));
-                            throw new Error(error.message || 'Failed to create Stripe connection');
+
+                          if (functionError) {
+                            const msg = functionError.message || 'Unknown error';
+                            if (msg.includes('fetch') || msg.includes('Failed to send') || msg.includes('network')) {
+                              toast.error(
+                                'Cannot reach Stripe service. Deploy: "supabase functions deploy stripe-admin-connect" and add STRIPE_SECRET_KEY in Supabase Dashboard > Edge Functions > Secrets.',
+                                { duration: 8000 }
+                              );
+                            } else if (msg.includes('not found') || msg.includes('404')) {
+                              toast.info('Deploy the function: supabase functions deploy stripe-admin-connect', { duration: 6000 });
+                            } else {
+                              toast.error(msg);
+                            }
+                            return;
                           }
-                          
-                          const { url } = await response.json();
-                          if (url) {
-                            window.location.href = url;
+
+                          if (data?.error) {
+                            toast.error(data.error);
+                            return;
+                          }
+
+                          if (data?.connected && data?.dashboard_url) {
+                            toast.success(`Stripe connected (${data.mode || 'test'} mode). Opening dashboard...`);
+                            window.open(data.dashboard_url, '_blank');
                           } else {
-                            throw new Error('No redirect URL received from server');
+                            toast.error('Stripe verification failed');
                           }
-                          */
                         } catch (error: any) {
-                          toast.error(error.message || 'Failed to create Stripe connection. Please check your backend setup.');
+                          toast.error(error.message || 'Failed to verify Stripe connection.');
                         }
                       }}
                       className="gap-2"

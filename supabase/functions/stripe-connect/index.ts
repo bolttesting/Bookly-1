@@ -1,18 +1,11 @@
 // Supabase Edge Function for Stripe Connect
-// This function creates a Stripe Connect account and returns an onboarding URL
-// 
-// To deploy: npx supabase functions deploy stripe-connect
-// 
-// Required environment variables in Supabase Dashboard:
-// - STRIPE_SECRET_KEY: Your Stripe secret key (sk_test_... or sk_live_...)
+// Creates a Stripe Connect account for a business and returns onboarding URL
+// Deploy: supabase functions deploy stripe-connect
+// Set STRIPE_SECRET_KEY and SITE_URL in Supabase Dashboard > Edge Functions > Secrets
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
-
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-  apiVersion: "2023-10-16",
-  httpClient: Stripe.createFetchHttpClient(),
-});
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,29 +13,66 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+function jsonResponse(data: object, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { 
-      status: 200,
-      headers: corsHeaders 
-    });
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+  if (!stripeKey || !stripeKey.startsWith("sk_")) {
+    return jsonResponse({
+      error: "STRIPE_SECRET_KEY is not configured. Add it in Supabase Dashboard > Project Settings > Edge Functions > Secrets.",
+    }, 500);
   }
 
   try {
-    const { business_id } = await req.json();
+    let body: { business_id?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResponse({ error: "Invalid JSON body" }, 400);
+    }
+    const { business_id } = body || {};
 
     if (!business_id) {
-      return new Response(
-        JSON.stringify({ error: "business_id is required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return jsonResponse({ error: "business_id is required" }, 400);
     }
 
-    // Create a Stripe Connect account
+    const stripe = new Stripe(stripeKey, {
+      apiVersion: "2023-10-16",
+      httpClient: Stripe.createFetchHttpClient(),
+    });
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const siteUrl = Deno.env.get("SITE_URL") || "http://localhost:8081";
+
+    // Check if business already has Stripe account
+    if (supabaseServiceKey) {
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      const { data: biz } = await supabase
+        .from("businesses")
+        .select("stripe_account_id")
+        .eq("id", business_id)
+        .single();
+      if (biz?.stripe_account_id) {
+        const accountLink = await stripe.accountLinks.create({
+          account: biz.stripe_account_id,
+          refresh_url: `${siteUrl}/settings?stripe_refresh=true`,
+          return_url: `${siteUrl}/settings?stripe_success=true`,
+          type: "account_onboarding",
+        });
+        return jsonResponse({ account_id: biz.stripe_account_id, url: accountLink.url });
+      }
+    }
+
     const account = await stripe.accounts.create({
       type: "express",
       country: "US", // Change to your default country
@@ -53,36 +83,25 @@ serve(async (req) => {
       },
     });
 
-    // Create an account link for onboarding
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: `${Deno.env.get("SITE_URL") || "http://localhost:8081"}/settings?stripe_refresh=true`,
-      return_url: `${Deno.env.get("SITE_URL") || "http://localhost:8081"}/settings?stripe_success=true`,
+      refresh_url: `${siteUrl}/settings?stripe_refresh=true`,
+      return_url: `${siteUrl}/settings?stripe_success=true`,
       type: "account_onboarding",
     });
 
-    // Update the business record in Supabase
-    // Note: You'll need to use the Supabase client here to update the database
-    // For now, we'll just return the account ID and onboarding URL
-    // You should update the business record with the account ID after successful onboarding
+    if (supabaseServiceKey) {
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      await supabase.from("businesses").update({
+        stripe_account_id: account.id,
+        updated_at: new Date().toISOString(),
+      }).eq("id", business_id);
+    }
 
-    return new Response(
-      JSON.stringify({
-        account_id: account.id,
-        url: accountLink.url,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({ account_id: account.id, url: accountLink.url });
   } catch (error: any) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    console.error("Stripe connect error:", error);
+    return jsonResponse({ error: error?.message || "Stripe connection failed" }, 500);
   }
 });
 
