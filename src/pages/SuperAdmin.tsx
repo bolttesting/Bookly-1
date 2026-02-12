@@ -43,6 +43,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { format } from 'date-fns';
 import { formatCurrencySimple, CURRENCIES } from '@/lib/currency';
 import { SubscriptionPlanDialog } from '@/components/subscriptions/SubscriptionPlanDialog';
@@ -888,7 +889,13 @@ export default function SuperAdmin() {
                           });
 
                           if (functionError) {
-                            const msg = functionError.message || 'Unknown error';
+                            let msg = functionError.message || 'Unknown error';
+                            if (functionError instanceof FunctionsHttpError && functionError.context) {
+                              try {
+                                const body = await functionError.context.json();
+                                if (body?.error) msg = body.error;
+                              } catch {}
+                            }
                             if (msg.includes('fetch') || msg.includes('Failed to send') || msg.includes('network')) {
                               toast.error(
                                 'Cannot reach Stripe service. Deploy: "supabase functions deploy stripe-admin-connect" and add STRIPE_SECRET_KEY in Supabase Dashboard > Edge Functions > Secrets.',

@@ -21,6 +21,7 @@ import { useStripeConnection } from '@/hooks/useStripeConnection';
 import { useReminderSettings } from '@/hooks/useReminders';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { LocationHoursSettings } from '@/components/settings/LocationHoursSettings';
 import { LocationsSettings } from '@/components/settings/LocationsSettings';
 import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
@@ -1085,7 +1086,13 @@ const Settings = () => {
                         });
 
                         if (functionError) {
-                          const msg = functionError.message || 'Unknown error';
+                          let msg = functionError.message || 'Unknown error';
+                          if (functionError instanceof FunctionsHttpError && functionError.context) {
+                            try {
+                              const body = await functionError.context.json();
+                              if (body?.error) msg = body.error;
+                            } catch {}
+                          }
                           if (msg.includes('fetch') || msg.includes('Failed to send') || msg.includes('network')) {
                             toast.error(
                               'Cannot reach Stripe service. Deploy the Edge Function: run "supabase functions deploy stripe-connect" and add STRIPE_SECRET_KEY in Supabase Dashboard > Edge Functions > Secrets.',
