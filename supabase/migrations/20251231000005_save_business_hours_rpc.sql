@@ -29,9 +29,10 @@ BEGIN
     p_business_id,
     p_location_id,
     (e->>'day_of_week')::int,
-    COALESCE(e->>>'open_time', '09:00'),
-    COALESCE(e->>>'close_time', '18:00'),
+    (COALESCE(e->>'open_time', '09:00'))::time,
+    (COALESCE(e->>'close_time', '18:00'))::time,
     COALESCE((e->>'is_closed')::boolean, false)
   FROM jsonb_array_elements(p_hours) AS e;
 END;
 $$;
+ 
