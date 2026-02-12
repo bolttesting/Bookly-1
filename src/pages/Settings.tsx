@@ -1141,7 +1141,7 @@ const Settings = () => {
                       className="bg-background"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Used for Stripe onboarding. Add or update if empty.
+                      Use a permanent email (Stripe rejects temp/disposable addresses). If you get "invalid email", try a different address—yours may already be linked to another Stripe account.
                     </p>
                   </div>
                   <Button
@@ -1151,9 +1151,9 @@ const Settings = () => {
                           toast.error('Business not found');
                           return;
                         }
-                        const emailToUse = stripeConnectEmail?.trim() || user?.email || business?.email;
-                        if (!emailToUse) {
-                          toast.error('Please enter your email above. Stripe requires a valid email.');
+                        const emailToUse = (stripeConnectEmail?.trim() || user?.email || business?.email || '').trim().toLowerCase();
+                        if (!emailToUse || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailToUse)) {
+                          toast.error('Please enter a valid email above. Use a permanent address (not temp/disposable).');
                           return;
                         }
 

@@ -1,10 +1,9 @@
+// @ts-nocheck - Deno/Edge Runtime; IDE lacks types but deploys correctly
 // Supabase Edge Function for Super Admin Stripe connection
-// Verifies STRIPE_SECRET_KEY is configured and returns dashboard link
 // Deploy: supabase functions deploy stripe-admin-connect
-// Set STRIPE_SECRET_KEY in Supabase Dashboard > Edge Functions > Secrets
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
+import Stripe from "https://esm.sh/stripe@14?target=denonext";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,8 +32,7 @@ serve(async (req) => {
 
   try {
     const stripe = new Stripe(stripeKey, {
-      apiVersion: "2023-10-16",
-      httpClient: Stripe.createFetchHttpClient(),
+      apiVersion: "2024-11-20",
     });
 
     await stripe.balance.retrieve();

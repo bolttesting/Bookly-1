@@ -1,12 +1,12 @@
+// @ts-nocheck - Deno/Edge Runtime; IDE lacks types but deploys correctly
 // Supabase Edge Function for Stripe Connect
-// Creates a Stripe Connect account for a business and returns onboarding URL
 // Deploy: supabase functions deploy stripe-connect
 // Set in Supabase Dashboard > Project Settings > Edge Functions > Secrets:
 //   STRIPE_SECRET_KEY - your Stripe secret key
 //   SITE_URL - your app URL (e.g. https://your-app.vercel.app) for Stripe redirects
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
+import Stripe from "https://esm.sh/stripe@14?target=denonext";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -48,8 +48,7 @@ serve(async (req) => {
     }
 
     const stripe = new Stripe(stripeKey, {
-      apiVersion: "2023-10-16",
-      httpClient: Stripe.createFetchHttpClient(),
+      apiVersion: "2024-11-20",
     });
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -113,10 +112,16 @@ serve(async (req) => {
       }, 400);
     }
 
+    // Sanitize: trim, lowercase, remove control chars (Stripe is strict)
+    const sanitizedEmail = ownerEmail
+      .trim()
+      .toLowerCase()
+      .replace(/[\x00-\x1F\x7F]/g, "");
+
     const account = await stripe.accounts.create({
       type: "express",
       country: "US",
-      email: ownerEmail,
+      email: sanitizedEmail,
       capabilities: {
         card_payments: { requested: true },
         transfers: { requested: true },
@@ -141,7 +146,11 @@ serve(async (req) => {
     return jsonResponse({ account_id: account.id, url: accountLink.url });
   } catch (error: any) {
     console.error("Stripe connect error:", error);
-    return jsonResponse({ error: error?.message || "Stripe connection failed" }, 500);
+    let errMsg = error?.message || "Stripe connection failed";
+    if (errMsg.toLowerCase().includes("invalid") && errMsg.toLowerCase().includes("email")) {
+      errMsg += " Try a different email - this one may already be linked to another Stripe account or use a non-disposable address.";
+    }
+    return jsonResponse({ error: errMsg }, 500);
   }
 });
 

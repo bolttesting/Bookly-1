@@ -3,7 +3,7 @@
 // Set STRIPE_SECRET_KEY and SITE_URL in Supabase Edge Function Secrets
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
+import Stripe from "https://esm.sh/stripe@14?target=denonext";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -57,8 +57,7 @@ serve(async (req) => {
 
     const amountCents = Math.round(Number(plan.price) * 100);
     const stripe = new Stripe(stripeKey, {
-      apiVersion: "2023-10-16",
-      httpClient: Stripe.createFetchHttpClient(),
+      apiVersion: "2024-11-20",
     });
 
     const session = await stripe.checkout.sessions.create({
