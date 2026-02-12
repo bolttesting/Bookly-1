@@ -134,6 +134,7 @@ export default function PublicBooking() {
   const [businessHours, setBusinessHours] = useState<BusinessHours[]>([]);
   const [hourRangesByBhId, setHourRangesByBhId] = useState<Record<string, TimeRange[]>>({});
   const [slotBlocks, setSlotBlocks] = useState<{ service_id: string; blocked_date: string; start_time: string }[]>([]);
+  const [serviceSchedules, setServiceSchedules] = useState<Record<string, Record<number, TimeRange[]>>>({});
   const [appointments, setAppointments] = useState<{ start_time: string; service_id: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -176,7 +177,7 @@ export default function PublicBooking() {
   
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; discountType: 'percentage' | 'fixed' } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; couponId: string; discount: number; discountType: 'percentage' | 'fixed' } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
@@ -357,6 +358,29 @@ export default function PublicBooking() {
           blocked_date: b.blocked_date,
           start_time: typeof b.start_time === 'string' ? b.start_time.slice(0, 5) : '00:00',
         })));
+
+        // Fetch service-specific schedules (when each service is bookable)
+        const serviceIds = (activeServices || []).map(s => s.id);
+        const scheduleMap: Record<string, Record<number, TimeRange[]>> = {};
+        if (serviceIds.length > 0) {
+          const { data: schedulesData } = await supabase
+            .from('service_schedules')
+            .select('service_id, day_of_week, start_time, end_time')
+            .in('service_id', serviceIds)
+            .order('display_order')
+            .order('start_time');
+          for (const sch of schedulesData || []) {
+            const sid = (sch as any).service_id;
+            const day = (sch as any).day_of_week;
+            if (!scheduleMap[sid]) scheduleMap[sid] = {};
+            if (!scheduleMap[sid][day]) scheduleMap[sid][day] = [];
+            scheduleMap[sid][day].push({
+              start_time: String((sch as any).start_time).slice(0, 5),
+              end_time: String((sch as any).end_time).slice(0, 5),
+            });
+          }
+        }
+        setServiceSchedules(scheduleMap);
       } catch (error) {
         console.error('Error fetching business:', error);
         toast.error('Failed to load booking page');
@@ -400,10 +424,17 @@ export default function PublicBooking() {
     const capacity = effectiveService.slot_capacity || 1;
     const now = new Date();
 
-    // Support split hours (e.g. 9 AM–1 PM and 5 PM–10 PM)
-    const ranges: TimeRange[] = dayHours?.id && hourRangesByBhId[dayHours.id]?.length
-      ? hourRangesByBhId[dayHours.id]
-      : [{ start_time: openTime, end_time: closeTime }];
+    // Service-specific schedule (e.g. Pilates 9am–1pm, Yoga 2pm–4pm) takes precedence
+    const serviceDayRanges = serviceSchedules[effectiveService.id]?.[dayOfWeek];
+    let ranges: TimeRange[];
+    if (serviceDayRanges && serviceDayRanges.length > 0) {
+      ranges = serviceDayRanges;
+    } else {
+      // Fall back to business hours / split hours
+      ranges = dayHours?.id && hourRangesByBhId[dayHours.id]?.length
+        ? hourRangesByBhId[dayHours.id]
+        : [{ start_time: openTime, end_time: closeTime }];
+    }
 
     for (const range of ranges) {
       const [openH, openM] = range.start_time.split(':').map(Number);
@@ -909,6 +940,22 @@ export default function PublicBooking() {
             console.error('Error generating initial appointments:', generateError);
             toast.warning('Series created but some appointments could not be generated. Please check availability.');
           }
+
+          // Record coupon usage for recurring series
+          if (appliedCoupon?.couponId && customerId) {
+            const discountAmount = servicePrice - finalPrice;
+            try {
+              await supabase.rpc('record_coupon_usage', {
+                _coupon_id: appliedCoupon.couponId,
+                _customer_id: customerId,
+                _user_id: loggedInUser?.id || null,
+                _order_id: newSeries.id,
+                _discount_amount: discountAmount,
+              });
+            } catch (couponErr) {
+              console.error('Failed to record coupon usage:', couponErr);
+            }
+          }
           
           toast.success('Recurring appointment series created successfully!');
           setBookingComplete(true);
@@ -959,6 +1006,23 @@ export default function PublicBooking() {
       }
 
       console.log('✅ Appointment created successfully:', appointment.id);
+
+      // Record coupon usage when booking completes without advance payment
+      if (appliedCoupon?.couponId && customerId && !requiresAdvancePayment) {
+        const discountAmount = servicePrice - finalPrice;
+        try {
+          await supabase.rpc('record_coupon_usage', {
+            _coupon_id: appliedCoupon.couponId,
+            _customer_id: customerId,
+            _user_id: loggedInUser?.id || null,
+            _order_id: appointment.id,
+            _discount_amount: discountAmount,
+          });
+        } catch (couponErr) {
+          console.error('Failed to record coupon usage:', couponErr);
+          // Don't fail booking if coupon recording fails
+        }
+      }
 
       if (requiresAdvancePayment) {
         console.log('💰 Payment required - showing payment screen');
@@ -1168,6 +1232,25 @@ export default function PublicBooking() {
     if (!createdAppointmentId) return;
 
     try {
+      // Record coupon usage when payment completes
+      if (appliedCoupon?.couponId && createdCustomerId) {
+        const basePrice = Number(selectedPackage?.price ?? effectiveService?.price ?? 0);
+        const discountAmount = appliedCoupon.discountType === 'percentage'
+          ? basePrice * appliedCoupon.discount / 100
+          : appliedCoupon.discount;
+        try {
+          await supabase.rpc('record_coupon_usage', {
+            _coupon_id: appliedCoupon.couponId,
+            _customer_id: createdCustomerId,
+            _user_id: loggedInUser?.id || null,
+            _order_id: createdAppointmentId,
+            _discount_amount: discountAmount,
+          });
+        } catch (couponErr) {
+          console.error('Failed to record coupon usage:', couponErr);
+        }
+      }
+
       // Create appointment reminders
       try {
         await createReminders.mutateAsync(createdAppointmentId);
@@ -2246,6 +2329,7 @@ export default function PublicBooking() {
                                   const result = data[0];
                                   setAppliedCoupon({
                                     code: couponCode.trim(),
+                                    couponId: result.coupon_data?.id || '',
                                     discount: Number(result.discount_amount),
                                     discountType: result.coupon_data?.discount_type === 'percentage' ? 'percentage' : 'fixed',
                                   });

@@ -430,6 +430,8 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
       }
 
       // Create payment record
+      const currency = business?.currency || 'USD';
+
       const { data: payment, error: paymentError } = await supabase
         .from('payments')
         .insert({
@@ -437,7 +439,7 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
           customer_id: appointment.customer_id,
           appointment_id: appointmentId,
           amount,
-          currency: 'USD', // TODO: Get from business currency
+          currency,
           status: 'completed',
           payment_method: paymentMethod,
         })

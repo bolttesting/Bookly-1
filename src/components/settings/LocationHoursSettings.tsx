@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Clock, Save, MapPin, ChevronDown, Calendar, X, Plus, Ban } from 'lucide-react';
+import { Clock, Save, MapPin, ChevronDown, Calendar, X, Plus, Ban, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -10,10 +10,12 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useBusinessHours } from '@/hooks/useBusinessHours';
 import { useLocations } from '@/hooks/useLocations';
+import { useServices } from '@/hooks/useServices';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { OffDaysManager } from './OffDaysManager';
 import { SplitHoursEditor } from './SplitHoursEditor';
 import { BlockedSlotsManager } from './BlockedSlotsManager';
+import { ServiceScheduleEditor } from './ServiceScheduleEditor';
 
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   const hours = Math.floor(i / 2);
@@ -163,6 +165,70 @@ function HoursEditor({ locationId, locationName }: HoursEditorProps) {
   );
 }
 
+function ServiceSchedulesSection() {
+  const { services, isLoading: servicesLoading } = useServices();
+  const { hoursByDay } = useBusinessHours();
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+
+  const defaultOpen = hoursByDay.find(h => !h.is_closed)?.open_time?.slice(0, 5) ?? '09:00';
+  const defaultClose = hoursByDay.find(h => !h.is_closed)?.close_time?.slice(0, 5) ?? '18:00';
+
+  if (servicesLoading || services.length === 0) return null;
+
+  const activeServiceId = selectedServiceId || services[0]?.id;
+
+  return (
+    <div className="border-t border-border pt-6">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <div className="flex items-center justify-between p-3 sm:p-4 bg-secondary/30 rounded-lg border cursor-pointer hover:bg-secondary/50 transition-colors gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+              <LayoutGrid className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
+              <div className="min-w-0">
+                <p className="font-medium text-sm sm:text-base truncate">Service Schedules</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  Set when each service is bookable (e.g. Pilates 9am–1pm, Yoga 2pm–4pm)
+                </p>
+              </div>
+            </div>
+            <ChevronDown className={`h-4 w-4 sm:h-5 sm:w-5 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-3 sm:pt-4 px-2 sm:px-4 space-y-4">
+          <div className="space-y-2 mb-4">
+            <p className="text-xs text-muted-foreground">
+              Useful when 1 employee offers multiple services at different times each day.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {services.map((svc) => (
+                <Button
+                  key={svc.id}
+                  variant={activeServiceId === svc.id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedServiceId(svc.id)}
+                >
+                  {svc.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+          {activeServiceId && (
+            <div className="border rounded-lg p-4 bg-background/50">
+              <ServiceScheduleEditor
+                serviceId={activeServiceId}
+                serviceName={services.find(s => s.id === activeServiceId)?.name ?? ''}
+                businessOpenTime={defaultOpen}
+                businessCloseTime={defaultClose}
+              />
+            </div>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
 export function LocationHoursSettings() {
   const { locations, isLoading: locationsLoading } = useLocations();
   const [openLocations, setOpenLocations] = useState<string[]>([]);
@@ -207,6 +273,7 @@ export function LocationHoursSettings() {
           </h3>
           <BlockedSlotsManager />
         </div>
+        <ServiceSchedulesSection />
       </div>
     );
   }
@@ -270,6 +337,9 @@ export function LocationHoursSettings() {
             </div>
           </CollapsibleContent>
         </Collapsible>
+
+        {/* Service Schedules */}
+        <ServiceSchedulesSection />
 
         {/* Location-Specific Hours */}
         {locations.map((location) => (

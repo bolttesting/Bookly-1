@@ -29,6 +29,7 @@ import {
   Search,
   ArrowRight,
   CheckCircle,
+  Tag,
   Settings,
   Eye,
   EyeOff,
@@ -141,9 +142,14 @@ export default function MyAppointments() {
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<{ id: string; name: string; address: string | null } | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [bookingNotes, setBookingNotes] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; couponId: string; discount: number; discountType: 'percentage' | 'fixed' } | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
   const [businessSearchQuery, setBusinessSearchQuery] = useState('');
   const [showBusinessSelector, setShowBusinessSelector] = useState(false);
@@ -464,7 +470,27 @@ export default function MyAppointments() {
     enabled: !!selectedBusiness?.id,
   });
 
-  // Get business hours
+  // Get locations for selected business
+  const { data: locations = [] } = useQuery({
+    queryKey: ['locations', selectedBusiness?.id],
+    queryFn: async () => {
+      if (!selectedBusiness?.id) return [];
+
+      const { data, error } = await supabase
+        .from('business_locations')
+        .select('id, name, address')
+        .eq('business_id', selectedBusiness.id)
+        .eq('status', 'active')
+        .order('is_primary', { ascending: false })
+        .order('name');
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedBusiness?.id,
+  });
+
+  // Get business hours (all - default + per-location for slot generation)
   const { data: businessHours = [] } = useQuery({
     queryKey: ['business-hours', selectedBusiness?.id],
     queryFn: async () => {
@@ -474,7 +500,8 @@ export default function MyAppointments() {
         .from('business_hours')
         .select('*')
         .eq('business_id', selectedBusiness.id)
-        .order('day_of_week');
+        .order('day_of_week')
+        .order('location_id', { ascending: true, nullsFirst: true });
 
       if (error) throw error;
       return data || [];
@@ -482,25 +509,119 @@ export default function MyAppointments() {
     enabled: !!selectedBusiness?.id,
   });
 
-  // Get off days
+  // Get split hour ranges (multiple ranges per day)
+  const { data: hourRangesByBhId = {} } = useQuery({
+    queryKey: ['business-hour-ranges', selectedBusiness?.id, businessHours.map(h => h.id).filter(Boolean)],
+    queryFn: async (): Promise<Record<string, Array<{ start_time: string; end_time: string }>>> => {
+      const bhIds = businessHours.filter((h: any) => h.id).map((h: any) => h.id);
+      if (bhIds.length === 0) return {};
+
+      const { data, error } = await supabase
+        .from('business_hour_ranges')
+        .select('business_hours_id, start_time, end_time')
+        .in('business_hours_id', bhIds)
+        .order('display_order')
+        .order('start_time');
+
+      if (error) throw error;
+      const map: Record<string, Array<{ start_time: string; end_time: string }>> = {};
+      for (const r of data || []) {
+        const bid = (r as any).business_hours_id;
+        if (!map[bid]) map[bid] = [];
+        map[bid].push({
+          start_time: String((r as any).start_time).slice(0, 5),
+          end_time: String((r as any).end_time).slice(0, 5),
+        });
+      }
+      return map;
+    },
+    enabled: !!selectedBusiness?.id && businessHours.length > 0,
+  });
+
+  // Get blocked slots for this service and date
+  const { data: slotBlocks = [] } = useQuery({
+    queryKey: ['slot-blocks', selectedBusiness?.id, selectedService?.id, selectedDate],
+    queryFn: async () => {
+      if (!selectedBusiness?.id || !selectedService?.id || !selectedDate) return [];
+
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const { data, error } = await supabase
+        .from('slot_blocks')
+        .select('start_time')
+        .eq('business_id', selectedBusiness.id)
+        .eq('service_id', selectedService.id)
+        .eq('blocked_date', dateStr);
+
+      if (error) throw error;
+      return (data || []).map((b: any) => ({
+        start_time: String(b.start_time).slice(0, 5),
+      }));
+    },
+    enabled: !!selectedBusiness?.id && !!selectedService?.id && !!selectedDate,
+  });
+
+  // Get service-specific schedules (when each service is bookable per day)
+  const { data: serviceSchedules = {} } = useQuery({
+    queryKey: ['service-schedules', selectedBusiness?.id],
+    queryFn: async (): Promise<Record<string, Record<number, Array<{ start_time: string; end_time: string }>>>> => {
+      if (!selectedBusiness?.id || !selectedService?.id) return {};
+
+      const { data, error } = await supabase
+        .from('service_schedules')
+        .select('service_id, day_of_week, start_time, end_time')
+        .eq('service_id', selectedService.id)
+        .order('display_order')
+        .order('start_time');
+
+      if (error) throw error;
+      const map: Record<string, Record<number, Array<{ start_time: string; end_time: string }>>> = {};
+      for (const s of data || []) {
+        const sid = (s as any).service_id;
+        const day = (s as any).day_of_week;
+        if (!map[sid]) map[sid] = {};
+        if (!map[sid][day]) map[sid][day] = [];
+        map[sid][day].push({
+          start_time: String((s as any).start_time).slice(0, 5),
+          end_time: String((s as any).end_time).slice(0, 5),
+        });
+      }
+      return map;
+    },
+    enabled: !!selectedBusiness?.id && !!selectedService?.id,
+  });
+
+  // Get off days (location-specific + default when location selected)
   const { data: offDaysData = [] } = useQuery({
-    queryKey: ['off-days', selectedBusiness?.id],
+    queryKey: ['off-days', selectedBusiness?.id, selectedLocation?.id],
     queryFn: async () => {
       if (!selectedBusiness?.id) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('off_days')
         .select('off_date')
-        .eq('business_id', selectedBusiness.id)
-        .is('location_id', null);
+        .eq('business_id', selectedBusiness.id);
 
+      if (selectedLocation) {
+        query = query.or(`location_id.eq.${selectedLocation.id},location_id.is.null`);
+      } else {
+        query = query.is('location_id', null);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
     enabled: !!selectedBusiness?.id,
   });
 
-  const offDays = offDaysData.map(d => d.off_date);
+  const offDays = offDaysData.map((d: { off_date: string }) => d.off_date);
+
+  // Auto-select single location
+  useEffect(() => {
+    if (locations.length === 1 && !selectedLocation) {
+      setSelectedLocation(locations[0]);
+    }
+  }, [locations, selectedLocation]);
 
   // Get appointments for availability
   const { data: existingAppointments = [] } = useQuery({
@@ -539,7 +660,13 @@ export default function MyAppointments() {
     if (!selectedDate || !selectedService || !selectedBusiness) return [];
 
     const dayOfWeek = selectedDate.getDay();
-    const dayHours = businessHours.find(h => h.day_of_week === dayOfWeek && !h.is_closed);
+    // Location-specific hours first, then default
+    let dayHours = selectedLocation
+      ? businessHours.find((h: any) => h.day_of_week === dayOfWeek && h.location_id === selectedLocation.id && !h.is_closed)
+      : null;
+    if (!dayHours) {
+      dayHours = businessHours.find((h: any) => h.day_of_week === dayOfWeek && h.location_id === null && !h.is_closed);
+    }
     
     if (!dayHours || dayHours.is_closed) return [];
 
@@ -547,40 +674,59 @@ export default function MyAppointments() {
     const closeTime = dayHours.close_time || '18:00';
     const slotInterval = selectedService.duration + (selectedService.buffer_time || 0);
     const capacity = selectedService.slot_capacity || 1;
-
-    const [openHours, openMinutes] = openTime.split(':').map(Number);
-    const [closeHours, closeMinutes] = closeTime.split(':').map(Number);
-
-    let current = setMinutes(setHours(startOfDay(selectedDate), openHours), openMinutes);
-    const end = setMinutes(setHours(startOfDay(selectedDate), closeHours), closeMinutes);
     const now = new Date();
 
+    // Service-specific schedule takes precedence, then split hours, then single range
+    const serviceDayRanges = serviceSchedules[selectedService.id]?.[dayOfWeek];
+    const splitRanges = dayHours.id && hourRangesByBhId[dayHours.id]?.length
+      ? hourRangesByBhId[dayHours.id]
+      : null;
+    const ranges: Array<{ start_time: string; end_time: string }> = serviceDayRanges?.length
+      ? serviceDayRanges
+      : splitRanges?.length
+        ? splitRanges
+        : [{ start_time: openTime, end_time: closeTime }];
+
+    const blockedTimes = new Set(slotBlocks.map((b: { start_time: string }) => b.start_time));
+
     const slots: SlotAvailability[] = [];
-    while (isBefore(current, end)) {
-      const appointmentEnd = addMinutes(current, selectedService.duration);
-      if (isAfter(appointmentEnd, end)) break;
+    for (const range of ranges) {
+      const [openH, openM] = range.start_time.split(':').map(Number);
+      const [closeH, closeM] = range.end_time.split(':').map(Number);
+      let current = setMinutes(setHours(startOfDay(selectedDate), openH), openM);
+      const end = setMinutes(setHours(startOfDay(selectedDate), closeH), closeM);
 
-      if (!isBefore(current, now)) {
+      while (isBefore(current, end)) {
+        const appointmentEnd = addMinutes(current, selectedService.duration);
+        if (isAfter(appointmentEnd, end)) break;
+
         const timeStr = format(current, 'HH:mm');
-        const booked = existingAppointments.filter(apt => {
-          const aptDate = new Date(apt.start_time);
-          return format(aptDate, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') &&
-                 format(aptDate, 'HH:mm') === timeStr &&
-                 apt.service_id === selectedService.id;
-        }).length;
-
-        const available = capacity - booked;
-        
-        if (available > 0) {
-          slots.push({
-            time: timeStr,
-            booked,
-            capacity,
-            available
-          });
+        if (blockedTimes.has(timeStr)) {
+          current = addMinutes(current, slotInterval);
+          continue;
         }
+
+        if (!isBefore(current, now)) {
+          const booked = existingAppointments.filter(apt => {
+            const aptDate = new Date(apt.start_time);
+            return format(aptDate, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') &&
+                   format(aptDate, 'HH:mm') === timeStr &&
+                   apt.service_id === selectedService.id;
+          }).length;
+
+          const available = capacity - booked;
+          
+          if (available > 0) {
+            slots.push({
+              time: timeStr,
+              booked,
+              capacity,
+              available
+            });
+          }
+        }
+        current = addMinutes(current, slotInterval);
       }
-      current = addMinutes(current, slotInterval);
     }
 
     return slots;
@@ -625,6 +771,16 @@ export default function MyAppointments() {
         customer = newCustomer;
       }
 
+      const basePrice = Number(selectedService.price);
+      let finalPrice = basePrice;
+      if (appliedCoupon) {
+        if (appliedCoupon.discountType === 'percentage') {
+          finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
+        } else {
+          finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
+        }
+      }
+
       // If recurring, create a series instead of a single appointment
       if (isRecurring) {
         // Create recurring series
@@ -635,6 +791,7 @@ export default function MyAppointments() {
             customer_id: customer.id,
             service_id: selectedService.id,
             staff_id: selectedStaff?.id || null,
+            location_id: selectedLocation?.id || null,
             recurrence_pattern: recurrencePattern,
             recurrence_frequency: recurrenceFrequency,
             start_date: format(selectedDate, 'yyyy-MM-dd'),
@@ -642,7 +799,7 @@ export default function MyAppointments() {
             max_occurrences: recurrenceEndType === 'occurrences' ? recurrenceMaxOccurrences : null,
             time_of_day: selectedTime,
             notes: bookingNotes || null,
-            price: Number(selectedService.price),
+            price: finalPrice,
             status: 'active',
           })
           .select()
@@ -665,6 +822,22 @@ export default function MyAppointments() {
           // Don't fail, just warn
         }
 
+        // Record coupon usage for recurring
+        if (appliedCoupon?.couponId && customer?.id) {
+          const discountAmount = basePrice - finalPrice;
+          try {
+            await supabase.rpc('record_coupon_usage', {
+              _coupon_id: appliedCoupon.couponId,
+              _customer_id: customer.id,
+              _user_id: user?.id || null,
+              _order_id: newSeries.id,
+              _discount_amount: discountAmount,
+            });
+          } catch (couponErr) {
+            console.error('Failed to record coupon usage:', couponErr);
+          }
+        }
+
         return { id: newSeries.id, isRecurring: true };
       }
 
@@ -680,9 +853,10 @@ export default function MyAppointments() {
           customer_id: customer.id,
           service_id: selectedService.id,
           staff_id: selectedStaff?.id || null,
+          location_id: selectedLocation?.id || null,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          price: Number(selectedService.price),
+          price: finalPrice,
           status: 'pending',
           notes: bookingNotes || null,
         })
@@ -690,6 +864,23 @@ export default function MyAppointments() {
         .single();
 
       if (error) throw error;
+
+      // Record coupon usage for single appointment
+      if (appliedCoupon?.couponId && customer?.id && appointment?.id) {
+        const discountAmount = basePrice - finalPrice;
+        try {
+          await supabase.rpc('record_coupon_usage', {
+            _coupon_id: appliedCoupon.couponId,
+            _customer_id: customer.id,
+            _user_id: user?.id || null,
+            _order_id: appointment.id,
+            _discount_amount: discountAmount,
+          });
+        } catch (couponErr) {
+          console.error('Failed to record coupon usage:', couponErr);
+        }
+      }
+
       return appointment;
     },
     onSuccess: (result: any) => {
@@ -702,9 +893,13 @@ export default function MyAppointments() {
       }
       setSelectedService(null);
       setSelectedStaff(null);
+      setSelectedLocation(null);
       setSelectedDate(undefined);
       setSelectedTime(null);
       setBookingNotes('');
+      setCouponCode('');
+      setAppliedCoupon(null);
+      setCouponError('');
       setIsRecurring(false);
       setRecurrencePattern('weekly');
       setRecurrenceFrequency(1);
@@ -1144,6 +1339,10 @@ export default function MyAppointments() {
                               onClick={() => {
                                 setSelectedBusiness(business);
                                 setSelectedService(service);
+                                setSelectedLocation(null);
+                                setCouponCode('');
+                                setAppliedCoupon(null);
+                                setCouponError('');
                                 setIsBooking(true);
                               }}
                             >
@@ -1193,8 +1392,12 @@ export default function MyAppointments() {
                         setSelectedService(null);
                         setSelectedBusiness(null);
                         setSelectedStaff(null);
+                        setSelectedLocation(null);
                         setSelectedDate(undefined);
                         setSelectedTime(null);
+                        setCouponCode('');
+                        setAppliedCoupon(null);
+                        setCouponError('');
                       }} className="w-full sm:w-auto">
                         <ArrowRight className="h-4 w-4 mr-2 rotate-180" />
                         Back
@@ -1219,11 +1422,14 @@ export default function MyAppointments() {
                               if (isBefore(date, startOfDay(new Date())) || isAfter(date, addDays(new Date(), 30))) {
                                 return true;
                               }
-                              // Check if date is closed by business hours
                               const dayOfWeek = date.getDay();
-                              const dayHours = businessHours.find(h => h.day_of_week === dayOfWeek);
-                              if (dayHours?.is_closed) return true;
-                              // Check if date is an off day
+                              let dayH = selectedLocation
+                                ? businessHours.find((h: any) => h.day_of_week === dayOfWeek && h.location_id === selectedLocation?.id)
+                                : null;
+                              if (!dayH) {
+                                dayH = businessHours.find((h: any) => h.day_of_week === dayOfWeek && h.location_id === null);
+                              }
+                              if (dayH?.is_closed) return true;
                               const dateStr = format(date, 'yyyy-MM-dd');
                               return offDays.includes(dateStr);
                             }}
@@ -1271,6 +1477,37 @@ export default function MyAppointments() {
                       </Card>
                     </div>
 
+                    {locations.length > 0 && (
+                      <Card className="glass-card">
+                        <CardHeader>
+                          <CardTitle>Select Location {locations.length > 1 ? '(Optional)' : ''}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {locations.length > 1 && (
+                              <Button
+                                variant={selectedLocation === null ? 'default' : 'outline'}
+                                onClick={() => setSelectedLocation(null)}
+                              >
+                                No Preference
+                              </Button>
+                            )}
+                            {locations.map((loc: { id: string; name: string; address: string | null }) => (
+                              <Button
+                                key={loc.id}
+                                variant={selectedLocation?.id === loc.id ? 'default' : 'outline'}
+                                onClick={() => setSelectedLocation(loc)}
+                                className="justify-start"
+                              >
+                                <MapPin className="h-4 w-4 mr-2 shrink-0" />
+                                {loc.name}
+                              </Button>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     {staff.length > 0 && (
                       <Card className="glass-card">
                         <CardHeader>
@@ -1297,6 +1534,131 @@ export default function MyAppointments() {
                         </CardContent>
                       </Card>
                     )}
+
+                    <Card className="glass-card">
+                      <CardHeader>
+                        <CardTitle>Booking Summary</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Service</span>
+                            <span className="font-medium">{selectedService?.name}</span>
+                          </div>
+                          {selectedDate && selectedTime && (
+                            <>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Date & Time</span>
+                                <span className="font-medium">
+                                  {format(selectedDate, 'MMM d, yyyy')} at {format(new Date(`2000-01-01T${selectedTime}`), 'h:mm a')}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Price</span>
+                                <span className="font-medium">
+                                  {(() => {
+                                    const basePrice = Number(selectedService?.price ?? 0);
+                                    let finalPrice = basePrice;
+                                    if (appliedCoupon) {
+                                      if (appliedCoupon.discountType === 'percentage') {
+                                        finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
+                                      } else {
+                                        finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
+                                      }
+                                    }
+                                    return formatCurrencySimple(finalPrice, selectedBusiness?.currency || 'USD');
+                                  })()}
+                                </span>
+                              </div>
+                              {appliedCoupon && (
+                                <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                                  <span>Discount ({appliedCoupon.code})</span>
+                                  <span>
+                                    -{appliedCoupon.discountType === 'percentage'
+                                      ? `${appliedCoupon.discount}%`
+                                      : formatCurrencySimple(appliedCoupon.discount, selectedBusiness?.currency || 'USD')}
+                                  </span>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div className="space-y-2 pt-2 border-t">
+                          <Label className="text-sm">Have a coupon code?</Label>
+                          {appliedCoupon ? (
+                            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                              <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                                Coupon {appliedCoupon.code} applied
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setAppliedCoupon(null);
+                                  setCouponCode('');
+                                  setCouponError('');
+                                }}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Enter coupon code"
+                                value={couponCode}
+                                onChange={(e) => {
+                                  setCouponCode(e.target.value.toUpperCase());
+                                  setCouponError('');
+                                }}
+                                className="flex-1"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={async () => {
+                                  if (!couponCode.trim() || !selectedService || !selectedBusiness) return;
+                                  setIsApplyingCoupon(true);
+                                  setCouponError('');
+                                  try {
+                                    const { data, error } = await supabase.rpc('validate_coupon', {
+                                      _coupon_code: couponCode.trim(),
+                                      _business_id: selectedBusiness.id,
+                                      _purchase_amount: Number(selectedService.price),
+                                      _service_id: selectedService.id,
+                                      _package_template_id: null,
+                                    });
+                                    if (error) throw error;
+                                    if (data && data.length > 0 && data[0].is_valid) {
+                                      const result = data[0];
+                                      setAppliedCoupon({
+                                        code: couponCode.trim(),
+                                        couponId: result.coupon_data?.id || '',
+                                        discount: Number(result.discount_amount),
+                                        discountType: result.coupon_data?.discount_type === 'percentage' ? 'percentage' : 'fixed',
+                                      });
+                                      toast.success('Coupon applied!');
+                                    } else {
+                                      setCouponError(data?.[0]?.message || 'Invalid coupon code');
+                                    }
+                                  } catch (err: any) {
+                                    setCouponError(err.message || 'Failed to apply coupon');
+                                    toast.error(err.message || 'Failed to apply coupon');
+                                  } finally {
+                                    setIsApplyingCoupon(false);
+                                  }
+                                }}
+                                disabled={isApplyingCoupon || !couponCode.trim()}
+                              >
+                                {isApplyingCoupon ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                              </Button>
+                            </div>
+                          )}
+                          {couponError && <p className="text-xs text-red-600 dark:text-red-400">{couponError}</p>}
+                        </div>
+                      </CardContent>
+                    </Card>
 
                     <Card className="glass-card">
                       <CardHeader>
