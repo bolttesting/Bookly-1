@@ -15,10 +15,11 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CalendarIcon, Clock, AlertCircle } from 'lucide-react';
+import { CalendarIcon, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRescheduleRequests } from '@/hooks/useRescheduleRequests';
 import { useBusiness } from '@/hooks/useBusiness';
+import { useAvailableSlots } from '@/hooks/useAvailableSlots';
 import { toast } from 'sonner';
 
 interface RescheduleRequestDialogProps {
@@ -28,7 +29,10 @@ interface RescheduleRequestDialogProps {
     id: string;
     start_time: string;
     end_time: string;
-    service?: { name: string; duration: number } | null;
+    business_id: string;
+    service_id: string;
+    location_id?: string | null;
+    service?: { name: string; duration: number; buffer_time?: number; slot_capacity?: number } | null;
   };
   rescheduleDeadlineHours?: number | null;
 }
@@ -58,6 +62,19 @@ export function RescheduleRequestDialog({
   const hoursUntilAppointment = differenceInHours(oldStartTime, now);
   const isDeadlinePassed = deadlineHours > 0 && hoursUntilAppointment < deadlineHours;
 
+  // Fetch available slots for the selected date (only available times for this service)
+  const { slots: timeSlots, isLoading: slotsLoading, offDays } = useAvailableSlots({
+    businessId: appointment.business_id,
+    serviceId: appointment.service_id,
+    service: {
+      duration: appointment.service?.duration || 60,
+      buffer_time: appointment.service?.buffer_time ?? 0,
+      slot_capacity: appointment.service?.slot_capacity ?? 1,
+    },
+    locationId: appointment.location_id ?? null,
+    selectedDate,
+  });
+
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
@@ -68,15 +85,12 @@ export function RescheduleRequestDialog({
     }
   }, [open]);
 
-  // Generate time slots (every 30 minutes from 8 AM to 8 PM)
-  const timeSlots: string[] = [];
-  for (let hour = 8; hour < 20; hour++) {
-    for (let minute = 0; minute < 60; minute += 30) {
-      const time = new Date();
-      time.setHours(hour, minute, 0, 0);
-      timeSlots.push(format(time, 'h:mm a'));
+  // Clear selected time when date changes or when selected time is no longer available
+  useEffect(() => {
+    if (selectedTime && timeSlots.length > 0 && !timeSlots.includes(selectedTime)) {
+      setSelectedTime('');
     }
-  }
+  }, [selectedDate, timeSlots, selectedTime]);
 
   const handleSubmit = async () => {
     if (!selectedDate || !selectedTime) {
@@ -181,13 +195,15 @@ export function RescheduleRequestDialog({
                   selected={selectedDate}
                   onSelect={(date) => {
                     setSelectedDate(date);
+                    setSelectedTime('');
                     setCalendarOpen(false);
                   }}
                   disabled={(date) => {
-                    // Disable past dates
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
-                    return date < today;
+                    if (date < today) return true;
+                    const dateStr = format(date, 'yyyy-MM-dd');
+                    return offDays.includes(dateStr);
                   }}
                   initialFocus
                 />
@@ -197,17 +213,41 @@ export function RescheduleRequestDialog({
 
           <div className="space-y-2">
             <Label htmlFor="time">New Time *</Label>
-            <Select value={selectedTime} onValueChange={setSelectedTime}>
+            <Select
+              value={selectedTime}
+              onValueChange={setSelectedTime}
+              disabled={!selectedDate || slotsLoading}
+            >
               <SelectTrigger id="time">
-                <Clock className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Select time" />
+                {slotsLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Clock className="mr-2 h-4 w-4" />
+                )}
+                <SelectValue
+                  placeholder={
+                    !selectedDate
+                      ? 'Select a date first'
+                      : slotsLoading
+                        ? 'Loading available slots...'
+                        : timeSlots.length === 0
+                          ? 'No available slots'
+                          : 'Select time'
+                  }
+                />
               </SelectTrigger>
               <SelectContent className="max-h-[200px]">
-                {timeSlots.map((slot) => (
-                  <SelectItem key={slot} value={slot}>
-                    {slot}
-                  </SelectItem>
-                ))}
+                {timeSlots.length === 0 && !slotsLoading ? (
+                  <div className="py-6 text-center text-sm text-muted-foreground">
+                    No available slots for this date
+                  </div>
+                ) : (
+                  timeSlots.map((slot) => (
+                    <SelectItem key={slot} value={slot}>
+                      {slot}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>

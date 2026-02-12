@@ -504,6 +504,19 @@ const Settings = () => {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="businessLogo">Logo URL</Label>
+                <Input 
+                  id="businessLogo" 
+                  type="url"
+                  placeholder="https://example.com/logo.png"
+                  defaultValue={business?.logo_url || ''} 
+                  className="bg-secondary" 
+                />
+                <p className="text-xs text-muted-foreground">
+                  Your logo will appear in the booking widget. Use a direct image URL.
+                </p>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="industry">Industry</Label>
                 <Input 
                   id="industry" 
@@ -589,6 +602,7 @@ const Settings = () => {
                 disabled={isSaving}
                 onClick={async () => {
                   const name = (document.getElementById('businessName') as HTMLInputElement)?.value;
+                  const logoUrl = (document.getElementById('businessLogo') as HTMLInputElement)?.value?.trim() || null;
                   const industry = (document.getElementById('industry') as HTMLInputElement)?.value;
                   const email = (document.getElementById('businessEmail') as HTMLInputElement)?.value;
                   const phone = (document.getElementById('businessPhone') as HTMLInputElement)?.value;
@@ -600,6 +614,7 @@ const Settings = () => {
                     setIsSaving(true);
                     await updateBusiness({
                       name,
+                      logo_url: logoUrl,
                       industry: industry || null,
                       email: email || null,
                       phone: phone || null,

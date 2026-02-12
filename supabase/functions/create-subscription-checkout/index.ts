@@ -57,7 +57,7 @@ serve(async (req) => {
 
     const amountCents = Math.round(Number(plan.price) * 100);
     const stripe = new Stripe(stripeKey, {
-      apiVersion: "2024-11-20",
+      apiVersion: "2026-01-28.clover",
     });
 
     const session = await stripe.checkout.sessions.create({

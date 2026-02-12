@@ -34,6 +34,7 @@ interface Business {
   id: string;
   name: string;
   slug: string;
+  logo_url: string | null;
   industry: string | null;
   phone: string | null;
   email: string | null;
@@ -1460,22 +1461,48 @@ export default function PublicBooking() {
 
   return (
     <div className={`min-h-screen bg-background ${isEmbedded ? 'p-2' : ''}`}>
-      {/* Header - hidden in embed mode */}
-      {!isEmbedded && (
+      {/* Header - full in standalone, compact in embed */}
+      {(isEmbedded ? (
+        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border/50">
+          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center overflow-hidden shrink-0">
+            {business.logo_url ? (
+              <img src={business.logo_url} alt={business.name} className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; (e.currentTarget.nextElementSibling as HTMLElement)?.classList.remove('hidden'); }} />
+            ) : null}
+            <span className={`flex items-center justify-center w-full h-full ${business.logo_url ? 'hidden' : ''}`}>
+              <Calendar className="h-4 w-4 text-primary-foreground" />
+            </span>
+          </div>
+          <h1 className="font-display font-bold text-base truncate">{business.name}</h1>
+        </div>
+      ) : (
         <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-50">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-                <Calendar className="h-5 w-5 text-primary-foreground" />
+              <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center overflow-hidden shrink-0">
+                {business.logo_url ? (
+                  <img
+                    src={business.logo_url}
+                    alt={business.name}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                      if (fallback) fallback.classList.remove('hidden');
+                    }}
+                  />
+                ) : null}
+                <span className={`flex items-center justify-center w-full h-full ${business.logo_url ? 'hidden' : ''}`}>
+                  <Calendar className="h-5 w-5 text-primary-foreground" />
+                </span>
               </div>
-              <div>
-                <h1 className="font-display font-bold text-lg">{business.name}</h1>
+              <div className="min-w-0">
+                <h1 className="font-display font-bold text-lg truncate">{business.name}</h1>
                 <p className="text-xs text-muted-foreground">{business.industry}</p>
               </div>
             </div>
           </div>
         </header>
-      )}
+      ))}
 
       <main className={`container mx-auto px-4 sm:px-6 ${isEmbedded ? 'py-4' : 'py-6 sm:py-8'} max-w-4xl`}>
         {/* Login/Signup bar - visible from step 1 when viewing services */}

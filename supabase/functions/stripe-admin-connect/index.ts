@@ -32,7 +32,7 @@ serve(async (req) => {
 
   try {
     const stripe = new Stripe(stripeKey, {
-      apiVersion: "2024-11-20",
+      apiVersion: "2026-01-28.clover",
     });
 
     await stripe.balance.retrieve();

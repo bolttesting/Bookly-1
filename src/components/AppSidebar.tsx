@@ -10,6 +10,7 @@ import {
   Package,
   Tag,
   BarChart3,
+  ClipboardCheck,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -31,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Calendar", url: "/calendar", icon: Calendar },
+  { title: "Attendance", url: "/attendance", icon: ClipboardCheck },
   { title: "Services", url: "/services", icon: Briefcase },
   { title: "Packages", url: "/packages", icon: Package },
   { title: "Coupons", url: "/coupons", icon: Tag },

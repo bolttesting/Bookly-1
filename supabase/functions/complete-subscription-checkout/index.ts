@@ -37,7 +37,7 @@ serve(async (req) => {
     }
 
     const stripe = new Stripe(stripeKey, {
-      apiVersion: "2024-11-20",
+      apiVersion: "2026-01-28.clover",
     });
 
     const session = await stripe.checkout.sessions.retrieve(session_id);

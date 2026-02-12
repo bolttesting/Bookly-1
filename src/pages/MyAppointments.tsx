@@ -109,7 +109,10 @@ export default function MyAppointments() {
     id: string;
     start_time: string;
     end_time: string;
-    service?: { name: string; duration: number } | null;
+    business_id: string;
+    service_id: string;
+    location_id?: string | null;
+    service?: { name: string; duration: number; buffer_time?: number; slot_capacity?: number } | null;
     businessDeadlineHours?: number | null;
   } | null>(null);
   
@@ -291,7 +294,8 @@ export default function MyAppointments() {
           price,
           service_id,
           staff_id,
-          business_id
+          business_id,
+          location_id
         `)
         .in('customer_id', customerIds)
         .order('start_time', { ascending: true });
@@ -303,7 +307,7 @@ export default function MyAppointments() {
       const businessIds = [...new Set(data.map(a => a.business_id))];
 
       const [servicesRes, staffRes, businessesRes] = await Promise.all([
-        supabase.from('services').select('id, name, duration').in('id', serviceIds),
+        supabase.from('services').select('id, name, duration, buffer_time, slot_capacity').in('id', serviceIds),
         staffIds.length > 0 
           ? supabase.from('staff_members').select('id, name').in('id', staffIds)
           : Promise.resolve({ data: [] }),
@@ -1195,7 +1199,17 @@ export default function MyAppointments() {
                                       id: apt.id,
                                       start_time: apt.start_time,
                                       end_time: apt.end_time,
-                                      service: apt.service ? { name: apt.service.name, duration: apt.service.duration } : null,
+                                      business_id: apt.business_id,
+                                      service_id: apt.service_id,
+                                      location_id: apt.location_id ?? null,
+                                      service: apt.service
+                                        ? {
+                                            name: apt.service.name,
+                                            duration: apt.service.duration,
+                                            buffer_time: apt.service.buffer_time,
+                                            slot_capacity: apt.service.slot_capacity,
+                                          }
+                                        : null,
                                       businessDeadlineHours: apt.business?.reschedule_deadline_hours,
                                     });
                                     setRescheduleDialogOpen(true);
