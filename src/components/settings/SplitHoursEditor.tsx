@@ -35,47 +35,48 @@ export function SplitHoursEditor({ locationId, locationName }: SplitHoursEditorP
   const [rangesByDay, setRangesByDay] = useState<Record<number, Array<{ id?: string; start_time: string; end_time: string; display_order: number }>>>({});
   const initialized = useRef(false);
 
-  // Initialize local hours and fetch ranges when hoursByDay is ready
+  // Initialize and resync when hoursByDay changes (handles tab switch + cache refresh)
   useEffect(() => {
-    if (!isLoading && hoursByDay.length === 7 && !initialized.current) {
-      setLocalHours(hoursByDay);
-      
-      // Fetch ranges for each day
-      const fetchRanges = async () => {
-        const newRanges: typeof rangesByDay = {};
-        
-        for (const day of hoursByDay) {
-          if (day.id && !day.is_closed) {
-            const { data: ranges } = await supabase
-              .from('business_hour_ranges')
-              .select('*')
-              .eq('business_hours_id', day.id)
-              .order('display_order', { ascending: true })
-              .order('start_time', { ascending: true });
+    if (!isLoading && hoursByDay.length === 7) {
+      const dataSignature = hoursByDay.map(h => `${h.id}|${h.open_time}|${h.close_time}|${h.is_closed}`).join(';');
+      const prevSignature = localHours.length === 7
+        ? localHours.map(h => `${h.id}|${h.open_time}|${h.close_time}|${h.is_closed}`).join(';')
+        : '';
+      if (!initialized.current || dataSignature !== prevSignature) {
+        setLocalHours(hoursByDay);
 
-            if (ranges && ranges.length > 0) {
-              newRanges[day.day] = ranges.map(r => ({
-                id: r.id,
-                start_time: r.start_time.slice(0, 5),
-                end_time: r.end_time.slice(0, 5),
-                display_order: r.display_order,
-              }));
-            } else {
-              // If no ranges exist, create default from open_time/close_time
-              newRanges[day.day] = [{
-                start_time: day.open_time,
-                end_time: day.close_time,
-                display_order: 0,
-              }];
+        const fetchRanges = async () => {
+          const newRanges: typeof rangesByDay = {};
+          for (const day of hoursByDay) {
+            if (day.id && !day.is_closed) {
+              const { data: ranges } = await supabase
+                .from('business_hour_ranges')
+                .select('*')
+                .eq('business_hours_id', day.id)
+                .order('display_order', { ascending: true })
+                .order('start_time', { ascending: true });
+
+              if (ranges && ranges.length > 0) {
+                newRanges[day.day] = ranges.map(r => ({
+                  id: r.id,
+                  start_time: r.start_time.slice(0, 5),
+                  end_time: r.end_time.slice(0, 5),
+                  display_order: r.display_order,
+                }));
+              } else {
+                newRanges[day.day] = [{
+                  start_time: day.open_time,
+                  end_time: day.close_time,
+                  display_order: 0,
+                }];
+              }
             }
           }
-        }
-        
-        setRangesByDay(newRanges);
-        initialized.current = true;
-      };
-      
-      fetchRanges();
+          setRangesByDay(newRanges);
+          initialized.current = true;
+        };
+        fetchRanges();
+      }
     }
   }, [hoursByDay, isLoading]);
 

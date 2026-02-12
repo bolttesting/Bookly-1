@@ -37,6 +37,7 @@ export function useBusinessHours(businessId?: string, locationId?: string | null
 
   const { data: hours = [], isLoading, error } = useQuery({
     queryKey: ['business-hours', targetBusinessId, locationId],
+    staleTime: 0,
     queryFn: async () => {
       if (!targetBusinessId) return [];
 
@@ -79,38 +80,19 @@ export function useBusinessHours(businessId?: string, locationId?: string | null
     mutationFn: async (hoursData: BusinessHoursFormData[]) => {
       if (!targetBusinessId) throw new Error('No business found');
 
-      // Delete existing hours for this business+location first (handles NULL location_id correctly;
-      // PostgreSQL unique constraint treats NULL != NULL so upsert fails for default hours)
-      let deleteQuery = supabase
-        .from('business_hours')
-        .delete()
-        .eq('business_id', targetBusinessId);
+      // Use RPC to reliably save (handles NULL location_id and RLS edge cases)
+      const { error } = await supabase.rpc('save_business_hours', {
+        p_business_id: targetBusinessId,
+        p_location_id: locationId || null,
+        p_hours: hoursData.map(h => ({
+          day_of_week: h.day_of_week,
+          open_time: h.open_time,
+          close_time: h.close_time,
+          is_closed: h.is_closed,
+        })),
+      });
 
-      if (locationId) {
-        deleteQuery = deleteQuery.eq('location_id', locationId);
-      } else {
-        deleteQuery = deleteQuery.is('location_id', null);
-      }
-
-      const { error: deleteError } = await deleteQuery;
-
-      if (deleteError) throw deleteError;
-
-      // Insert new hours
-      const { error: insertError } = await supabase
-        .from('business_hours')
-        .insert(
-          hoursData.map(h => ({
-            business_id: targetBusinessId,
-            location_id: locationId || null,
-            day_of_week: h.day_of_week,
-            open_time: h.open_time,
-            close_time: h.close_time,
-            is_closed: h.is_closed,
-          }))
-        );
-
-      if (insertError) throw insertError;
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['business-hours', targetBusinessId, locationId] });
