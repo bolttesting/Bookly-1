@@ -29,7 +29,7 @@ import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
 const Settings = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { business, updateBusiness } = useBusiness();
+  const { business, updateBusiness, refetch: refetchBusiness } = useBusiness();
   const { currencyCode, currencies } = useCurrency();
   const { plans: subscriptionPlans, isLoading: plansLoading } = useSubscriptionPlans();
   const { subscription, isLoading: subscriptionLoading, updateSubscription } = useBusinessSubscription();
@@ -1066,8 +1066,22 @@ const Settings = () => {
                 <Button
                   variant="outline"
                   onClick={async () => {
-                    // TODO: Implement Stripe disconnect
-                    toast.info('Disconnect functionality coming soon');
+                    if (!business?.id) return;
+                    const { error } = await supabase
+                      .from('businesses')
+                      .update({
+                        stripe_account_id: null,
+                        stripe_connected: false,
+                        stripe_onboarding_complete: false,
+                        updated_at: new Date().toISOString(),
+                      })
+                      .eq('id', business.id);
+                    if (error) {
+                      toast.error(error.message || 'Failed to disconnect Stripe');
+                      return;
+                    }
+                    refetchBusiness();
+                    toast.success('Stripe disconnected');
                   }}
                 >
                   Disconnect Stripe
@@ -1172,11 +1186,6 @@ const Settings = () => {
                   <Package className="h-5 w-5 text-primary" />
                   <h2 className="text-lg font-semibold">Upgrade Your Plan</h2>
                 </div>
-                {!stripeConnected && (
-                  <Badge variant="outline" className="text-xs">
-                    Test Mode - No Payment Required
-                  </Badge>
-                )}
               </div>
               
               {/* Current Plan Status */}

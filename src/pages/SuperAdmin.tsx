@@ -912,21 +912,37 @@ export default function SuperAdmin() {
                     )}
                   </h3>
                   {stripeAdminConnected === true ? (
-                    <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                      <p className="text-sm text-muted-foreground mb-4">
+                    <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg space-y-3">
+                      <p className="text-sm text-muted-foreground">
                         Your Stripe account is connected. STRIPE_SECRET_KEY is configured and verified. You can open the Stripe dashboard to manage payments.
                       </p>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          const mode = stripeAdminMode === 'live' ? '' : '/test';
-                          window.open(`https://dashboard.stripe.com${mode}`, '_blank');
-                        }}
-                        className="gap-2"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        Open Stripe Dashboard
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            const mode = stripeAdminMode === 'live' ? '' : '/test';
+                            window.open(`https://dashboard.stripe.com${mode}`, '_blank');
+                          }}
+                          className="gap-2"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Open Stripe Dashboard
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setStripeAdminConnected(false);
+                            setStripeAdminMode(null);
+                            toast.info(
+                              'To fully disconnect, remove STRIPE_SECRET_KEY from Supabase Dashboard → Project Settings → Edge Functions → Secrets.',
+                              { duration: 6000 }
+                            );
+                          }}
+                          className="gap-2 text-destructive hover:text-destructive"
+                        >
+                          Disconnect
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
