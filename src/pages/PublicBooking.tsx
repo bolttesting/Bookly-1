@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { format, addMinutes, setHours, setMinutes, startOfDay, isBefore, isAfter, addDays } from 'date-fns';
-import { Calendar, Clock, User, Mail, Phone, ArrowRight, ArrowLeft, CheckCircle, Loader2, Users, LogIn, MapPin, Eye, EyeOff, Tag, Repeat, CalendarIcon } from 'lucide-react';
+import { Calendar, Clock, User, Mail, Phone, ArrowRight, ArrowLeft, CheckCircle, Loader2, Users, LogIn, MapPin, Eye, EyeOff, Tag, Repeat, CalendarIcon, Package, LayoutDashboard } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -86,6 +86,18 @@ interface SlotAvailability {
   available: number;
 }
 
+interface PackageTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  booking_limit: number;
+  duration_type: string;
+  duration_value: number;
+  business_id: string;
+  services?: { id: string; name: string }[];
+}
+
 const customerSchema = z.object({
   name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
   email: z.string().trim().email('Please enter a valid email'),
@@ -110,6 +122,7 @@ export default function PublicBooking() {
   const isEmbedded = searchParams.get('embed') === 'true';
   const [business, setBusiness] = useState<Business | null>(null);
   const [services, setServices] = useState<Service[]>([]);
+  const [packages, setPackages] = useState<PackageTemplate[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [businessHours, setBusinessHours] = useState<BusinessHours[]>([]);
@@ -141,8 +154,10 @@ export default function PublicBooking() {
   const [showSignupPassword, setShowSignupPassword] = useState(false);
 
   // Booking state
+  const [bookableType, setBookableType] = useState<'service' | 'package'>('service');
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<PackageTemplate | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -156,6 +171,11 @@ export default function PublicBooking() {
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; discountType: 'percentage' | 'fixed' } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+
+  // When booking a package, require login/signup (no guest)
+  useEffect(() => {
+    if (selectedPackage && authMode === 'guest') setAuthMode('login');
+  }, [selectedPackage, authMode]);
 
   // Check for logged in user
   useEffect(() => {
@@ -225,6 +245,26 @@ export default function PublicBooking() {
 
         setServices(activeServices);
 
+        // Fetch packages
+        const { data: packagesData } = await supabase
+          .from('package_templates')
+          .select(`
+            *,
+            package_services (
+              service_id,
+              services (id, name)
+            )
+          `)
+          .eq('business_id', businessData.id)
+          .eq('status', 'active')
+          .order('name');
+
+        const packagesMapped = (packagesData || []).map((pkg: any) => ({
+          ...pkg,
+          services: ((pkg.package_services || []).map((ps: any) => ps?.services).filter(Boolean)) as { id: string; name: string }[],
+        }));
+        setPackages(packagesMapped);
+
         // Fetch staff
         const { data: staffData } = await supabase
           .from('staff_members')
@@ -284,8 +324,13 @@ export default function PublicBooking() {
     fetchBusinessData();
   }, [slug]);
 
+  // For packages, use first service for slot duration/availability
+  const effectiveService = selectedPackage && selectedPackage.services?.length
+    ? services.find(s => s.id === (selectedPackage.services![0] as { id: string })?.id) ?? null
+    : selectedService;
+
   const generateTimeSlotsWithAvailability = (): SlotAvailability[] => {
-    if (!selectedDate || !selectedService) return [];
+    if (!selectedDate || !effectiveService) return [];
 
     const dayOfWeek = selectedDate.getDay();
     
@@ -311,8 +356,8 @@ export default function PublicBooking() {
     const [closeHours, closeMinutes] = closeTime.split(':').map(Number);
     
     // Calculate slot interval: duration + buffer time
-    const slotInterval = selectedService.duration + (selectedService.buffer_time || 0);
-    const capacity = selectedService.slot_capacity || 1;
+    const slotInterval = effectiveService.duration + (effectiveService.buffer_time || 0);
+    const capacity = effectiveService.slot_capacity || 1;
 
     let current = setMinutes(setHours(startOfDay(selectedDate), openHours), openMinutes);
     const end = setMinutes(setHours(startOfDay(selectedDate), closeHours), closeMinutes);
@@ -320,7 +365,7 @@ export default function PublicBooking() {
 
     while (isBefore(current, end)) {
       // Check if the appointment would fit before closing time
-      const appointmentEnd = addMinutes(current, selectedService.duration);
+      const appointmentEnd = addMinutes(current, effectiveService.duration);
       if (isAfter(appointmentEnd, end)) break;
       
       // Don't show past times for today
@@ -332,7 +377,7 @@ export default function PublicBooking() {
           const aptDate = new Date(apt.start_time);
           return format(aptDate, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') &&
                  format(aptDate, 'HH:mm') === timeStr &&
-                 apt.service_id === selectedService.id;
+                 apt.service_id === effectiveService.id;
         }).length;
 
         const available = capacity - booked;
@@ -506,13 +551,19 @@ export default function PublicBooking() {
       customerEmail,
     });
     
-    if (!business || !selectedService || !selectedDate || !selectedTime) {
+    if (!business || !effectiveService || !selectedDate || !selectedTime) {
       console.error('❌ Missing required fields:', {
         business: !business,
-        selectedService: !selectedService,
+        effectiveService: !effectiveService,
         selectedDate: !selectedDate,
         selectedTime: !selectedTime,
       });
+      toast.error('Please complete all steps.');
+      return;
+    }
+
+    if (selectedPackage && !loggedInUser) {
+      toast.error('Please log in or sign up to book a package.');
       return;
     }
 
@@ -677,21 +728,46 @@ export default function PublicBooking() {
         throw new Error('Failed to create or find customer');
       }
 
+      let customerPackageId: string | null = null;
+      if (selectedPackage) {
+        const now = new Date();
+        let expiresAt = new Date();
+        const dt = selectedPackage.duration_type;
+        const dv = selectedPackage.duration_value;
+        if (dt === 'days') expiresAt.setDate(now.getDate() + dv);
+        else if (dt === 'weeks') expiresAt.setDate(now.getDate() + dv * 7);
+        else if (dt === 'months') expiresAt.setMonth(now.getMonth() + dv);
+        else if (dt === 'years') expiresAt.setFullYear(now.getFullYear() + dv);
+        else expiresAt.setMonth(now.getMonth() + 1);
+        const { data: cp, error: cpErr } = await supabase.from('customer_packages').insert({
+          customer_id: customerId,
+          package_template_id: selectedPackage.id,
+          business_id: business.id,
+          expires_at: expiresAt.toISOString(),
+          bookings_remaining: selectedPackage.booking_limit - 1,
+          bookings_used: 1,
+          status: 'active',
+        }).select('id').single();
+        if (cpErr) throw cpErr;
+        customerPackageId = cp?.id ?? null;
+      }
+
       // Create appointment
       const [hours, minutes] = selectedTime.split(':').map(Number);
       const startTime = setMinutes(setHours(selectedDate, hours), minutes);
-      const endTime = addMinutes(startTime, selectedService.duration);
+      const endTime = addMinutes(startTime, effectiveService.duration);
 
       console.log('📅 Appointment timing:', {
         selectedDate: selectedDate.toISOString(),
         selectedTime,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
-        duration: selectedService.duration,
+        duration: effectiveService.duration,
       });
 
-      // Calculate final price with coupon discount
-      const servicePrice = Number(selectedService.price) || 0;
+      // Calculate final price with coupon discount (package total or single service)
+      const basePrice = selectedPackage ? Number(selectedPackage.price) : Number(effectiveService.price);
+      const servicePrice = basePrice || 0;
       let finalPrice = servicePrice;
       
       if (appliedCoupon) {
@@ -745,7 +821,7 @@ export default function PublicBooking() {
       });
 
       // If recurring, create a series instead of a single appointment
-      if (isRecurring) {
+      if (isRecurring && !selectedPackage) {
         console.log('📅 Creating recurring appointment series...');
         try {
           // Create recurring series directly
@@ -754,7 +830,7 @@ export default function PublicBooking() {
             .insert({
               business_id: business.id,
               customer_id: customerId,
-              service_id: selectedService.id,
+              service_id: effectiveService.id,
               staff_id: selectedStaff?.id || null,
               location_id: selectedLocation?.id || null,
               recurrence_pattern: recurrencePattern,
@@ -802,7 +878,7 @@ export default function PublicBooking() {
       const appointmentData = {
           business_id: business.id,
           customer_id: customerId,
-          service_id: selectedService.id,
+          service_id: effectiveService.id,
           staff_id: selectedStaff?.id || null,
           location_id: selectedLocation?.id || null,
           start_time: startTime.toISOString(),
@@ -811,6 +887,7 @@ export default function PublicBooking() {
           status: 'pending',
           payment_status: paymentStatus,
           notes: customerNotes || null,
+          package_id: customerPackageId,
       };
       
       console.log('📝 Attempting to create appointment with data:', appointmentData);
@@ -921,7 +998,7 @@ export default function PublicBooking() {
             appointmentId: appointment.id,
             customerEmail,
             customerName,
-            serviceName: selectedService.name,
+            serviceName: selectedPackage?.name || effectiveService.name,
             businessName: business.name,
             startTime: startTime.toISOString(),
             staffName: selectedStaff?.name,
@@ -932,7 +1009,7 @@ export default function PublicBooking() {
             appointmentId: appointment.id,
             customerEmail,
             customerName,
-            serviceName: selectedService.name,
+            serviceName: selectedPackage?.name || effectiveService.name,
             businessName: business.name,
             startTime: startTime.toISOString(),
             staffName: selectedStaff?.name,
@@ -990,7 +1067,7 @@ export default function PublicBooking() {
 
         await notifyBusinessUsers(business.id, {
           title: 'New Appointment Booked',
-          message: `${customerName} booked ${selectedService.name} on ${formattedDate} at ${formattedTime}`,
+          message: `${customerName} booked ${selectedPackage?.name || effectiveService.name} on ${formattedDate} at ${formattedTime}`,
           type: 'appointment',
           link: '/calendar',
         });
@@ -1060,7 +1137,7 @@ export default function PublicBooking() {
           appointmentId: createdAppointmentId,
           customerEmail,
           customerName,
-          serviceName: selectedService?.name || '',
+          serviceName: selectedPackage?.name || effectiveService?.name || '',
           businessName: business?.name || '',
           startTime: selectedDate && selectedTime 
             ? setMinutes(setHours(selectedDate, parseInt(selectedTime.split(':')[0])), parseInt(selectedTime.split(':')[1])).toISOString()
@@ -1073,7 +1150,7 @@ export default function PublicBooking() {
             appointmentId: createdAppointmentId,
             customerEmail,
             customerName,
-            serviceName: selectedService?.name || '',
+            serviceName: selectedPackage?.name || effectiveService?.name || '',
             businessName: business?.name || '',
             startTime: selectedDate && selectedTime 
               ? setMinutes(setHours(selectedDate, parseInt(selectedTime.split(':')[0])), parseInt(selectedTime.split(':')[1])).toISOString()
@@ -1128,7 +1205,7 @@ export default function PublicBooking() {
     }
   };
 
-  if (showPayment && createdAppointmentId && business && selectedService) {
+  if (showPayment && createdAppointmentId && business && effectiveService) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-2xl space-y-6">
@@ -1145,7 +1222,7 @@ export default function PublicBooking() {
             businessId={business.id}
             appointmentId={createdAppointmentId}
             amount={(() => {
-              const basePrice = Number(selectedService.price);
+              const basePrice = Number(selectedPackage?.price ?? effectiveService?.price);
               let finalPrice = basePrice;
               if (appliedCoupon) {
                 if (appliedCoupon.discountType === 'percentage') {
@@ -1170,7 +1247,7 @@ export default function PublicBooking() {
             <CardContent className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Service</span>
-                <span className="font-medium">{selectedService.name}</span>
+                <span className="font-medium">{selectedPackage?.name || effectiveService?.name}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Date</span>
@@ -1208,7 +1285,7 @@ export default function PublicBooking() {
             <div className="glass-card p-4 space-y-2">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Service</span>
-                <span className="font-medium">{selectedService?.name}</span>
+                <span className="font-medium">{selectedPackage?.name || effectiveService?.name}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Date</span>
@@ -1220,7 +1297,7 @@ export default function PublicBooking() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Price</span>
-                <span className="font-medium">${selectedService?.price}</span>
+                <span className="font-medium">{formatCurrencySimple(Number(selectedPackage?.price ?? effectiveService?.price), business?.currency || 'USD')}</span>
               </div>
             </div>
             <p className="text-sm text-muted-foreground text-center">
@@ -1233,6 +1310,7 @@ export default function PublicBooking() {
                 setBookingComplete(false);
                 setStep(1);
                 setSelectedService(null);
+                setSelectedPackage(null);
                 setSelectedStaff(null);
                 setSelectedDate(undefined);
                 setSelectedTime(null);
@@ -1273,9 +1351,14 @@ export default function PublicBooking() {
         {/* Login/Signup bar - visible from step 1 when viewing services */}
         <div className="flex items-center justify-end gap-2 mb-4 pb-3 border-b border-border/50">
           {loggedInUser ? (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Logged in as</span>
-              <span className="font-medium truncate max-w-[180px]">{loggedInUser.email}</span>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/my-appointments">
+                  <LayoutDashboard className="h-4 w-4 mr-1" />
+                  My Dashboard
+                </Link>
+              </Button>
+              <span className="text-sm text-muted-foreground truncate max-w-[140px]">{loggedInUser.email}</span>
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -1474,52 +1557,107 @@ export default function PublicBooking() {
           </div>
         )}
 
-        {/* Step: Select Service (Step 1 if no locations, Step 2 if locations) */}
+        {/* Step: Select Service or Package (Step 1 if no locations, Step 2 if locations) */}
         {((locations.length <= 1 && step === 1) || (locations.length > 1 && step === 2)) && (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-xl sm:text-2xl font-display font-bold">Select a Service</h2>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">Choose the service you'd like to book</p>
+              <h2 className="text-xl sm:text-2xl font-display font-bold">Select a Service or Package</h2>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">Choose what you'd like to book</p>
             </div>
 
-            {services.length === 0 ? (
-              <Card className="glass-card p-6 sm:p-8 text-center">
-                <p className="text-sm sm:text-base text-muted-foreground">No services available at this time.</p>
-              </Card>
-            ) : (
-              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
-                {services.map((service) => (
-                  <Card
-                    key={service.id}
-                    className={`glass-card cursor-pointer transition-all hover:border-primary/50 ${
-                      selectedService?.id === service.id ? 'border-primary ring-2 ring-primary/20' : ''
-                    }`}
-                    onClick={() => setSelectedService(service)}
-                  >
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <CardTitle className="text-lg">{service.name}</CardTitle>
-                        <span className="text-lg font-bold text-primary">
-                          {formatCurrencySimple(Number(service.price), business?.currency || 'USD')}
-                        </span>
-                      </div>
-                      {service.category && (
-                        <span className="text-xs text-muted-foreground">{service.category}</span>
-                      )}
-                    </CardHeader>
-                    <CardContent>
-                      {service.description && (
-                        <p className="text-sm text-muted-foreground mb-2">{service.description}</p>
-                      )}
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>{service.duration} minutes</span>
-                      </div>
-                    </CardContent>
+            <Tabs value={bookableType} onValueChange={(v) => { setBookableType(v as 'service' | 'package'); setSelectedService(null); setSelectedPackage(null); }} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="service" className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Services
+                </TabsTrigger>
+                <TabsTrigger value="package" className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Packages
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="service" className="mt-0">
+                {services.length === 0 ? (
+                  <Card className="glass-card p-6 sm:p-8 text-center">
+                    <p className="text-sm sm:text-base text-muted-foreground">No services available at this time.</p>
                   </Card>
-                ))}
-              </div>
-            )}
+                ) : (
+                  <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+                    {services.map((service) => (
+                      <Card
+                        key={service.id}
+                        className={`glass-card cursor-pointer transition-all hover:border-primary/50 ${
+                          effectiveService?.id === service.id ? 'border-primary ring-2 ring-primary/20' : ''
+                        }`}
+                        onClick={() => { setSelectedService(service); setSelectedPackage(null); }}
+                      >
+                        <CardHeader className="pb-2">
+                          <div className="flex justify-between items-start">
+                            <CardTitle className="text-lg">{service.name}</CardTitle>
+                            <span className="text-lg font-bold text-primary">
+                              {formatCurrencySimple(Number(service.price), business?.currency || 'USD')}
+                            </span>
+                          </div>
+                          {service.category && (
+                            <span className="text-xs text-muted-foreground">{service.category}</span>
+                          )}
+                        </CardHeader>
+                        <CardContent>
+                          {service.description && (
+                            <p className="text-sm text-muted-foreground mb-2">{service.description}</p>
+                          )}
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Clock className="h-4 w-4" />
+                            <span>{service.duration} minutes</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="package" className="mt-0">
+                {packages.length === 0 ? (
+                  <Card className="glass-card p-6 sm:p-8 text-center">
+                    <p className="text-sm sm:text-base text-muted-foreground">No packages available at this time.</p>
+                  </Card>
+                ) : (
+                  <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+                    {packages.map((pkg) => (
+                      <Card
+                        key={pkg.id}
+                        className={`glass-card cursor-pointer transition-all hover:border-primary/50 ${
+                          selectedPackage?.id === pkg.id ? 'border-primary ring-2 ring-primary/20' : ''
+                        }`}
+                        onClick={() => { setSelectedPackage(pkg); setSelectedService(null); }}
+                      >
+                        <CardHeader className="pb-2">
+                          <div className="flex justify-between items-start">
+                            <CardTitle className="text-lg">{pkg.name}</CardTitle>
+                            <span className="text-lg font-bold text-primary">
+                              {formatCurrencySimple(Number(pkg.price), business?.currency || 'USD')}
+                            </span>
+                          </div>
+                          <Badge variant="secondary" className="text-xs">{pkg.booking_limit} sessions</Badge>
+                        </CardHeader>
+                        <CardContent>
+                          {pkg.description && (
+                            <p className="text-sm text-muted-foreground mb-2">{pkg.description}</p>
+                          )}
+                          {pkg.services && pkg.services.length > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Includes: {pkg.services.map((s: { name: string }) => s.name).join(', ')}
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
 
             <div className="flex justify-between">
               {locations.length > 1 && (
@@ -1530,7 +1668,7 @@ export default function PublicBooking() {
               )}
               {locations.length <= 1 && <div />}
               <Button
-                disabled={!selectedService}
+                disabled={!effectiveService}
                 onClick={() => setStep(locations.length > 1 ? 3 : 2)}
               >
                 Continue
@@ -1632,10 +1770,10 @@ export default function PublicBooking() {
               <Card className="glass-card">
                 <CardHeader>
                   <CardTitle className="text-lg">Select Time</CardTitle>
-                  {selectedService && selectedService.slot_capacity > 1 && (
+                  {effectiveService && effectiveService.slot_capacity > 1 && (
                     <CardDescription className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
-                      Up to {selectedService.slot_capacity} spots per slot
+                      Up to {effectiveService.slot_capacity} spots per slot
                     </CardDescription>
                   )}
                 </CardHeader>
@@ -1709,6 +1847,11 @@ export default function PublicBooking() {
               <p className="text-sm sm:text-base text-muted-foreground mt-1">
                 {loggedInUser ? `Logged in as ${loggedInUser.email}` : 'Please provide your contact information'}
               </p>
+              {selectedPackage && !loggedInUser && (
+                <p className="text-sm text-amber-600 dark:text-amber-500 mt-2 font-medium">
+                  Package bookings require an account. Please log in or sign up below.
+                </p>
+              )}
             </div>
 
             <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
@@ -1721,18 +1864,19 @@ export default function PublicBooking() {
                   {!loggedInUser && (
                     <CardDescription>
                       <Tabs value={authMode} onValueChange={(v) => setAuthMode(v as 'guest' | 'login' | 'signup')}>
-                        <TabsList className="grid w-full grid-cols-3 text-xs sm:text-sm">
-                          <TabsTrigger value="guest">Guest</TabsTrigger>
+                        <TabsList className={`grid w-full text-xs sm:text-sm ${selectedPackage ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                          {!selectedPackage && <TabsTrigger value="guest">Guest</TabsTrigger>}
                           <TabsTrigger value="login">Login</TabsTrigger>
                           <TabsTrigger value="signup">Sign Up</TabsTrigger>
                         </TabsList>
                       </Tabs>
+                      {selectedPackage && <p className="text-amber-600 dark:text-amber-500 text-xs mt-2">Packages require an account</p>}
                     </CardDescription>
                   )}
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Guest Mode */}
-                  {authMode === 'guest' && !loggedInUser && (
+                  {/* Guest Mode - hidden for packages (require account) */}
+                  {authMode === 'guest' && !loggedInUser && !selectedPackage && (
                     <>
                       <div className="space-y-2">
                         <Label htmlFor="name">Full Name *</Label>
@@ -1943,11 +2087,11 @@ export default function PublicBooking() {
                   <div className="space-y-3">
                     <div className="flex justify-between py-2 border-b border-border">
                       <span className="text-muted-foreground">Service</span>
-                      <span className="font-medium">{selectedService?.name}</span>
+                      <span className="font-medium">{selectedPackage?.name || effectiveService?.name}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-border">
                       <span className="text-muted-foreground">Duration</span>
-                      <span className="font-medium">{selectedService?.duration} min</span>
+                      <span className="font-medium">{effectiveService?.duration} min</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-border">
                       <span className="text-muted-foreground">Staff</span>
@@ -1978,8 +2122,8 @@ export default function PublicBooking() {
                     <div className="flex justify-between py-2 text-lg">
                       <span className="font-semibold">Total</span>
                       <span className="font-bold text-primary">
-                        {selectedService ? (() => {
-                          const basePrice = Number(selectedService.price);
+                        {effectiveService ? (() => {
+                          const basePrice = Number(selectedPackage?.price ?? effectiveService?.price);
                           let finalPrice = basePrice;
                           if (appliedCoupon) {
                             if (appliedCoupon.discountType === 'percentage') {
@@ -2035,7 +2179,7 @@ export default function PublicBooking() {
                             type="button"
                             variant="outline"
                             onClick={async () => {
-                              if (!couponCode.trim() || !selectedService || !business) return;
+                              if (!couponCode.trim() || !effectiveService || !business) return;
                               
                               setIsApplyingCoupon(true);
                               setCouponError('');
@@ -2044,9 +2188,9 @@ export default function PublicBooking() {
                                 const { data, error } = await supabase.rpc('validate_coupon', {
                                   _coupon_code: couponCode.trim(),
                                   _business_id: business.id,
-                                  _purchase_amount: Number(selectedService.price),
-                                  _service_id: selectedService.id,
-                                  _package_template_id: null,
+                                  _purchase_amount: Number(selectedPackage?.price ?? effectiveService?.price),
+                                  _service_id: effectiveService.id,
+                                  _package_template_id: selectedPackage?.id || null,
                                 });
                                 
                                 if (error) throw error;
@@ -2204,7 +2348,7 @@ export default function PublicBooking() {
               </Button>
               {(authMode === 'guest' || loggedInUser) && (
                 <Button
-                  disabled={!customerName || !customerEmail || submitting}
+                  disabled={!customerName || !customerEmail || submitting || (selectedPackage && !loggedInUser)}
                   onClick={handleSubmit}
                   className="flex-1 sm:flex-initial"
                 >
