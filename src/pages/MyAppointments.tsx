@@ -301,7 +301,7 @@ export default function MyAppointments() {
         staffIds.length > 0 
           ? supabase.from('staff_members').select('id, name').in('id', staffIds)
           : Promise.resolve({ data: [] }),
-        supabase.from('businesses').select('id, name, address, city, reschedule_deadline_hours').in('id', businessIds),
+        supabase.from('businesses').select('id, name, address, city, currency, reschedule_deadline_hours').in('id', businessIds),
       ]);
 
       const services = servicesRes.data || [];
@@ -972,7 +972,7 @@ export default function MyAppointments() {
                           </div>
                           {apt.price && (
                               <div className="text-left sm:text-right shrink-0">
-                                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-primary">{formatCurrency(Number(apt.price))}</p>
+                                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-primary">{formatCurrencySimple(Number(apt.price), apt.business?.currency || 'USD')}</p>
                             </div>
                           )}
                           </div>

@@ -18,6 +18,10 @@ export interface ReminderSettings {
   send_welcome_email?: boolean;
   send_followup_email?: boolean;
   followup_days_after?: number;
+  notify_new_bookings?: boolean;
+  notify_cancellations?: boolean;
+  notify_daily_summary?: boolean;
+  notify_marketing_updates?: boolean;
 }
 
 export interface AppointmentReminder {
@@ -69,6 +73,10 @@ export function useReminderSettings() {
             send_welcome_email: false,
             send_followup_email: false,
             followup_days_after: 1,
+            notify_new_bookings: true,
+            notify_cancellations: true,
+            notify_daily_summary: false,
+            notify_marketing_updates: false,
           })
           .select()
           .single();

@@ -40,9 +40,8 @@ serve(async (req) => {
     );
 
     const now = new Date();
-    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
 
-    // Get pending follow-up emails that are due to be sent (within the next hour)
+    // Get pending follow-up emails that are past due (scheduled_send_date <= now)
     const { data: scheduledFollowups, error: followupsError } = await supabaseClient
       .from("scheduled_followup_emails")
       .select(`
@@ -57,8 +56,7 @@ serve(async (req) => {
         businesses:business_id (name, slug)
       `)
       .eq("status", "pending")
-      .gte("scheduled_send_date", now.toISOString())
-      .lte("scheduled_send_date", oneHourFromNow.toISOString());
+      .lte("scheduled_send_date", now.toISOString());
 
     if (followupsError) {
       console.error("Error fetching scheduled follow-ups:", followupsError);

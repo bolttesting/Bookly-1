@@ -29,9 +29,8 @@ serve(async (req) => {
     );
 
     const now = new Date();
-    const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
 
-    // Get pending reminders that are due to be sent
+    // Get pending reminders that are past due (reminder_time <= now)
     const { data: reminders, error: remindersError } = await supabaseClient
       .from("appointment_reminders")
       .select(`
@@ -47,8 +46,7 @@ serve(async (req) => {
         )
       `)
       .eq("status", "pending")
-      .gte("reminder_time", now.toISOString())
-      .lte("reminder_time", fiveMinutesFromNow.toISOString());
+      .lte("reminder_time", now.toISOString());
 
     if (remindersError) {
       console.error("Error fetching reminders:", remindersError);

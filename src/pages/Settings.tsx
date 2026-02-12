@@ -809,39 +809,72 @@ const Settings = () => {
           {/* Business Notifications */}
           <div className="glass-card p-4 sm:p-6">
             <h2 className="text-lg font-semibold mb-4">Business Notifications</h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">New Bookings</p>
-                  <p className="text-sm text-muted-foreground">Get notified when customers book</p>
-                </div>
-                <Switch defaultChecked />
+            <p className="text-sm text-muted-foreground mb-6">
+              In-app notifications (bell icon) and email preferences
+            </p>
+            {reminderSettingsLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Cancellations</p>
-                  <p className="text-sm text-muted-foreground">Get notified when customers cancel</p>
+            ) : reminderSettings ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">New Bookings</p>
+                    <p className="text-sm text-muted-foreground">Get notified when customers book (in-app)</p>
+                  </div>
+                  <Switch
+                    checked={reminderSettings.notify_new_bookings ?? true}
+                    onCheckedChange={async (checked) => {
+                      await updateReminderSettings.mutateAsync({ notify_new_bookings: checked });
+                    }}
+                  />
                 </div>
-                <Switch defaultChecked />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Daily Summary</p>
-                  <p className="text-sm text-muted-foreground">Receive daily booking summary</p>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Cancellations</p>
+                    <p className="text-sm text-muted-foreground">Get notified when customers cancel (in-app)</p>
+                  </div>
+                  <Switch
+                    checked={reminderSettings.notify_cancellations ?? true}
+                    onCheckedChange={async (checked) => {
+                      await updateReminderSettings.mutateAsync({ notify_cancellations: checked });
+                    }}
+                  />
                 </div>
-                <Switch />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Marketing Updates</p>
-                  <p className="text-sm text-muted-foreground">Tips and feature announcements</p>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Daily Summary</p>
+                    <p className="text-sm text-muted-foreground">Receive daily booking summary via email</p>
+                  </div>
+                  <Switch
+                    checked={reminderSettings.notify_daily_summary ?? false}
+                    onCheckedChange={async (checked) => {
+                      await updateReminderSettings.mutateAsync({ notify_daily_summary: checked });
+                    }}
+                  />
                 </div>
-                <Switch />
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Marketing Updates</p>
+                    <p className="text-sm text-muted-foreground">Tips and feature announcements (saved for future use)</p>
+                  </div>
+                  <Switch
+                    checked={reminderSettings.notify_marketing_updates ?? false}
+                    onCheckedChange={async (checked) => {
+                      await updateReminderSettings.mutateAsync({ notify_marketing_updates: checked });
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Failed to load notification settings
+              </div>
+            )}
           </div>
         </TabsContent>
 
