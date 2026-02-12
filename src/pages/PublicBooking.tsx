@@ -16,6 +16,13 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
 import { PaymentForm } from '@/components/payment/PaymentForm';
@@ -126,6 +133,8 @@ export default function PublicBooking() {
   const [authMode, setAuthMode] = useState<'guest' | 'login' | 'signup'>('guest');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<{ id: string; email: string } | null>(null);
+  const [earlyAuthDialogOpen, setEarlyAuthDialogOpen] = useState(false);
+  const [earlyAuthMode, setEarlyAuthMode] = useState<'login' | 'signup'>('login');
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
@@ -423,6 +432,7 @@ export default function PublicBooking() {
           setCustomerName(`${profile.first_name || ''} ${profile.last_name || ''}`.trim());
         }
         
+        setEarlyAuthDialogOpen(false);
         toast.success('Logged in successfully!');
       }
     } catch (error: any) {
@@ -432,7 +442,7 @@ export default function PublicBooking() {
     }
   };
 
-  const handleSignup = async () => {
+  const handleSignup = async (submitBookingAfter = false) => {
     const validation = signupSchema.safeParse({ 
       name: customerName, 
       email: customerEmail, 
@@ -466,12 +476,11 @@ export default function PublicBooking() {
 
       if (data.user) {
         setLoggedInUser({ id: data.user.id, email: data.user.email || '' });
-        toast.success('Account created! Proceeding with booking...');
-        
-        // Auto-submit the booking after signup
-        setTimeout(() => {
-          handleSubmit();
-        }, 500);
+        setEarlyAuthDialogOpen(false);
+        toast.success(submitBookingAfter ? 'Account created! Proceeding with booking...' : 'Account created! Continue with your booking.');
+        if (submitBookingAfter) {
+          setTimeout(() => handleSubmit(), 500);
+        }
       }
     } catch (error: any) {
       if (error.message?.includes('already registered')) {
@@ -1261,6 +1270,129 @@ export default function PublicBooking() {
       )}
 
       <main className={`container mx-auto px-4 sm:px-6 ${isEmbedded ? 'py-4' : 'py-6 sm:py-8'} max-w-4xl`}>
+        {/* Login/Signup bar - visible from step 1 when viewing services */}
+        <div className="flex items-center justify-end gap-2 mb-4 pb-3 border-b border-border/50">
+          {loggedInUser ? (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Logged in as</span>
+              <span className="font-medium truncate max-w-[180px]">{loggedInUser.email}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEarlyAuthMode('login');
+                  setEarlyAuthDialogOpen(true);
+                }}
+              >
+                <LogIn className="h-4 w-4 mr-1" />
+                Log in
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEarlyAuthMode('signup');
+                  setEarlyAuthDialogOpen(true);
+                }}
+              >
+                Sign up
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Early Login/Signup dialog - from services step */}
+        <Dialog open={earlyAuthDialogOpen} onOpenChange={setEarlyAuthDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{earlyAuthMode === 'login' ? 'Log in' : 'Create an account'}</DialogTitle>
+              <DialogDescription>
+                {earlyAuthMode === 'login'
+                  ? 'Log in to use your saved details and manage bookings.'
+                  : 'Sign up to save your details and view your appointments.'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              {earlyAuthMode === 'login' ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="early-login-email">Email</Label>
+                    <Input
+                      id="early-login-email"
+                      type="email"
+                      placeholder="john@example.com"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="early-login-password">Password</Label>
+                    <Input
+                      id="early-login-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                    />
+                  </div>
+                  <Button className="w-full" onClick={handleLogin} disabled={isAuthLoading}>
+                    {isAuthLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <LogIn className="h-4 w-4 mr-2" />}
+                    Sign In
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="early-signup-name">Full Name *</Label>
+                    <Input
+                      id="early-signup-name"
+                      placeholder="John Doe"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="early-signup-email">Email *</Label>
+                    <Input
+                      id="early-signup-email"
+                      type="email"
+                      placeholder="john@example.com"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="early-signup-password">Password *</Label>
+                    <Input
+                      id="early-signup-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
+                    />
+                  </div>
+                  <Button className="w-full" onClick={() => handleSignup(false)} disabled={isAuthLoading}>
+                    {isAuthLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <User className="h-4 w-4 mr-2" />}
+                    Create Account
+                  </Button>
+                </>
+              )}
+              <div className="flex justify-center gap-2 text-sm">
+                <Button
+                  variant="link"
+                  className="text-muted-foreground h-auto p-0"
+                  onClick={() => setEarlyAuthMode(earlyAuthMode === 'login' ? 'signup' : 'login')}
+                >
+                  {earlyAuthMode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Log in'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Progress Steps - Dynamic based on whether locations exist */}
         {(() => {
           const hasMultipleLocations = locations.length > 1;
@@ -1730,7 +1862,7 @@ export default function PublicBooking() {
                       <Button 
                         type="button" 
                         className="w-full" 
-                        onClick={handleSignup}
+                        onClick={() => handleSignup(true)}
                         disabled={isAuthLoading}
                       >
                         {isAuthLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <User className="h-4 w-4 mr-2" />}
