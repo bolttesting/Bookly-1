@@ -9,8 +9,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Loader2, Calendar, Sparkles, Eye, EyeOff, Home } from 'lucide-react';
+import { Loader2, Calendar, Sparkles, Eye, EyeOff, Home, KeyRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Please enter a valid email address'),
@@ -47,12 +56,75 @@ export default function Auth() {
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Forgot password
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [sendingReset, setSendingReset] = useState(false);
+  const [resetLinkSent, setResetLinkSent] = useState(false);
+  const [isRecovery, setIsRecovery] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const h = window.location.hash;
+    if (!h) return false;
+    const params = new URLSearchParams(h.slice(1));
+    return params.get('type') === 'recovery';
+  });
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [settingResetPassword, setSettingResetPassword] = useState(false);
+
+  const resetRedirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/business-auth` : '';
+
   // Redirect if already logged in
   useEffect(() => {
     if (user && !authLoading) {
       navigate('/dashboard');
     }
   }, [user, authLoading, navigate]);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail?.trim()) {
+      toast.error('Enter your email address');
+      return;
+    }
+    setSendingReset(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+      redirectTo: resetRedirectUrl,
+    });
+    setSendingReset(false);
+    if (error) {
+      const msg = error.message.toLowerCase().includes('rate limit')
+        ? 'Too many emails sent. Please wait an hour and try again.'
+        : error.message;
+      toast.error(msg);
+      return;
+    }
+    setResetLinkSent(true);
+  };
+
+  const handleSetPasswordFromRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (resetNewPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (resetNewPassword !== resetConfirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setSettingResetPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: resetNewPassword });
+    setSettingResetPassword(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success('Password updated. You can now sign in with your new password.');
+    setIsRecovery(false);
+    setResetNewPassword('');
+    setResetConfirmPassword('');
+    window.history.replaceState(null, '', window.location.pathname);
+  };
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
@@ -177,6 +249,69 @@ export default function Auth() {
             <span className="text-2xl font-display font-bold gradient-text">Bookly</span>
           </div>
 
+          {isRecovery ? (
+            <Card className="glass-card border-border/50">
+              <CardHeader className="text-center pb-2">
+                <CardTitle className="text-2xl font-display flex items-center justify-center gap-2">
+                  <KeyRound className="h-6 w-6" />
+                  Set new password
+                </CardTitle>
+                <CardDescription>
+                  Enter and confirm your new password below.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSetPasswordFromRecovery} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-new">New password</Label>
+                    <Input
+                      id="reset-new"
+                      type="password"
+                      placeholder="••••••••"
+                      value={resetNewPassword}
+                      onChange={(e) => setResetNewPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      disabled={settingResetPassword}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-confirm">Confirm password</Label>
+                    <Input
+                      id="reset-confirm"
+                      type="password"
+                      placeholder="••••••••"
+                      value={resetConfirmPassword}
+                      onChange={(e) => setResetConfirmPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      disabled={settingResetPassword}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={settingResetPassword}>
+                    {settingResetPassword ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update password'
+                    )}
+                  </Button>
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
+                      onClick={() => setIsRecovery(false)}
+                      disabled={settingResetPassword}
+                    >
+                      Back to sign in
+                    </button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          ) : (
           <Card className="glass-card border-border/50">
             <CardHeader className="text-center pb-2">
               <CardTitle className="text-2xl font-display">
@@ -290,6 +425,16 @@ export default function Auth() {
                           'Sign In'
                         )}
                       </Button>
+                      <div className="text-center">
+                        <button
+                          type="button"
+                          className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
+                          onClick={() => setForgotPasswordOpen(true)}
+                          disabled={isLoading}
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
                       <Button variant="outline" className="w-full" asChild>
                         <Link to="/">
                           <Home className="mr-2 h-4 w-4" />
@@ -462,6 +607,57 @@ export default function Auth() {
               </Tabs>
             </CardContent>
           </Card>
+          )}
+
+          <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Forgot password</DialogTitle>
+                <DialogDescription>
+                  {resetLinkSent
+                    ? 'Check your email for a link to reset your password. The link may take a few minutes to arrive.'
+                    : 'Enter your email and we\'ll send you a link to reset your password.'}
+                </DialogDescription>
+              </DialogHeader>
+              {!resetLinkSent ? (
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">Email</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      required
+                      disabled={sendingReset}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setForgotPasswordOpen(false)} disabled={sendingReset}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={sendingReset}>
+                      {sendingReset ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        'Send reset link'
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              ) : (
+                <DialogFooter>
+                  <Button onClick={() => { setForgotPasswordOpen(false); setResetLinkSent(false); setResetEmail(''); }}>
+                    Done
+                  </Button>
+                </DialogFooter>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>
