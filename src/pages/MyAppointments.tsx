@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -164,15 +164,10 @@ export default function MyAppointments() {
   const [recurrenceMaxOccurrences, setRecurrenceMaxOccurrences] = useState<number | null>(null);
   const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'date' | 'occurrences'>('never');
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [user, authLoading, navigate]);
-
   // Get businesses customer is associated with
   const { data: businesses = [], refetch: refetchBusinesses } = useQuery({
     queryKey: ['customer-businesses', user?.id],
+    staleTime: 60_000, // 1 min - avoid refetch on tab switch/refresh
     queryFn: async () => {
       if (!user?.id) return [];
 
@@ -271,6 +266,7 @@ export default function MyAppointments() {
   // Get appointments
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['my-appointments', user?.id],
+    staleTime: 30_000, // 30s - reduce refetch on refresh
     queryFn: async () => {
       if (!user?.id) return [];
 
@@ -1004,6 +1000,12 @@ export default function MyAppointments() {
     navigate('/auth');
   };
 
+  // Redirect unauthenticated users immediately (prevents flash of dashboard on refresh)
+  if (!authLoading && !user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  // Show loading until auth and critical data are ready
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">

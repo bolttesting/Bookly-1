@@ -51,7 +51,7 @@ interface Appointment {
 export function useSuperAdmin() {
   const { user } = useAuth();
 
-  const { data: isSuperAdmin, isLoading: checkingAdmin } = useQuery({
+  const { data: isSuperAdmin, isLoading: queryLoading } = useQuery({
     queryKey: ['isSuperAdmin', user?.id],
     queryFn: async () => {
       if (!user?.id) return false;
@@ -66,7 +66,11 @@ export function useSuperAdmin() {
       return !!data;
     },
     enabled: !!user?.id,
+    staleTime: 60_000, // 1 min - avoid refetch on refresh
   });
+
+  // Stay in "checking" until we have a definitive answer (prevents redirect flash on refresh)
+  const checkingAdmin = !!user && (queryLoading || isSuperAdmin === undefined);
 
   const { data: allBusinesses = [], isLoading: loadingBusinesses } = useQuery({
     queryKey: ['superadmin-businesses'],
