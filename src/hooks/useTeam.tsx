@@ -153,20 +153,51 @@ export function useTeam() {
       if (!business?.id) throw new Error('No business found');
       if (!user?.id) throw new Error('Not authenticated');
 
-      const { error } = await supabase
+      const { data: inserted, error } = await supabase
         .from('team_invitations')
         .insert({
           business_id: business.id,
           email: email.toLowerCase(),
           role,
           invited_by: user.id,
-        });
+        })
+        .select('id, token')
+        .single();
 
       if (error) {
         if (error.code === '23505') {
           throw new Error('This email has already been invited');
         }
         throw error;
+      }
+
+      // Get inviter name from profile
+      let inviterName: string | undefined;
+      const { data: profile } = await supabase.from('profiles').select('first_name, last_name').eq('id', user.id).maybeSingle();
+      if (profile?.first_name || profile?.last_name) {
+        inviterName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
+      }
+
+      // Send invitation email
+      const acceptUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/accept-invite?token=${inserted.token}`;
+      const { data: emailResult, error: emailError } = await supabase.functions.invoke('send-team-invitation', {
+        body: {
+          inviteeEmail: email.toLowerCase(),
+          businessName: business.name || 'the team',
+          inviterEmail: user.email || '',
+          inviterName,
+          role,
+          acceptUrl,
+        },
+      });
+
+      if (emailError) {
+        console.error('Failed to send invitation email:', emailError);
+        throw new Error(emailError.message || 'Invitation saved but email could not be sent. Check RESEND_API_KEY in Supabase.');
+      }
+      if (emailResult && !emailResult.success) {
+        console.error('Email function error:', emailResult);
+        throw new Error(emailResult.error || 'Failed to send invitation email');
       }
     },
     onSuccess: () => {

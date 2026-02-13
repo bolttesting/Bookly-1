@@ -41,6 +41,7 @@ import MyAppointments from "./pages/MyAppointments";
 import NotFound from "./pages/NotFound";
 import MovingLanding from "./pages/MovingLanding";
 import BlogPost from "./pages/BlogPost";
+import AcceptInvite from "./pages/AcceptInvite";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ function AppRoutes() {
         <Route path="/my-appointments" element={<MyAppointments />} />
         <Route path="/book/:slug" element={<PublicBooking />} />
         <Route path="/blog/:slug" element={<BlogPost />} />
+        <Route path="/accept-invite" element={<AcceptInvite />} />
         <Route path="/super-admin" element={<SuperAdmin />}>
           <Route index element={<SuperAdminOverview />} />
           <Route path="businesses" element={<SuperAdminBusinesses />} />

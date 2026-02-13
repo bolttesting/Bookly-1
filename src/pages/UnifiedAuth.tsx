@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,8 @@ const signupSchema = z.object({
 
 export default function UnifiedAuth() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect');
   const { user, loading: authLoading, signIn, signUp, signInWithGoogle } = useAuth();
   
   const [userType, setUserType] = useState<'business' | 'customer'>('business');
@@ -55,13 +57,15 @@ export default function UnifiedAuth() {
   // Redirect if already logged in
   useEffect(() => {
     if (user && !authLoading) {
-      if (userType === 'business') {
+      if (redirectTo) {
+        navigate(redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`);
+      } else if (userType === 'business') {
         navigate('/dashboard');
       } else {
         navigate('/my-appointments');
       }
     }
-  }, [user, authLoading, navigate, userType]);
+  }, [user, authLoading, navigate, userType, redirectTo]);
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
@@ -93,7 +97,9 @@ export default function UnifiedAuth() {
       }
     } else {
       toast.success('Welcome back!');
-      if (userType === 'business') {
+      if (redirectTo) {
+        navigate(redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`);
+      } else if (userType === 'business') {
         navigate('/dashboard');
       } else {
         navigate('/my-appointments');
@@ -129,7 +135,9 @@ export default function UnifiedAuth() {
       }
     } else {
       toast.success('Account created successfully!');
-      if (userType === 'business') {
+      if (redirectTo) {
+        navigate(redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`);
+      } else if (userType === 'business') {
         navigate('/dashboard');
       } else {
         navigate('/my-appointments');
