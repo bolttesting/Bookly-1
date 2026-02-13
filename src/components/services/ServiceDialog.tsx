@@ -33,6 +33,8 @@ import { Loader2 } from 'lucide-react';
 import { Service, ServiceFormData } from '@/hooks/useServices';
 import { ImageUploadField } from '@/components/ImageUploadField';
 import { useBusinessImageUpload } from '@/hooks/useBusinessImageUpload';
+import { useBusiness } from '@/hooks/useBusiness';
+import { getCurrencyByCode } from '@/lib/currency';
 
 const serviceSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name is too long'),
@@ -74,7 +76,9 @@ export function ServiceDialog({
   isLoading,
 }: ServiceDialogProps) {
   const isEditing = !!service;
+  const { business } = useBusiness();
   const { uploadImages, isUploading } = useBusinessImageUpload();
+  const currencySymbol = getCurrencyByCode(business?.currency || 'USD').symbol;
   const [imageItems, setImageItems] = useState<(string | File)[]>([]);
 
   const form = useForm<ServiceFormValues>({
@@ -249,7 +253,7 @@ export function ServiceDialog({
                 name="price"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Price ($) *</FormLabel>
+                    <FormLabel>Price ({currencySymbol}) *</FormLabel>
                     <FormControl>
                       <Input type="number" min={0} step={0.01} {...field} />
                     </FormControl>

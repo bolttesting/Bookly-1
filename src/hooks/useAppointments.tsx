@@ -489,6 +489,10 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments', business?.id] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics-revenue'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics-services'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics-staff'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Payment recorded successfully');
     },

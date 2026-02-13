@@ -14,8 +14,10 @@ import { CustomerAnalyticsSection } from '@/components/analytics/CustomerAnalyti
 import { ServicePerformanceSection } from '@/components/analytics/ServicePerformanceSection';
 import { StaffPerformanceSection } from '@/components/analytics/StaffPerformanceSection';
 import { exportAnalyticsToCSV, exportAnalyticsToPDF } from '@/lib/analytics-export';
+import { useBusiness } from '@/hooks/useBusiness';
 
 export default function Analytics() {
+  const { business } = useBusiness();
   const [dateFilter, setDateFilter] = useState<DateRangeFilter>({ type: 'month' });
   const [customStartDate, setCustomStartDate] = useState<Date>();
   const [customEndDate, setCustomEndDate] = useState<Date>();
@@ -44,6 +46,7 @@ export default function Analytics() {
         servicePerformance,
         staffPerformance,
         dateRange,
+        currency: business?.currency || 'USD',
       });
     }
   };
@@ -56,6 +59,7 @@ export default function Analytics() {
         servicePerformance,
         staffPerformance,
         dateRange,
+        currency: business?.currency || 'USD',
       });
     }
   };

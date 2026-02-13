@@ -8,10 +8,11 @@ interface ExportData {
   servicePerformance: ServicePerformance;
   staffPerformance: StaffPerformance;
   dateRange: { start: Date; end: Date };
+  currency?: string;
 }
 
 export function exportAnalyticsToCSV(data: ExportData) {
-  const { revenueReport, customerAnalytics, servicePerformance, staffPerformance, dateRange } = data;
+  const { revenueReport, customerAnalytics, servicePerformance, staffPerformance, dateRange, currency = 'USD' } = data;
 
   // Create CSV content
   let csvContent = 'Bookly Analytics Report\n';
@@ -111,8 +112,8 @@ export function exportAnalyticsToCSV(data: ExportData) {
 export async function exportAnalyticsToPDF(data: ExportData) {
   // For PDF export, we'll use a simple approach with window.print() or a library
   // For now, we'll create an HTML page that can be printed as PDF
-  
-  const { revenueReport, customerAnalytics, servicePerformance, staffPerformance, dateRange } = data;
+
+  const { revenueReport, customerAnalytics, servicePerformance, staffPerformance, dateRange, currency = 'USD' } = data;
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -153,7 +154,7 @@ export async function exportAnalyticsToPDF(data: ExportData) {
       <div>
         <div class="stat-box">
           <div class="stat-label">Total Revenue</div>
-          <div class="stat-value">$${revenueReport.totalRevenue.toLocaleString()}</div>
+          <div class="stat-value">${formatCurrencySimple(revenueReport.totalRevenue, currency)}</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">Total Appointments</div>
@@ -165,7 +166,7 @@ export async function exportAnalyticsToPDF(data: ExportData) {
         </div>
         <div class="stat-box">
           <div class="stat-label">Avg Revenue/Appointment</div>
-          <div class="stat-value">$${revenueReport.averageRevenuePerAppointment.toFixed(2)}</div>
+          <div class="stat-value">${formatCurrencySimple(revenueReport.averageRevenuePerAppointment, currency)}</div>
         </div>
       </div>
 
@@ -182,7 +183,7 @@ export async function exportAnalyticsToPDF(data: ExportData) {
           ${revenueReport.revenueByService.map(s => `
             <tr>
               <td>${s.serviceName}</td>
-              <td>$${s.revenue.toLocaleString()}</td>
+              <td>${formatCurrencySimple(s.revenue, currency)}</td>
               <td>${s.appointments}</td>
             </tr>
           `).join('')}
@@ -205,7 +206,7 @@ export async function exportAnalyticsToPDF(data: ExportData) {
         </div>
         <div class="stat-box">
           <div class="stat-label">Avg Lifetime Value</div>
-          <div class="stat-value">$${customerAnalytics.averageLifetimeValue.toFixed(2)}</div>
+          <div class="stat-value">${formatCurrencySimple(customerAnalytics.averageLifetimeValue, currency)}</div>
         </div>
       </div>
 
@@ -223,9 +224,9 @@ export async function exportAnalyticsToPDF(data: ExportData) {
           ${customerAnalytics.topCustomers.map(c => `
             <tr>
               <td>${c.customerName}</td>
-              <td>$${c.totalSpent.toLocaleString()}</td>
+              <td>${formatCurrencySimple(c.totalSpent, currency)}</td>
               <td>${c.totalVisits}</td>
-              <td>$${c.averageSpent.toFixed(2)}</td>
+              <td>${formatCurrencySimple(c.averageSpent, currency)}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -247,8 +248,8 @@ export async function exportAnalyticsToPDF(data: ExportData) {
             <tr>
               <td>${s.serviceName}</td>
               <td>${s.bookings}</td>
-              <td>$${s.revenue.toLocaleString()}</td>
-              <td>$${s.averagePrice.toFixed(2)}</td>
+              <td>${formatCurrencySimple(s.revenue, currency)}</td>
+              <td>${formatCurrencySimple(s.averagePrice, currency)}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -271,7 +272,7 @@ export async function exportAnalyticsToPDF(data: ExportData) {
               <td>${s.staffName}</td>
               <td>${s.totalAppointments}</td>
               <td>${s.completedAppointments}</td>
-              <td>$${s.revenue.toLocaleString()}</td>
+              <td>${formatCurrencySimple(s.revenue, currency)}</td>
               <td>${Math.round(s.completionRate)}%</td>
             </tr>
           `).join('')}

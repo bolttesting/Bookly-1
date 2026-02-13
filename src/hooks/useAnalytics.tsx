@@ -123,13 +123,14 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
     queryFn: async (): Promise<RevenueReport> => {
       if (!business?.id) throw new Error('Business not found');
 
-      // Fetch all appointments in date range
+      // Fetch all appointments in date range (include payment_status for revenue)
       const { data: appointments, error } = await supabase
         .from('appointments')
         .select(`
           id,
           start_time,
           status,
+          payment_status,
           price,
           service_id,
           staff_id,
@@ -142,10 +143,14 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
 
       if (error) throw error;
 
+      const isPaidOrCompleted = (apt: { status: string; payment_status?: string | null }) =>
+        apt.status === 'completed' || apt.payment_status === 'paid' || apt.payment_status === 'partial';
+
       const completed = appointments?.filter(a => a.status === 'completed') || [];
+      const revenueAppointments = appointments?.filter(a => isPaidOrCompleted(a)) || [];
       const cancelled = appointments?.filter(a => a.status === 'cancelled') || [];
       
-      const totalRevenue = completed.reduce((sum, apt) => sum + (Number(apt.price) || 0), 0);
+      const totalRevenue = revenueAppointments.reduce((sum, apt) => sum + (Number(apt.price) || 0), 0);
       const totalAppointments = appointments?.length || 0;
       const completedAppointments = completed.length;
       const cancelledAppointments = cancelled.length;
@@ -153,10 +158,10 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
         ? totalRevenue / completedAppointments 
         : 0;
 
-      // Revenue by day
+      // Revenue by day (include paid/partial)
       const revenueByDayMap: Record<string, { revenue: number; appointments: number }> = {};
       appointments?.forEach(apt => {
-        if (apt.status === 'completed' && apt.price) {
+        if (isPaidOrCompleted(apt) && apt.price) {
           const dateKey = format(new Date(apt.start_time), 'yyyy-MM-dd');
           if (!revenueByDayMap[dateKey]) {
             revenueByDayMap[dateKey] = { revenue: 0, appointments: 0 };
@@ -170,9 +175,9 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
         .map(([date, data]) => ({ date, ...data }))
         .sort((a, b) => a.date.localeCompare(b.date));
 
-      // Revenue by service
+      // Revenue by service (include paid/partial)
       const revenueByServiceMap: Record<string, { serviceName: string; revenue: number; appointments: number }> = {};
-      completed.forEach(apt => {
+      revenueAppointments.forEach(apt => {
         const serviceName = (apt.services as any)?.name || 'Unknown Service';
         const serviceId = apt.service_id;
         if (!revenueByServiceMap[serviceId]) {
@@ -185,9 +190,9 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
       const revenueByService = Object.values(revenueByServiceMap)
         .sort((a, b) => b.revenue - a.revenue);
 
-      // Revenue by staff
+      // Revenue by staff (include paid/partial)
       const revenueByStaffMap: Record<string, { staffName: string; revenue: number; appointments: number }> = {};
-      completed.forEach(apt => {
+      revenueAppointments.forEach(apt => {
         if (apt.staff_id) {
           const staffName = (apt.staff_members as any)?.name || 'Unassigned';
           const staffId = apt.staff_id;
@@ -349,15 +354,18 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
 
       if (servicesError) throw servicesError;
 
-      // Get appointments in date range
+      // Get appointments in date range (include payment_status for revenue)
       const { data: appointments, error: appointmentsError } = await supabase
         .from('appointments')
-        .select('service_id, price, status, services:service_id (name)')
+        .select('service_id, price, status, payment_status, services:service_id (name)')
         .eq('business_id', business.id)
         .gte('start_time', dateRange.start.toISOString())
         .lte('start_time', dateRange.end.toISOString());
 
       if (appointmentsError) throw appointmentsError;
+
+      const isPaidOrCompleted = (apt: { status: string; payment_status?: string | null }) =>
+        apt.status === 'completed' || apt.payment_status === 'paid' || apt.payment_status === 'partial';
 
       // Calculate service stats
       const serviceStatsMap: Record<string, {
@@ -368,7 +376,7 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
         totalPrice: number;
       }> = {};
 
-      appointments?.forEach(apt => {
+      appointments?.forEach((apt: any) => {
         const serviceId = apt.service_id;
         const serviceName = (apt.services as any)?.name || 'Unknown';
         const price = Number(apt.price) || 0;
@@ -384,7 +392,7 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
         }
 
         serviceStatsMap[serviceId].bookings += 1;
-        if (apt.status === 'completed') {
+        if (isPaidOrCompleted(apt)) {
           serviceStatsMap[serviceId].revenue += price;
         }
         serviceStatsMap[serviceId].totalPrice += price;
@@ -432,10 +440,10 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
 
       if (staffError) throw staffError;
 
-      // Get appointments in date range
+      // Get appointments in date range (include payment_status for revenue)
       const { data: appointments, error: appointmentsError } = await supabase
         .from('appointments')
-        .select('staff_id, price, status, staff_members:staff_id (name)')
+        .select('staff_id, price, status, payment_status, staff_members:staff_id (name)')
         .eq('business_id', business.id)
         .gte('start_time', dateRange.start.toISOString())
         .lte('start_time', dateRange.end.toISOString());
@@ -450,6 +458,9 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
         completedAppointments: number;
         revenue: number;
       }> = {};
+
+      const isPaidOrCompletedStaff = (apt: { status: string; payment_status?: string | null }) =>
+        apt.status === 'completed' || apt.payment_status === 'paid' || apt.payment_status === 'partial';
 
       appointments?.forEach(apt => {
         if (apt.staff_id) {
@@ -469,6 +480,8 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
           staffStatsMap[staffId].totalAppointments += 1;
           if (apt.status === 'completed') {
             staffStatsMap[staffId].completedAppointments += 1;
+          }
+          if (isPaidOrCompletedStaff(apt)) {
             staffStatsMap[staffId].revenue += Number(apt.price) || 0;
           }
         }

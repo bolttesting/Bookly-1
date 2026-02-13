@@ -43,7 +43,7 @@ const Dashboard = () => {
       </div>
 
       {/* Stats Cards */}
-      <StatsCards stats={stats} loading={loading} />
+      <StatsCards stats={stats} loading={loading} currency={business?.currency || 'USD'} />
 
       {/* Main Content Grid */}
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">

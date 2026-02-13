@@ -2302,7 +2302,7 @@ export default function PublicBooking() {
                             }
                           }
                           return formatCurrencySimple(finalPrice, business?.currency || 'USD');
-                        })() : '$0.00'}
+                        })() : formatCurrencySimple(0, business?.currency || 'USD')}
                       </span>
                     </div>
                   </div>

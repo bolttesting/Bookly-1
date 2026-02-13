@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from './useBusiness';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, format, subDays } from 'date-fns';
@@ -40,21 +40,41 @@ interface RevenueData {
   revenue: number;
 }
 
+interface DashboardData {
+  stats: DashboardStats;
+  recentAppointments: Appointment[];
+  upcomingAppointments: Appointment[];
+  weeklyRevenue: RevenueData[];
+}
+
+function isPaidOrCompleted(status: string, paymentStatus: string | null): boolean {
+  return status === 'completed' || paymentStatus === 'paid' || paymentStatus === 'partial';
+}
+
 export function useDashboard() {
   const { business } = useBusiness();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentAppointments, setRecentAppointments] = useState<Appointment[]>([]);
-  const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
-  const [weeklyRevenue, setWeeklyRevenue] = useState<RevenueData[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  const fetchDashboardData = async () => {
-    if (!business?.id) {
-      setLoading(false);
-      return;
-    }
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['dashboard', business?.id],
+    queryFn: async (): Promise<DashboardData> => {
+      if (!business?.id) {
+        return {
+          stats: {
+            todayBookings: 0,
+            yesterdayBookings: 0,
+            totalCustomers: 0,
+            newCustomersThisMonth: 0,
+            todayRevenue: 0,
+            avgDailyRevenue: 0,
+            completionRate: 0,
+            lastWeekCompletionRate: 0,
+          },
+          recentAppointments: [],
+          upcomingAppointments: [],
+          weeklyRevenue: [],
+        };
+      }
 
-    try {
       const today = new Date();
       const todayStart = startOfDay(today);
       const todayEnd = endOfDay(today);
@@ -94,39 +114,43 @@ export function useDashboard() {
         .eq('business_id', business.id)
         .gte('created_at', monthStart.toISOString());
 
-      // Fetch today's revenue
+      // Fetch today's appointments with payment_status for revenue (include completed OR paid/partial)
       const { data: todayAppointments } = await supabase
         .from('appointments')
-        .select('price')
+        .select('price, status, payment_status')
         .eq('business_id', business.id)
-        .eq('status', 'completed')
         .gte('start_time', todayStart.toISOString())
         .lte('start_time', todayEnd.toISOString());
 
-      const todayRevenue = todayAppointments?.reduce((sum, apt) => sum + (apt.price || 0), 0) || 0;
+      const todayRevenue = (todayAppointments || []).reduce((sum, apt) => {
+        if (isPaidOrCompleted(apt.status, apt.payment_status) && apt.price) {
+          return sum + Number(apt.price);
+        }
+        return sum;
+      }, 0);
 
       // Fetch this week's appointments for completion rate and revenue chart
       const { data: weekAppointments } = await supabase
         .from('appointments')
-        .select('start_time, status, price')
+        .select('start_time, status, payment_status, price')
         .eq('business_id', business.id)
         .gte('start_time', weekStart.toISOString())
         .lte('start_time', weekEnd.toISOString());
 
-      const completedThisWeek = weekAppointments?.filter(a => a.status === 'completed').length || 0;
+      const completedThisWeek = (weekAppointments || []).filter(a => a.status === 'completed').length;
       const totalThisWeek = weekAppointments?.length || 0;
       const completionRate = totalThisWeek > 0 ? Math.round((completedThisWeek / totalThisWeek) * 100) : 100;
 
-      // Calculate weekly revenue by day
+      // Calculate weekly revenue by day (include completed OR paid/partial)
       const revenueByDay: Record<string, number> = {};
       const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       days.forEach(day => revenueByDay[day] = 0);
 
-      weekAppointments?.forEach(apt => {
-        if (apt.status === 'completed' && apt.price) {
+      (weekAppointments || []).forEach(apt => {
+        if (isPaidOrCompleted(apt.status, apt.payment_status) && apt.price) {
           const dayName = format(new Date(apt.start_time), 'EEE');
           if (revenueByDay[dayName] !== undefined) {
-            revenueByDay[dayName] += apt.price;
+            revenueByDay[dayName] += Number(apt.price);
           }
         }
       });
@@ -175,46 +199,31 @@ export function useDashboard() {
         .order('start_time', { ascending: true })
         .limit(4);
 
-      setStats({
-        todayBookings: todayCount || 0,
-        yesterdayBookings: yesterdayCount || 0,
-        totalCustomers: totalCustomers || 0,
-        newCustomersThisMonth: newCustomers || 0,
-        todayRevenue,
-        avgDailyRevenue: 0,
-        completionRate,
-        lastWeekCompletionRate: 0,
-      });
-
-      setRecentAppointments(recent as unknown as Appointment[] || []);
-      setUpcomingAppointments(upcoming as unknown as Appointment[] || []);
-      setWeeklyRevenue(weeklyRevenueData);
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (business?.id) {
-      fetchDashboardData();
-    } else {
-      // Clear data if business is not available
-      setStats(null);
-      setRecentAppointments([]);
-      setUpcomingAppointments([]);
-      setWeeklyRevenue([]);
-      setLoading(false);
-    }
-  }, [business?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+      return {
+        stats: {
+          todayBookings: todayCount || 0,
+          yesterdayBookings: yesterdayCount || 0,
+          totalCustomers: totalCustomers || 0,
+          newCustomersThisMonth: newCustomers || 0,
+          todayRevenue,
+          avgDailyRevenue: 0,
+          completionRate,
+          lastWeekCompletionRate: 0,
+        },
+        recentAppointments: (recent as unknown as Appointment[]) || [],
+        upcomingAppointments: (upcoming as unknown as Appointment[]) || [],
+        weeklyRevenue: weeklyRevenueData,
+      };
+    },
+    enabled: !!business?.id,
+  });
 
   return {
-    stats,
-    recentAppointments,
-    upcomingAppointments,
-    weeklyRevenue,
-    loading,
-    refetch: fetchDashboardData,
+    stats: data?.stats ?? null,
+    recentAppointments: data?.recentAppointments ?? [],
+    upcomingAppointments: data?.upcomingAppointments ?? [],
+    weeklyRevenue: data?.weeklyRevenue ?? [],
+    loading: isLoading,
+    refetch,
   };
 }

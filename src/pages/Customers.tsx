@@ -19,10 +19,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useCustomers, Customer, CustomerFormData } from '@/hooks/useCustomers';
+import { useBusiness } from '@/hooks/useBusiness';
+import { formatCurrencySimple } from '@/lib/currency';
 import { CustomerDialog } from '@/components/customers/CustomerDialog';
 import { DeleteCustomerDialog } from '@/components/customers/DeleteCustomerDialog';
 
 const Customers = () => {
+  const { business } = useBusiness();
   const { customers, stats, isLoading, createCustomer, updateCustomer, deleteCustomer } = useCustomers();
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -252,7 +255,7 @@ const Customers = () => {
                     </div>
                   </TableCell>
                   <TableCell className="text-xs sm:text-sm hidden md:table-cell">{customer.total_visits}</TableCell>
-                  <TableCell className="text-xs sm:text-sm font-medium hidden md:table-cell">${Number(customer.total_spent).toFixed(2)}</TableCell>
+                  <TableCell className="text-xs sm:text-sm font-medium hidden md:table-cell">{formatCurrencySimple(Number(customer.total_spent), business?.currency || 'USD')}</TableCell>
                   <TableCell>{getStatusBadge(customer.status)}</TableCell>
                   <TableCell>
                     <DropdownMenu>

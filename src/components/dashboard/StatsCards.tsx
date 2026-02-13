@@ -1,7 +1,9 @@
 import { CalendarCheck, Users, DollarSign, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrencySimple } from "@/lib/currency";
 
 interface StatsCardsProps {
+  currency?: string;
   stats: {
     todayBookings: number;
     yesterdayBookings: number;
@@ -13,7 +15,7 @@ interface StatsCardsProps {
   loading?: boolean;
 }
 
-export function StatsCards({ stats, loading }: StatsCardsProps) {
+export function StatsCards({ stats, loading, currency = 'USD' }: StatsCardsProps) {
   if (loading || !stats) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -51,7 +53,7 @@ export function StatsCards({ stats, loading }: StatsCardsProps) {
     },
     {
       title: "Revenue Today",
-      value: `$${stats.todayRevenue.toLocaleString()}`,
+      value: formatCurrencySimple(stats.todayRevenue, currency),
       change: "From completed appointments",
       icon: DollarSign,
       trend: "up",
