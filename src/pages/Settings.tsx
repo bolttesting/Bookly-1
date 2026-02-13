@@ -166,36 +166,36 @@ const Settings = () => {
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6 w-full">
         <div className="glass-card p-2 w-full overflow-x-auto">
-          <TabsList className="bg-transparent gap-1 min-w-max">
-            <TabsTrigger value="booking" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 h-auto bg-transparent gap-1">
+            <TabsTrigger value="booking" className="flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
               <Link2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Booking</span>
               <span className="sm:hidden">Book</span>
             </TabsTrigger>
-            <TabsTrigger value="hours" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
+            <TabsTrigger value="hours" className="flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
               <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Hours
             </TabsTrigger>
-            <TabsTrigger value="locations" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
+            <TabsTrigger value="locations" className="flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
               <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Locations</span>
               <span className="sm:hidden">Loc</span>
             </TabsTrigger>
-            <TabsTrigger value="profile" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
+            <TabsTrigger value="profile" className="flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
               <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Profile
             </TabsTrigger>
-            <TabsTrigger value="business" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
+            <TabsTrigger value="business" className="flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
               <Building2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Business</span>
               <span className="sm:hidden">Biz</span>
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
+            <TabsTrigger value="notifications" className="flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
               <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Notifications</span>
               <span className="sm:hidden">Notif</span>
             </TabsTrigger>
-            <TabsTrigger value="payments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
+            <TabsTrigger value="payments" className="flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
               <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Payments</span>
               <span className="sm:hidden">Pay</span>
