@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
@@ -27,114 +27,39 @@ interface Business {
   booking_theme?: 'light' | 'dark' | 'system' | null;
 }
 
+type AppRole = 'owner' | 'admin' | 'staff';
+
+async function fetchBusinessAndRole(userId: string): Promise<{ business: Business | null; role: AppRole | null }> {
+  const { data: roleData, error: roleError } = await supabase
+    .from('user_roles')
+    .select('business_id, role')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (roleError) throw roleError;
+  if (!roleData?.business_id) return { business: null, role: null };
+
+  const { data: businessData, error: businessError } = await supabase
+    .from('businesses')
+    .select('*')
+    .eq('id', roleData.business_id)
+    .single();
+  if (businessError) throw businessError;
+  return { business: businessData, role: (roleData.role as AppRole) ?? null };
+}
+
 export function useBusiness() {
   const { user, loading: authLoading } = useAuth();
-  const [business, setBusiness] = useState<Business | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const hasFetchedRef = useRef(false);
-  const fetchingRef = useRef(false);
-  const userIdRef = useRef<string | undefined>(undefined);
-  const businessRef = useRef<Business | null>(null);
+  const queryClient = useQueryClient();
 
-  // Keep business ref in sync with state
-  useEffect(() => {
-    businessRef.current = business;
-  }, [business]);
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['business', user?.id],
+    queryFn: () => fetchBusinessAndRole(user!.id),
+    enabled: !!user?.id && !authLoading,
+    staleTime: 30_000, // Cache 30s - one fetch shared by all components
+  });
 
-  const fetchBusiness = useCallback(async () => {
-    // Prevent multiple simultaneous fetches
-    if (fetchingRef.current) return;
-    
-    if (!user) {
-      setBusiness(null);
-      setLoading(false);
-      hasFetchedRef.current = false;
-      userIdRef.current = undefined;
-      businessRef.current = null;
-      return;
-    }
-
-    // If user ID hasn't changed and we already have a business, don't refetch
-    if (userIdRef.current === user.id && hasFetchedRef.current && businessRef.current) {
-      return;
-    }
-
-    fetchingRef.current = true;
-    setLoading(true);
-    setError(null);
-    userIdRef.current = user.id;
-
-    try {
-      // First get the user's business_id from user_roles
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('business_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (roleError) {
-        console.error('Error fetching user role:', roleError);
-        throw roleError;
-      }
-
-      if (!roleData?.business_id) {
-        setBusiness(null);
-        businessRef.current = null;
-        setLoading(false);
-        hasFetchedRef.current = true;
-        fetchingRef.current = false;
-        return;
-      }
-
-      // Then fetch the business details
-      const { data: businessData, error: businessError } = await supabase
-        .from('businesses')
-        .select('*')
-        .eq('id', roleData.business_id)
-        .single();
-
-      if (businessError) {
-        console.error('Error fetching business:', businessError);
-        throw businessError;
-      }
-
-      setBusiness(businessData);
-      businessRef.current = businessData;
-      hasFetchedRef.current = true;
-    } catch (err) {
-      console.error('Error in fetchBusiness:', err);
-      setError(err as Error);
-      // Don't clear business on error if we already have one
-      // This prevents the dashboard from disappearing on transient errors
-      if (!businessRef.current) {
-        setBusiness(null);
-        businessRef.current = null;
-      }
-    } finally {
-      setLoading(false);
-      fetchingRef.current = false;
-    }
-  }, [user?.id]); // Only depend on user.id
-
-  useEffect(() => {
-    if (!authLoading) {
-      if (user) {
-        // Only fetch if user ID changed or we haven't fetched yet
-        if (userIdRef.current !== user.id || !hasFetchedRef.current) {
-          fetchBusiness();
-        }
-      } else {
-        // User logged out
-        setBusiness(null);
-        businessRef.current = null;
-        setLoading(false);
-        hasFetchedRef.current = false;
-        userIdRef.current = undefined;
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, authLoading]); // Only depend on user.id and authLoading
+  const business = data?.business ?? null;
+  const role = data?.role ?? null;
 
   const createBusiness = async (businessData: {
     name: string;
@@ -192,7 +117,7 @@ export function useBusiness() {
 
     if (roleError) throw roleError;
 
-    setBusiness(newBusiness);
+    queryClient.setQueryData(['business', user.id], { business: newBusiness, role: 'owner' });
     return newBusiness;
   };
 
@@ -208,16 +133,19 @@ export function useBusiness() {
 
     if (error) throw error;
 
-    setBusiness(updatedBusiness);
+    queryClient.setQueryData(['business', user.id], (prev: { business: Business; role: AppRole } | undefined) =>
+      prev ? { ...prev, business: updatedBusiness } : { business: updatedBusiness, role: role ?? 'owner' }
+    );
     return updatedBusiness;
   };
 
   return {
     business,
-    loading: authLoading || loading,
-    error,
+    role,
+    loading: authLoading || isLoading,
+    error: error as Error | null,
     createBusiness,
     updateBusiness,
-    refetch: fetchBusiness,
+    refetch,
   };
 }

@@ -54,9 +54,9 @@ export function AppSidebar() {
   const { subscription, isLoading: subscriptionLoading } = useBusinessSubscription();
   const { canAccessAdmin, isLoading } = useDashboardRole();
 
-  // Show admin tabs only when we've confirmed canAccessAdmin (avoids showing tabs that redirect)
+  // Show all items while loading to avoid staff-view flash for admins on refresh
   const visibleNavItems = isLoading
-    ? navItems.filter((item) => !item.adminOnly)
+    ? navItems
     : navItems.filter((item) => !item.adminOnly || canAccessAdmin);
   
   // Only show upgrade button if on free plan (price = 0)
