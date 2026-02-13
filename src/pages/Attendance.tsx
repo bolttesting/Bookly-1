@@ -79,6 +79,8 @@ export default function Attendance() {
     onSuccess: (_, { attendanceStatus }) => {
       queryClient.invalidateQueries({ queryKey: ['attendance-appointments'] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics-customers'] });
       toast.success(
         attendanceStatus === 'present'
           ? 'Marked as present'

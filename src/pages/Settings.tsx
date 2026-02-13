@@ -155,7 +155,7 @@ const Settings = () => {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 animate-fade-in w-full px-2 sm:px-0">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in w-full min-w-0 px-2 sm:px-0">
       {/* Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">Settings</h1>
@@ -164,7 +164,7 @@ const Settings = () => {
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6 w-full">
         <div className="glass-card p-2 w-full overflow-x-auto">
           <TabsList className="bg-transparent gap-1 min-w-max">
             <TabsTrigger value="booking" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap">
@@ -203,8 +203,9 @@ const Settings = () => {
           </TabsList>
         </div>
 
-        <TabsContent value="booking" className="space-y-4 sm:space-y-6 max-w-full overflow-hidden">
-          <div className="glass-card p-4 sm:p-6 overflow-hidden">
+        <TabsContent value="booking" className="space-y-4 sm:space-y-6 w-full min-w-0 mt-4 sm:mt-6">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+          <div className="glass-card p-4 sm:p-6 overflow-hidden min-w-0">
             <h2 className="text-lg font-semibold mb-4">Public Booking Page</h2>
             <p className="text-muted-foreground mb-4">
               Share this link with your customers so they can book appointments online.
@@ -229,7 +230,7 @@ const Settings = () => {
           </div>
 
           {/* QR Code Section */}
-          <div className="glass-card p-6">
+          <div className="glass-card p-6 min-w-0">
             <div className="flex items-center gap-2 mb-4">
               <QrCode className="h-5 w-5 text-primary" />
               <h2 className="text-lg font-semibold">Booking QR Code</h2>
@@ -264,8 +265,8 @@ const Settings = () => {
             </div>
           </div>
 
-          {/* Embed Widget Section */}
-          <div className="glass-card p-6">
+          {/* Embed Widget Section - full width */}
+          <div className="glass-card p-6 lg:col-span-2">
             <div className="flex items-center gap-2 mb-4">
               <Code2 className="h-5 w-5 text-primary" />
               <h2 className="text-lg font-semibold">Embed on Your Website</h2>
@@ -338,7 +339,7 @@ const Settings = () => {
             </div>
           </div>
 
-          <div className="glass-card p-6">
+          <div className="glass-card p-6 lg:col-span-2">
             <h2 className="text-lg font-semibold mb-4">Booking Settings</h2>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -417,9 +418,10 @@ const Settings = () => {
               </div>
             </div>
           </div>
+          </div>
         </TabsContent>
 
-        <TabsContent value="hours">
+        <TabsContent value="hours" className="w-full min-w-0 mt-4 sm:mt-6">
           <LocationHoursSettings />
         </TabsContent>
 

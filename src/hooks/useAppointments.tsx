@@ -308,6 +308,8 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments', business?.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics-customers'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Appointment updated successfully');
     },
@@ -395,6 +397,8 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments', business?.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics-customers'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Appointment cancelled');
     },
@@ -493,6 +497,8 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
       queryClient.invalidateQueries({ queryKey: ['analytics-revenue'] });
       queryClient.invalidateQueries({ queryKey: ['analytics-services'] });
       queryClient.invalidateQueries({ queryKey: ['analytics-staff'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics-customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Payment recorded successfully');
     },

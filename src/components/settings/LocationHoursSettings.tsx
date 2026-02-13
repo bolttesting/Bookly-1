@@ -243,7 +243,7 @@ export function LocationHoursSettings() {
 
   if (locationsLoading) {
     return (
-      <div className="glass-card p-4 sm:p-6">
+      <div className="glass-card p-4 sm:p-6 w-full min-w-0">
         <div className="animate-pulse space-y-4">
           <div className="h-6 bg-secondary rounded w-1/4" />
           <div className="h-20 bg-secondary rounded" />
@@ -255,7 +255,7 @@ export function LocationHoursSettings() {
   // If no locations, show default business hours and blocked slots
   if (locations.length === 0) {
     return (
-      <div className="glass-card p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="glass-card p-4 sm:p-6 space-y-4 sm:space-y-6 w-full min-w-0">
         <div>
           <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2">
             <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -279,7 +279,7 @@ export function LocationHoursSettings() {
   }
 
   return (
-    <div className="glass-card p-4 sm:p-6 space-y-4 sm:space-y-6">
+    <div className="glass-card p-4 sm:p-6 space-y-4 sm:space-y-6 w-full min-w-0">
       <div>
         <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2">
           <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
