@@ -9,6 +9,7 @@ import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useReviews } from "@/hooks/useReviews";
 import { useBlogPosts } from "@/hooks/useBlogPosts";
+import { useFooterLinks } from "@/hooks/useFooterLinks";
 import { useEffect, useRef, useState } from "react";
 import { formatCurrencySimple, getCurrencyByCode } from "@/lib/currency";
 import { Loader2 } from "lucide-react";
@@ -35,7 +36,8 @@ import {
   Heart,
   Menu,
   X,
-  FileText
+  FileText,
+  ChevronUp
 } from "lucide-react";
 
 const Landing = () => {
@@ -57,6 +59,8 @@ const Landing = () => {
   const { settings: siteSettings } = useSiteSettings();
   const { reviews } = useReviews();
   const { posts: blogPosts } = useBlogPosts(false);
+  const { links: footerLinks } = useFooterLinks();
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   // Count-up animations for stats
   const [usersCount, startUsers] = useCountUp(10, 2000, 0);
@@ -67,6 +71,7 @@ const Landing = () => {
   useEffect(() => {
     const handleScroll = () => {
       setNavScrolled(window.scrollY > 50);
+      setShowBackToTop(window.scrollY > 400);
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
@@ -977,10 +982,26 @@ const Landing = () => {
             </div>
             
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <Link to="/auth" className="hover:text-foreground transition-colors">Sign In</Link>
-              <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-              <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-              <a href="#" className="hover:text-foreground transition-colors">Contact</a>
+              {footerLinks.length > 0 ? (
+                footerLinks.map((link) =>
+                  link.url.startsWith('/') ? (
+                    <Link key={link.id} to={link.url} className="hover:text-foreground transition-colors">
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <a key={link.id} href={link.url} className="hover:text-foreground transition-colors">
+                      {link.label}
+                    </a>
+                  )
+                )
+              ) : (
+                <>
+                  <Link to="/auth" className="hover:text-foreground transition-colors">Sign In</Link>
+                  <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
+                  <a href="#" className="hover:text-foreground transition-colors">Terms</a>
+                  <a href="#" className="hover:text-foreground transition-colors">Contact</a>
+                </>
+              )}
             </div>
             
             <p className="text-sm text-muted-foreground">
@@ -989,6 +1010,18 @@ const Landing = () => {
           </div>
         </div>
       </footer>
+
+      {/* Back to top button */}
+      {showBackToTop && (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-110 transition-transform duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          aria-label="Back to top"
+        >
+          <ChevronUp className="h-5 w-5" />
+        </button>
+      )}
     </div>
   );
 };
