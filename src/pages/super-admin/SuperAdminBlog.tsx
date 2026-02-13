@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useBlogPosts } from '@/hooks/useBlogPosts';
+import { useBlogImageUpload } from '@/hooks/useBlogImageUpload';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, Plus, Pencil, Trash2, FileText } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, FileText, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { BlogPost } from '@/hooks/useBlogPosts';
 
@@ -28,6 +29,8 @@ function slugify(text: string) {
 
 export default function SuperAdminBlog() {
   const { posts, isLoading, create, update, delete: deletePost, isCreating, isUpdating, isDeleting } = useBlogPosts(true);
+  const { uploadImage, isUploading } = useBlogImageUpload();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<BlogPost | null>(null);
   const [title, setTitle] = useState('');
@@ -232,13 +235,59 @@ export default function SuperAdminBlog() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="blog-image">Image URL</Label>
-              <Input
-                id="blog-image"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://..."
-              />
+              <Label>Featured Image</Label>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex gap-2 flex-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="gap-2"
+                  >
+                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    {isUploading ? 'Uploading...' : 'Upload image'}
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const url = await uploadImage(file);
+                        setImageUrl(url);
+                      } catch {}
+                      e.target.value = '';
+                    }}
+                  />
+                  {imageUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setImageUrl('')}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <Input
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="Or paste image URL"
+                  className="flex-1"
+                />
+              </div>
+              {imageUrl && (
+                <div className="mt-2 rounded-lg overflow-hidden border bg-muted aspect-video max-w-[300px]">
+                  <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <input

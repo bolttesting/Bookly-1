@@ -1,6 +1,7 @@
 import { Menu, KeyRound, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -27,6 +28,7 @@ export function SuperAdminHeader({ onChangePasswordClick }: SuperAdminHeaderProp
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
+        <ThemeToggle />
         {onChangePasswordClick && (
           <Button
             variant="outline"
