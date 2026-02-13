@@ -819,9 +819,10 @@ const Landing = () => {
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {blogPosts.slice(0, 6).map((post, i) => (
-                <div
+                <Link
                   key={post.id}
-                  className={`glass-card p-6 rounded-xl hover-lift transition-all duration-500 overflow-hidden ${blogVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+                  to={`/blog/${post.slug}`}
+                  className={`glass-card p-6 rounded-xl hover-lift transition-all duration-500 overflow-hidden block ${blogVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
                   style={{ transitionDelay: `${i * 100}ms` }}
                 >
                   {post.image_url && (
@@ -837,8 +838,8 @@ const Landing = () => {
                   {post.excerpt && (
                     <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{post.excerpt}</p>
                   )}
-                  <p className="text-sm text-primary font-medium">Read more →</p>
-                </div>
+                  <span className="text-sm text-primary font-medium inline-flex items-center gap-1">Read more →</span>
+                </Link>
               ))}
             </div>
           </div>

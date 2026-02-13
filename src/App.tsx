@@ -40,6 +40,7 @@ import UnifiedAuth from "./pages/UnifiedAuth";
 import MyAppointments from "./pages/MyAppointments";
 import NotFound from "./pages/NotFound";
 import MovingLanding from "./pages/MovingLanding";
+import BlogPost from "./pages/BlogPost";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ function AppRoutes() {
         <Route path="/customer-login" element={<CustomerAuth />} />
         <Route path="/my-appointments" element={<MyAppointments />} />
         <Route path="/book/:slug" element={<PublicBooking />} />
+        <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/super-admin" element={<SuperAdmin />}>
           <Route index element={<SuperAdminOverview />} />
           <Route path="businesses" element={<SuperAdminBusinesses />} />
