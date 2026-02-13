@@ -25,6 +25,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 import { LocationHoursSettings } from '@/components/settings/LocationHoursSettings';
 import { LocationsSettings } from '@/components/settings/LocationsSettings';
 import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
+import { TIMEZONES } from '@/lib/timezones';
 import { cn } from '@/lib/utils';
 
 const Settings = () => {
@@ -647,11 +648,39 @@ const Settings = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="timezone">Timezone</Label>
-                <Input 
-                  id="timezone" 
-                  defaultValue={business?.timezone || 'America/New_York'} 
-                  className="bg-secondary" 
-                />
+                <Select
+                  value={business?.timezone || 'America/New_York'}
+                  onValueChange={async (value) => {
+                    try {
+                      setIsSaving(true);
+                      await updateBusiness({ timezone: value });
+                      toast.success('Timezone updated successfully');
+                    } catch {
+                      toast.error('Failed to update timezone');
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }}
+                >
+                  <SelectTrigger id="timezone" className="bg-secondary">
+                    <SelectValue placeholder="Select timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(() => {
+                      const currentTz = business?.timezone || 'America/New_York';
+                      const hasCurrent = TIMEZONES.some((t) => t.value === currentTz);
+                      const options = hasCurrent ? TIMEZONES : [{ value: currentTz, label: currentTz }, ...TIMEZONES];
+                      return options.map((tz) => (
+                        <SelectItem key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </SelectItem>
+                      ));
+                    })()}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Used for scheduling and display of appointment times
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="currency">Currency</Label>
@@ -696,7 +725,6 @@ const Settings = () => {
                   const phone = (document.getElementById('businessPhone') as HTMLInputElement)?.value;
                   const address = (document.getElementById('address') as HTMLInputElement)?.value;
                   const city = (document.getElementById('city') as HTMLInputElement)?.value;
-                  const timezone = (document.getElementById('timezone') as HTMLInputElement)?.value;
 
                   try {
                     setIsSaving(true);
@@ -707,7 +735,7 @@ const Settings = () => {
                       phone: phone || null,
                       address: address || null,
                       city: city || null,
-                      timezone: timezone || null,
+                      timezone: business?.timezone || null,
                     });
                     toast.success('Business details updated successfully!');
                   } catch (error) {
