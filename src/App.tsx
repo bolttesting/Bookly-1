@@ -20,6 +20,15 @@ import Customers from "./pages/Customers";
 import Staff from "./pages/Staff";
 import Team from "./pages/Team";
 import SuperAdmin from "./pages/SuperAdmin";
+import SuperAdminOverview from "./pages/super-admin/SuperAdminOverview";
+import SuperAdminBusinesses from "./pages/super-admin/SuperAdminBusinesses";
+import SuperAdminPackages from "./pages/super-admin/SuperAdminPackages";
+import SuperAdminCustomers from "./pages/super-admin/SuperAdminCustomers";
+import SuperAdminAppointments from "./pages/super-admin/SuperAdminAppointments";
+import SuperAdminPlans from "./pages/super-admin/SuperAdminPlans";
+import SuperAdminSiteSettings from "./pages/super-admin/SuperAdminSiteSettings";
+import SuperAdminReviews from "./pages/super-admin/SuperAdminReviews";
+import SuperAdminBlog from "./pages/super-admin/SuperAdminBlog";
 import Settings from "./pages/Settings";
 import Analytics from "./pages/Analytics";
 import Attendance from "./pages/Attendance";
@@ -47,7 +56,17 @@ function AppRoutes() {
         <Route path="/customer-login" element={<CustomerAuth />} />
         <Route path="/my-appointments" element={<MyAppointments />} />
         <Route path="/book/:slug" element={<PublicBooking />} />
-        <Route path="/super-admin" element={<SuperAdmin />} />
+        <Route path="/super-admin" element={<SuperAdmin />}>
+          <Route index element={<SuperAdminOverview />} />
+          <Route path="businesses" element={<SuperAdminBusinesses />} />
+          <Route path="packages" element={<SuperAdminPackages />} />
+          <Route path="customers" element={<SuperAdminCustomers />} />
+          <Route path="appointments" element={<SuperAdminAppointments />} />
+          <Route path="plans" element={<SuperAdminPlans />} />
+          <Route path="site-settings" element={<SuperAdminSiteSettings />} />
+          <Route path="reviews" element={<SuperAdminReviews />} />
+          <Route path="blog" element={<SuperAdminBlog />} />
+        </Route>
         <Route element={<ProtectedRoute />}>
           <Route path="/onboarding" element={<Onboarding />} />
           <Route element={<RequiresBusiness />}>

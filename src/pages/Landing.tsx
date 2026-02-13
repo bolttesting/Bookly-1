@@ -6,6 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { useCountUp } from "@/hooks/useCountUp";
 import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useReviews } from "@/hooks/useReviews";
+import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { useEffect, useRef, useState } from "react";
 import { formatCurrencySimple, getCurrencyByCode } from "@/lib/currency";
 import { Loader2 } from "lucide-react";
@@ -31,7 +34,8 @@ import {
   MessageSquare,
   Heart,
   Menu,
-  X
+  X,
+  FileText
 } from "lucide-react";
 
 const Landing = () => {
@@ -49,6 +53,10 @@ const Landing = () => {
   const [testimonialsRef, testimonialsVisible] = useScrollAnimation({ threshold: 0.2 });
   const [pricingRef, pricingVisible] = useScrollAnimation({ threshold: 0.2 });
   const [contactRef, contactVisible] = useScrollAnimation({ threshold: 0.2 });
+  const [blogRef, blogVisible] = useScrollAnimation({ threshold: 0.2 });
+  const { settings: siteSettings } = useSiteSettings();
+  const { reviews } = useReviews();
+  const { posts: blogPosts } = useBlogPosts(false);
 
   // Count-up animations for stats
   const [usersCount, startUsers] = useCountUp(10, 2000, 0);
@@ -771,46 +779,71 @@ const Landing = () => {
           </div>
           
           <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                name: "Sarah Johnson",
-                role: "Salon Owner",
-                content: "Bookly has transformed how we manage appointments. Our booking rate increased by 40% in just the first month!",
-                rating: 5
-              },
-              {
-                name: "Michael Chen",
-                role: "Fitness Studio Manager",
-                content: "The automated reminders have reduced our no-shows significantly. The analytics dashboard is incredibly insightful.",
-                rating: 5
-              },
-              {
-                name: "Emily Rodriguez",
-                role: "Consultant",
-                content: "Easy to use, beautiful interface, and excellent customer support. Bookly has become essential to our business.",
-                rating: 5
-              }
-            ].map((testimonial, i) => (
+            {(reviews.length > 0 ? reviews : [
+              { id: '1', name: "Sarah Johnson", role: "Salon Owner", content: "Bookly has transformed how we manage appointments. Our booking rate increased by 40% in just the first month!", rating: 5 },
+              { id: '2', name: "Michael Chen", role: "Fitness Studio Manager", content: "The automated reminders have reduced our no-shows significantly. The analytics dashboard is incredibly insightful.", rating: 5 },
+              { id: '3', name: "Emily Rodriguez", role: "Consultant", content: "Easy to use, beautiful interface, and excellent customer support. Bookly has become essential to our business.", rating: 5 },
+            ]).slice(0, 6).map((testimonial, i) => (
               <div 
-                key={i} 
+                key={testimonial.id || i} 
                 className={`glass-card p-6 rounded-xl hover-lift transition-all duration-500 ${testimonialsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
                 style={{ transitionDelay: `${i * 150}ms` }}
               >
                 <div className="flex items-center gap-1 mb-4">
-                  {[...Array(testimonial.rating)].map((_, j) => (
+                  {[...Array(testimonial.rating || 5)].map((_, j) => (
                     <Star key={j} className="w-4 h-4 fill-warning text-warning animate-pulse" style={{ animationDelay: `${j * 100}ms` }} />
                   ))}
                 </div>
                 <p className="text-muted-foreground mb-4 italic">"{testimonial.content}"</p>
                 <div>
                   <p className="font-semibold">{testimonial.name}</p>
-                  <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                  <p className="text-sm text-muted-foreground">{testimonial.role || ''}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </section>
+
+      {/* Blog Section */}
+      {blogPosts.length > 0 && (
+        <section ref={blogRef} className="py-12 sm:py-20 px-4 sm:px-6 bg-muted/20">
+          <div className="container mx-auto max-w-6xl">
+            <div className={`text-center space-y-4 mb-10 sm:mb-12 transition-all duration-700 ${blogVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+              <h2 className="text-3xl sm:text-4xl font-display font-bold">
+                Latest from our <span className="gradient-text">blog</span>
+              </h2>
+              <p className="text-lg sm:text-xl text-muted-foreground">
+                Tips, updates, and industry insights
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {blogPosts.slice(0, 6).map((post, i) => (
+                <div
+                  key={post.id}
+                  className={`glass-card p-6 rounded-xl hover-lift transition-all duration-500 overflow-hidden ${blogVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+                  style={{ transitionDelay: `${i * 100}ms` }}
+                >
+                  {post.image_url && (
+                    <div className="aspect-video rounded-lg overflow-hidden mb-4 bg-muted">
+                      <img src={post.image_url} alt={post.title} className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="w-4 h-4 text-primary shrink-0" />
+                    <span className="text-xs text-muted-foreground">Blog</span>
+                  </div>
+                  <h3 className="text-lg font-display font-semibold mb-2 line-clamp-2">{post.title}</h3>
+                  {post.excerpt && (
+                    <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{post.excerpt}</p>
+                  )}
+                  <p className="text-sm text-primary font-medium">Read more →</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* CTA Section */}
       <section className="py-12 sm:py-16 md:py-20 px-4 sm:px-6">
@@ -863,8 +896,8 @@ const Landing = () => {
                     </div>
                     <div>
                       <p className="font-medium">Email</p>
-                      <a href="mailto:support@bookly.com" className="text-muted-foreground hover:text-primary transition-colors">
-                        support@bookly.com
+                      <a href={`mailto:${siteSettings?.contact_email || 'support@bookly.com'}`} className="text-muted-foreground hover:text-primary transition-colors">
+                        {siteSettings?.contact_email || 'support@bookly.com'}
                       </a>
                     </div>
                   </div>
@@ -874,8 +907,8 @@ const Landing = () => {
                     </div>
                     <div>
                       <p className="font-medium">Phone</p>
-                      <a href="tel:+1234567890" className="text-muted-foreground hover:text-primary transition-colors">
-                        +1 (234) 567-890
+                      <a href={`tel:${(siteSettings?.contact_phone || '+1234567890').replace(/\D/g, '')}`} className="text-muted-foreground hover:text-primary transition-colors">
+                        {siteSettings?.contact_phone || '+1 (234) 567-890'}
                       </a>
                     </div>
                   </div>
@@ -885,10 +918,8 @@ const Landing = () => {
                     </div>
                     <div>
                       <p className="font-medium">Address</p>
-                      <p className="text-muted-foreground">
-                        123 Business Street<br />
-                        Suite 100<br />
-                        City, State 12345
+                      <p className="text-muted-foreground whitespace-pre-line">
+                        {siteSettings?.contact_address || '123 Business Street, Suite 100, City, State 12345'}
                       </p>
                     </div>
                   </div>
@@ -952,7 +983,7 @@ const Landing = () => {
             </div>
             
             <p className="text-sm text-muted-foreground">
-              © 2024 Bookly. All rights reserved.
+              {siteSettings?.footer_copyright || '© 2024 Bookly. All rights reserved.'}
             </p>
           </div>
         </div>
