@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import RequiresBusiness from "@/components/RequiresBusiness";
+import RequiresAdmin from "@/components/RequiresAdmin";
 import DashboardLayout from "./layouts/DashboardLayout";
 import { PageTransition } from "@/components/PageTransition";
 import Landing from "./pages/Landing";
@@ -84,14 +85,16 @@ function AppRoutes() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/services" element={<Services />} />
-              <Route path="/packages" element={<Packages />} />
-              <Route path="/coupons" element={<Coupons />} />
               <Route path="/customers" element={<Customers />} />
               <Route path="/staff" element={<Staff />} />
-              <Route path="/team" element={<Team />} />
-              <Route path="/analytics" element={<Analytics />} />
               <Route path="/attendance" element={<Attendance />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route element={<RequiresAdmin />}>
+                <Route path="/packages" element={<Packages />} />
+                <Route path="/coupons" element={<Coupons />} />
+                <Route path="/team" element={<Team />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/settings" element={<Settings />} />
+              </Route>
             </Route>
           </Route>
         </Route>

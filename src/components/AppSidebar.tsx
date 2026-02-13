@@ -27,20 +27,21 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { useBusinessSubscription } from "@/hooks/useBusinessSubscription";
+import { useDashboardRole } from "@/hooks/useDashboardRole";
 import { Badge } from "@/components/ui/badge";
 
 const navItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Calendar", url: "/calendar", icon: Calendar },
-  { title: "Attendance", url: "/attendance", icon: ClipboardCheck },
-  { title: "Services", url: "/services", icon: Briefcase },
-  { title: "Packages", url: "/packages", icon: Package },
-  { title: "Coupons", url: "/coupons", icon: Tag },
-  { title: "Customers", url: "/customers", icon: Users },
-  { title: "Staff", url: "/staff", icon: UserCircle },
-  { title: "Team", url: "/team", icon: Shield },
-  { title: "Analytics", url: "/analytics", icon: BarChart3 },
-  { title: "Settings", url: "/settings", icon: Settings },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, adminOnly: false },
+  { title: "Calendar", url: "/calendar", icon: Calendar, adminOnly: false },
+  { title: "Attendance", url: "/attendance", icon: ClipboardCheck, adminOnly: false },
+  { title: "Services", url: "/services", icon: Briefcase, adminOnly: false },
+  { title: "Packages", url: "/packages", icon: Package, adminOnly: true },
+  { title: "Coupons", url: "/coupons", icon: Tag, adminOnly: true },
+  { title: "Customers", url: "/customers", icon: Users, adminOnly: false },
+  { title: "Staff", url: "/staff", icon: UserCircle, adminOnly: false },
+  { title: "Team", url: "/team", icon: Shield, adminOnly: true },
+  { title: "Analytics", url: "/analytics", icon: BarChart3, adminOnly: true },
+  { title: "Settings", url: "/settings", icon: Settings, adminOnly: true },
 ];
 
 export function AppSidebar() {
@@ -49,6 +50,12 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { subscription, isLoading: subscriptionLoading } = useBusinessSubscription();
+  const { canAccessAdmin, isLoading } = useDashboardRole();
+
+  // Default to showing all items while role is loading (avoids flash of hidden nav)
+  const visibleNavItems = isLoading
+    ? navItems
+    : navItems.filter((item) => !item.adminOnly || canAccessAdmin);
   
   // Only show upgrade button if on free plan (price = 0)
   // Default to showing upgrade button if subscription data isn't loaded yet or plan is null
@@ -81,7 +88,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
+              {visibleNavItems.map((item) => {
                 const isActive = location.pathname === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -112,7 +119,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-4 shrink-0 border-t border-sidebar-border">
-        {!collapsed && (
+        {!collapsed && canAccessAdmin && (
           <div className="glass-card p-4 text-center">
             {subscriptionLoading ? (
               <div className="text-xs text-muted-foreground">Loading...</div>
