@@ -5,6 +5,7 @@ import {
   Users,
   UserCircle,
   Settings,
+  User,
   Sparkles,
   Shield,
   Package,
@@ -39,6 +40,7 @@ const navItems = [
   { title: "Coupons", url: "/coupons", icon: Tag, adminOnly: true },
   { title: "Customers", url: "/customers", icon: Users, adminOnly: false },
   { title: "Staff", url: "/staff", icon: UserCircle, adminOnly: false },
+  { title: "Profile", url: "/profile", icon: User, adminOnly: false },
   { title: "Team", url: "/team", icon: Shield, adminOnly: true },
   { title: "Analytics", url: "/analytics", icon: BarChart3, adminOnly: true },
   { title: "Settings", url: "/settings", icon: Settings, adminOnly: true },
@@ -52,9 +54,9 @@ export function AppSidebar() {
   const { subscription, isLoading: subscriptionLoading } = useBusinessSubscription();
   const { canAccessAdmin, isLoading } = useDashboardRole();
 
-  // Default to showing all items while role is loading (avoids flash of hidden nav)
+  // Show admin tabs only when we've confirmed canAccessAdmin (avoids showing tabs that redirect)
   const visibleNavItems = isLoading
-    ? navItems
+    ? navItems.filter((item) => !item.adminOnly)
     : navItems.filter((item) => !item.adminOnly || canAccessAdmin);
   
   // Only show upgrade button if on free plan (price = 0)

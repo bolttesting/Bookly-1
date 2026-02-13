@@ -7,6 +7,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useDashboardRole } from "@/hooks/useDashboardRole";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationsDropdown } from "@/components/NotificationsDropdown";
 import {
@@ -22,6 +23,7 @@ export function DashboardHeader() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { profile, uploadAvatar, isUploading } = useProfile();
+  const { canAccessAdmin } = useDashboardRole();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleNavigation = (path: string) => {
@@ -127,23 +129,27 @@ export function DashboardHeader() {
               Change Photo
             </DropdownMenuItem>
             <DropdownMenuItem 
-              onClick={() => handleNavigation("/settings")}
+              onClick={() => handleNavigation("/profile")}
               className="cursor-pointer"
             >
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => handleNavigation("/settings?tab=payments")}
-              className="cursor-pointer"
-            >
-              Billing
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => handleNavigation("/settings")}
-              className="cursor-pointer"
-            >
-              Settings
-            </DropdownMenuItem>
+            {canAccessAdmin && (
+              <>
+                <DropdownMenuItem 
+                  onClick={() => handleNavigation("/settings?tab=payments")}
+                  className="cursor-pointer"
+                >
+                  Billing
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleNavigation("/settings")}
+                  className="cursor-pointer"
+                >
+                  Settings
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem 
               onClick={handleLogout}

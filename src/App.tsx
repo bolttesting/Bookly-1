@@ -31,6 +31,7 @@ import SuperAdminSiteSettings from "./pages/super-admin/SuperAdminSiteSettings";
 import SuperAdminReviews from "./pages/super-admin/SuperAdminReviews";
 import SuperAdminBlog from "./pages/super-admin/SuperAdminBlog";
 import Settings from "./pages/Settings";
+import Profile from "./pages/Profile";
 import Analytics from "./pages/Analytics";
 import Attendance from "./pages/Attendance";
 import Auth from "./pages/Auth";
@@ -88,6 +89,7 @@ function AppRoutes() {
               <Route path="/customers" element={<Customers />} />
               <Route path="/staff" element={<Staff />} />
               <Route path="/attendance" element={<Attendance />} />
+              <Route path="/profile" element={<Profile />} />
               <Route element={<RequiresAdmin />}>
                 <Route path="/packages" element={<Packages />} />
                 <Route path="/coupons" element={<Coupons />} />

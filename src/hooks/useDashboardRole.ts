@@ -5,9 +5,9 @@ import { useBusiness } from './useBusiness';
 type AppRole = 'owner' | 'admin' | 'staff';
 
 export function useDashboardRole() {
-  const { business } = useBusiness();
+  const { business, loading: businessLoading } = useBusiness();
 
-  const { data: currentUserRole, isLoading } = useQuery({
+  const { data: currentUserRole, isLoading: roleLoading } = useQuery({
     queryKey: ['dashboardRole', business?.id],
     queryFn: async () => {
       if (!business?.id) return null;
@@ -18,12 +18,15 @@ export function useDashboardRole() {
         .select('role')
         .eq('business_id', business.id)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       if (error) return null;
       return data?.role as AppRole;
     },
     enabled: !!business?.id,
   });
+
+  // Treat as loading until business is ready AND we have a definitive role result
+  const isLoading = businessLoading || (!!business?.id && roleLoading);
 
   return {
     role: currentUserRole ?? null,
