@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { User, Building2, CreditCard, Bell, Link2, Copy, Check, ExternalLink, Clock, Download, QrCode, Code2, MapPin, DollarSign, CheckCircle, Package, Loader2 } from "lucide-react";
+import { User, Building2, CreditCard, Bell, Link2, Copy, Check, ExternalLink, Clock, Download, QrCode, Code2, MapPin, DollarSign, CheckCircle, Package, Loader2, Upload, X } from "lucide-react";
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useBusiness } from '@/hooks/useBusiness';
+import { useBusinessImageUpload } from '@/hooks/useBusinessImageUpload';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
@@ -24,11 +25,13 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 import { LocationHoursSettings } from '@/components/settings/LocationHoursSettings';
 import { LocationsSettings } from '@/components/settings/LocationsSettings';
 import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
+import { cn } from '@/lib/utils';
 
 const Settings = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { business, updateBusiness, refetch: refetchBusiness } = useBusiness();
+  const { uploadImages, isUploading: isLogoUploading } = useBusinessImageUpload();
   const { currencyCode, currencies } = useCurrency();
   const { plans: subscriptionPlans, isLoading: plansLoading } = useSubscriptionPlans();
   const { subscription, isLoading: subscriptionLoading, updateSubscription } = useBusinessSubscription();
@@ -37,6 +40,7 @@ const Settings = () => {
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [logoDragActive, setLogoDragActive] = useState(false);
   const [stripeConnectEmail, setStripeConnectEmail] = useState('');
   const qrRef = useRef<HTMLDivElement>(null);
 
@@ -505,18 +509,101 @@ const Settings = () => {
                   className="bg-secondary" 
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="businessLogo">Logo URL</Label>
-                <Input 
-                  id="businessLogo" 
-                  type="url"
-                  placeholder="https://example.com/logo.png"
-                  defaultValue={business?.logo_url || ''} 
-                  className="bg-secondary" 
-                />
-                <p className="text-xs text-muted-foreground">
-                  Your logo will appear in the booking widget. Use a direct image URL.
+              <div className="space-y-2 md:col-span-2">
+                <Label>Business Logo</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Your logo will appear in the booking widget. Upload JPG, PNG, GIF or WebP (max 5MB).
                 </p>
+                <div className="flex flex-col sm:flex-row gap-4 items-start">
+                  {business?.logo_url && (
+                    <div className="relative shrink-0">
+                      <div className="w-24 h-24 rounded-lg overflow-hidden border border-border bg-muted">
+                        <img
+                          src={business.logo_url}
+                          alt="Business logo"
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-1 -right-1 h-6 w-6 rounded-full"
+                        disabled={isLogoUploading}
+                        onClick={async () => {
+                          try {
+                            await updateBusiness({ logo_url: null });
+                            toast.success('Logo removed');
+                          } catch {
+                            toast.error('Failed to remove logo');
+                          }
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                  <div
+                    onClick={() => !isLogoUploading && document.getElementById('logo-upload')?.click()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setLogoDragActive(false);
+                      if (!isLogoUploading && e.dataTransfer.files?.[0]) {
+                        const file = e.dataTransfer.files[0];
+                        if (['image/jpeg','image/png','image/gif','image/webp'].includes(file.type) && file.size <= 5 * 1024 * 1024) {
+                          uploadImages([file]).then(urls => {
+                            if (urls?.[0]) return updateBusiness({ logo_url: urls[0] });
+                          }).then(() => toast.success('Logo uploaded successfully')).catch(err => toast.error(err?.message || 'Failed to upload logo'));
+                        }
+                      }
+                    }}
+                    onDragOver={(e) => { e.preventDefault(); setLogoDragActive(true); }}
+                    onDragLeave={() => setLogoDragActive(false)}
+                    className={cn(
+                      'border-2 border-dashed rounded-lg p-4 flex-1 min-w-0 w-full transition-colors cursor-pointer',
+                      logoDragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/50',
+                      isLogoUploading && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    <input
+                      id="logo-upload"
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        try {
+                          const urls = await uploadImages([file]);
+                          if (urls?.[0]) {
+                            await updateBusiness({ logo_url: urls[0] });
+                            toast.success('Logo uploaded successfully');
+                          }
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : 'Failed to upload logo');
+                        }
+                      }}
+                      disabled={isLogoUploading}
+                    />
+                    {isLogoUploading ? (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="text-sm">Uploading...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Upload className="h-5 w-5 shrink-0" />
+                        <span className="text-sm">
+                          {business?.logo_url ? 'Click to replace logo' : 'Click or drag to upload logo'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="industry">Industry</Label>
@@ -604,7 +691,6 @@ const Settings = () => {
                 disabled={isSaving}
                 onClick={async () => {
                   const name = (document.getElementById('businessName') as HTMLInputElement)?.value;
-                  const logoUrl = (document.getElementById('businessLogo') as HTMLInputElement)?.value?.trim() || null;
                   const industry = (document.getElementById('industry') as HTMLInputElement)?.value;
                   const email = (document.getElementById('businessEmail') as HTMLInputElement)?.value;
                   const phone = (document.getElementById('businessPhone') as HTMLInputElement)?.value;
@@ -616,7 +702,6 @@ const Settings = () => {
                     setIsSaving(true);
                     await updateBusiness({
                       name,
-                      logo_url: logoUrl,
                       industry: industry || null,
                       email: email || null,
                       phone: phone || null,
