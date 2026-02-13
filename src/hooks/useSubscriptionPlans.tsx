@@ -38,6 +38,7 @@ export function useSubscriptionPlans() {
 
   const { data: plans = [], isLoading, error } = useQuery({
     queryKey: ['subscription-plans'],
+    staleTime: 10 * 60 * 1000, // 10 min - plans rarely change
     queryFn: async () => {
       // Check if Supabase is configured
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;

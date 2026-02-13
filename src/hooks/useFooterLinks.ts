@@ -14,6 +14,7 @@ export function useFooterLinks() {
 
   const { data = [], isLoading } = useQuery({
     queryKey: ['footerLinks'],
+    staleTime: 5 * 60 * 1000, // 5 min
     queryFn: async () => {
       const { data: rows, error } = await supabase
         .from('footer_links')

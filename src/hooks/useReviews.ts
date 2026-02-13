@@ -16,6 +16,7 @@ export function useReviews() {
 
   const { data = [], isLoading } = useQuery({
     queryKey: ['reviews'],
+    staleTime: 5 * 60 * 1000, // 5 min
     queryFn: async () => {
       const { data: rows, error } = await supabase
         .from('reviews')

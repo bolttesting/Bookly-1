@@ -18,6 +18,7 @@ export function useBlogPosts(adminView = false) {
 
   const { data = [], isLoading } = useQuery({
     queryKey: ['blogPosts', adminView],
+    staleTime: 3 * 60 * 1000, // 3 min
     queryFn: async () => {
       let q = supabase.from('blog_posts').select('*').order('created_at', { ascending: false });
       if (!adminView) {

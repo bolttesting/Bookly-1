@@ -15,6 +15,7 @@ export function useSiteSettings() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['siteSettings'],
+    staleTime: 5 * 60 * 1000, // 5 min
     queryFn: async () => {
       const { data: row, error } = await supabase
         .from('site_settings')
