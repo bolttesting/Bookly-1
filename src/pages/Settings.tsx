@@ -347,6 +347,36 @@ const Settings = () => {
           <div className="glass-card p-6 lg:col-span-2">
             <h2 className="text-lg font-semibold mb-4">Booking Settings</h2>
             <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1 flex-1 min-w-0">
+                  <Label className="font-medium">Booking Page Theme</Label>
+                  <p className="text-sm text-muted-foreground">Light, dark, or match visitor&apos;s preference</p>
+                </div>
+                <Select
+                  value={business?.booking_theme || 'system'}
+                  onValueChange={async (value: 'light' | 'dark' | 'system') => {
+                    try {
+                      setIsSaving(true);
+                      await updateBusiness({ booking_theme: value });
+                      toast.success('Booking theme updated');
+                    } catch {
+                      toast.error('Failed to update theme');
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-[130px] sm:w-[150px] shrink-0 bg-secondary">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="light">Light</SelectItem>
+                    <SelectItem value="dark">Dark</SelectItem>
+                    <SelectItem value="system">System</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Separator />
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">Online Booking</p>

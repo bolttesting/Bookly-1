@@ -24,6 +24,7 @@ interface Business {
   allow_partial_payment?: boolean | null;
   partial_payment_percentage?: number | null;
   reschedule_deadline_hours?: number | null;
+  booking_theme?: 'light' | 'dark' | 'system' | null;
 }
 
 export function useBusiness() {

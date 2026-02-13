@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { format, addMinutes, setHours, setMinutes, startOfDay, isBefore, isAfter, addDays } from 'date-fns';
-import { Calendar, Clock, User, Mail, Phone, ArrowRight, ArrowLeft, CheckCircle, Loader2, Users, LogIn, MapPin, Eye, EyeOff, Tag, Repeat, CalendarIcon, Package, LayoutDashboard } from 'lucide-react';
+import { Calendar, Clock, User, Mail, Phone, ArrowRight, ArrowLeft, CheckCircle, Loader2, Users, LogIn, MapPin, Eye, EyeOff, Tag, Repeat, CalendarIcon, Package, LayoutDashboard, Sun, Moon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +42,7 @@ interface Business {
   address: string | null;
   city: string | null;
   currency: string | null;
+  booking_theme?: 'light' | 'dark' | 'system' | null;
   require_payment?: boolean;
   stripe_connected?: boolean;
 }
@@ -178,11 +179,35 @@ export default function PublicBooking() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
   
+  // Theme: business setting + optional visitor override (stored in localStorage)
+  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('dark');
+
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; couponId: string; discount: number; discountType: 'percentage' | 'fixed' } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+
+  // Apply booking theme (business setting + visitor override)
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(effectiveTheme);
+  }, [effectiveTheme]);
+
+  // Set effective theme when business loads (respect visitor override in localStorage)
+  useEffect(() => {
+    if (!business) return;
+    const override = localStorage.getItem('bookly-booking-theme') as 'light' | 'dark' | null;
+    if (override) {
+      setEffectiveTheme(override);
+      return;
+    }
+    const bt = business.booking_theme || 'system';
+    if (bt === 'light') setEffectiveTheme('light');
+    else if (bt === 'dark') setEffectiveTheme('dark');
+    else setEffectiveTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  }, [business?.id, business?.booking_theme]);
 
   // When booking a package, require login/signup (no guest)
   useEffect(() => {
@@ -1465,42 +1490,72 @@ export default function PublicBooking() {
     <div className={`min-h-screen bg-background ${isEmbedded ? 'p-2' : ''}`}>
       {/* Header - full in standalone, compact in embed */}
       {(isEmbedded ? (
-        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border/50">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center overflow-hidden shrink-0">
-            {business.logo_url ? (
-              <img src={business.logo_url} alt={business.name} className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; (e.currentTarget.nextElementSibling as HTMLElement)?.classList.remove('hidden'); }} />
-            ) : null}
-            <span className={`flex items-center justify-center w-full h-full ${business.logo_url ? 'hidden' : ''}`}>
-              <Calendar className="h-4 w-4 text-primary-foreground" />
-            </span>
+        <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-border/50">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center overflow-hidden shrink-0">
+              {business.logo_url ? (
+                <img src={business.logo_url} alt={business.name} className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; (e.currentTarget.nextElementSibling as HTMLElement)?.classList.remove('hidden'); }} />
+              ) : null}
+              <span className={`flex items-center justify-center w-full h-full ${business.logo_url ? 'hidden' : ''}`}>
+                <Calendar className="h-4 w-4 text-primary-foreground" />
+              </span>
+            </div>
+            <h1 className="font-display font-bold text-base truncate">{business.name}</h1>
           </div>
-          <h1 className="font-display font-bold text-base truncate">{business.name}</h1>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={() => {
+              const next = effectiveTheme === 'dark' ? 'light' : 'dark';
+              setEffectiveTheme(next);
+              localStorage.setItem('bookly-booking-theme', next);
+            }}
+            aria-label={`Switch to ${effectiveTheme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {effectiveTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
         </div>
       ) : (
         <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-50">
           <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center overflow-hidden shrink-0">
-                {business.logo_url ? (
-                  <img
-                    src={business.logo_url}
-                    alt={business.name}
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                      if (fallback) fallback.classList.remove('hidden');
-                    }}
-                  />
-                ) : null}
-                <span className={`flex items-center justify-center w-full h-full ${business.logo_url ? 'hidden' : ''}`}>
-                  <Calendar className="h-5 w-5 text-primary-foreground" />
-                </span>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center overflow-hidden shrink-0">
+                  {business.logo_url ? (
+                    <img
+                      src={business.logo_url}
+                      alt={business.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <span className={`flex items-center justify-center w-full h-full ${business.logo_url ? 'hidden' : ''}`}>
+                    <Calendar className="h-5 w-5 text-primary-foreground" />
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <h1 className="font-display font-bold text-lg truncate">{business.name}</h1>
+                  <p className="text-xs text-muted-foreground">{business.industry}</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h1 className="font-display font-bold text-lg truncate">{business.name}</h1>
-                <p className="text-xs text-muted-foreground">{business.industry}</p>
-              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={() => {
+                  const next = effectiveTheme === 'dark' ? 'light' : 'dark';
+                  setEffectiveTheme(next);
+                  localStorage.setItem('bookly-booking-theme', next);
+                }}
+                aria-label={`Switch to ${effectiveTheme === 'dark' ? 'light' : 'dark'} mode`}
+              >
+                {effectiveTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
             </div>
           </div>
         </header>
