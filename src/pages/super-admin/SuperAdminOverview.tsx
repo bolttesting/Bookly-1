@@ -27,10 +27,10 @@ export default function SuperAdminOverview() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Overview</h1>
-        <p className="text-muted-foreground">Platform statistics at a glance</p>
+    <div className="space-y-4 sm:space-y-6 w-full max-w-full min-w-0">
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-2xl font-display font-bold truncate">Overview</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">Platform statistics at a glance</p>
       </div>
 
       {loading ? (
@@ -39,17 +39,17 @@ export default function SuperAdminOverview() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4 min-w-0">
             {statCards.map(({ label, value, icon: Icon }) => (
-              <Card key={label} className="glass-card">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Icon className="h-5 w-5 text-primary" />
+              <Card key={label} className="glass-card overflow-hidden min-w-0">
+                <CardContent className="p-4 sm:pt-6">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+                      <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                     </div>
-                    <div>
-                      <p className="text-2xl font-bold">{value}</p>
-                      <p className="text-xs text-muted-foreground">{label}</p>
+                    <div className="min-w-0">
+                      <p className="text-lg sm:text-2xl font-bold truncate">{value}</p>
+                      <p className="text-xs text-muted-foreground truncate">{label}</p>
                     </div>
                   </div>
                 </CardContent>

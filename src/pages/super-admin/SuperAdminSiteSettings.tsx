@@ -64,13 +64,13 @@ export default function SuperAdminSiteSettings() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Site Settings</h1>
-        <p className="text-muted-foreground">Edit footer and contact info shown on the home page</p>
+    <div className="space-y-4 sm:space-y-6 w-full max-w-full min-w-0">
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-2xl font-display font-bold truncate">Site Settings</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">Edit footer and contact info shown on the home page</p>
       </div>
 
-      <Card className="glass-card">
+      <Card className="glass-card overflow-hidden min-w-0 max-w-full">
         <CardHeader>
           <CardTitle>Home Page Content</CardTitle>
           <CardDescription>

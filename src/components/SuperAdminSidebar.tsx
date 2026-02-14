@@ -70,7 +70,7 @@ export function SuperAdminSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.title} className="min-w-0">
                   <SidebarMenuButton
                     asChild
                     isActive={false}
@@ -81,7 +81,7 @@ export function SuperAdminSidebar() {
                       end={item.end}
                       className={({ isActive }) =>
                         cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200",
+                          "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200 min-w-0",
                           isActive
                             ? "bg-primary/10 text-primary font-medium"
                             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -89,7 +89,7 @@ export function SuperAdminSidebar() {
                       }
                     >
                       <item.icon className="h-5 w-5 shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
+                      {!collapsed && <span className="truncate">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

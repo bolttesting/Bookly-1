@@ -81,19 +81,19 @@ export default function SuperAdminReviews() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 w-full max-w-full min-w-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Reviews</h1>
-          <p className="text-muted-foreground">Manage testimonials shown on the home page</p>
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-display font-bold truncate">Reviews</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage testimonials shown on the home page</p>
         </div>
-        <Button onClick={openCreate} className="gap-2">
+        <Button onClick={openCreate} className="gap-2 shrink-0 w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           Add Review
         </Button>
       </div>
 
-      <Card className="glass-card">
+      <Card className="glass-card overflow-hidden min-w-0 max-w-full">
         <CardHeader>
           <CardTitle>Testimonials</CardTitle>
           <CardDescription>{reviews.length} reviews displayed on the landing page</CardDescription>
@@ -106,7 +106,7 @@ export default function SuperAdminReviews() {
           ) : reviews.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">No reviews yet. Add one to get started.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
               <Table>
                 <TableHeader>
                   <TableRow>

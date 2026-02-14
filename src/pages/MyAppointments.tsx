@@ -1069,30 +1069,30 @@ export default function MyAppointments() {
   }, {} as Record<string, { business: Business; packages: PackageTemplate[] }>);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background w-full max-w-full overflow-x-hidden">
       {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
+      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50 min-w-0">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2 min-w-0">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
               <Calendar className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-display font-bold">My Dashboard</span>
+            <span className="text-lg sm:text-xl font-display font-bold truncate">My Dashboard</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <ThemeToggle />
-          <Button variant="ghost" onClick={handleSignOut} className="gap-2">
-            <LogOut className="h-4 w-4" />
-            Sign Out
-          </Button>
+            <Button variant="ghost" onClick={handleSignOut} className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+              <LogOut className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </Button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-6xl">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-          <div className="w-full overflow-x-auto">
-            <TabsList className="inline-flex w-full min-w-max gap-1 sm:gap-2 text-xs sm:text-sm">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-6xl w-full max-w-full min-w-0">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6 w-full min-w-0 overflow-hidden">
+          <div className="w-full max-w-full overflow-x-auto overflow-y-hidden scrollbar-thin touch-pan-x">
+            <TabsList className="inline-flex w-max min-w-full sm:min-w-0 gap-1 sm:gap-2 text-xs sm:text-sm flex-nowrap">
               <TabsTrigger value="appointments" className="whitespace-nowrap px-3 sm:px-4 shrink-0">
                 <span className="hidden sm:inline">Appointments</span>
                 <span className="sm:hidden">Apts</span>
@@ -1113,7 +1113,7 @@ export default function MyAppointments() {
             </TabsList>
           </div>
 
-          <TabsContent value="appointments" className="space-y-4 sm:space-y-6">
+          <TabsContent value="appointments" className="space-y-4 sm:space-y-6 min-w-0 overflow-hidden">
         {appointments.length === 0 ? (
           <Card className="glass-card text-center py-8 sm:py-12">
             <CardContent>
@@ -1259,7 +1259,7 @@ export default function MyAppointments() {
         )}
           </TabsContent>
 
-          <TabsContent value="services" className="space-y-4 sm:space-y-6">
+          <TabsContent value="services" className="space-y-4 sm:space-y-6 min-w-0 overflow-hidden">
             {businesses.length === 0 ? (
               <Card className="glass-card text-center py-8 sm:py-12">
                 <CardContent>
@@ -1837,7 +1837,7 @@ export default function MyAppointments() {
             )}
           </TabsContent>
 
-          <TabsContent value="packages" className="space-y-6">
+          <TabsContent value="packages" className="space-y-4 sm:space-y-6 min-w-0 overflow-hidden">
             {businesses.length === 0 ? (
               <Card className="glass-card text-center py-12">
                 <CardContent>
@@ -2010,7 +2010,7 @@ export default function MyAppointments() {
             )}
           </TabsContent>
 
-          <TabsContent value="my-packages" className="space-y-6">
+          <TabsContent value="my-packages" className="space-y-4 sm:space-y-6 min-w-0 overflow-hidden">
             {myPackages.length === 0 ? (
               <Card className="glass-card text-center py-12">
                 <CardContent>
@@ -2071,7 +2071,7 @@ export default function MyAppointments() {
             )}
           </TabsContent>
 
-          <TabsContent value="profile" className="space-y-6">
+          <TabsContent value="profile" className="space-y-4 sm:space-y-6 min-w-0 overflow-hidden">
             {profileLoading || authLoading ? (
               <Card className="glass-card">
                 <CardContent className="p-12 text-center">
@@ -2085,17 +2085,17 @@ export default function MyAppointments() {
                 </CardContent>
               </Card>
             ) : (
-              <Card className="glass-card">
-                <CardHeader>
-                  <CardTitle>Profile Settings</CardTitle>
-                  <CardDescription>
+              <Card className="glass-card overflow-hidden min-w-0 max-w-full">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-base sm:text-lg">Profile Settings</CardTitle>
+                  <CardDescription className="text-sm">
                     Update your personal information and account settings
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-6 p-4 sm:p-6 pt-0">
                   {/* Profile Picture */}
-                  <div className="flex items-center gap-6">
-                    <Avatar className="h-24 w-24">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 min-w-0">
+                    <Avatar className="h-20 w-20 sm:h-24 sm:w-24 shrink-0">
                       <AvatarImage src={profile?.avatar_url || user?.user_metadata?.avatar_url} />
                       <AvatarFallback>
                         {profile?.first_name?.[0] || profile?.last_name?.[0] || user?.email?.[0]?.toUpperCase() || 'U'}

@@ -11,17 +11,17 @@ export default function SuperAdminPackages() {
   const formatCurrency = (amount: number) => formatCurrencySimple(amount, 'USD');
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Packages</h1>
-        <p className="text-muted-foreground">{allPackages.length} total packages sold</p>
+    <div className="space-y-4 sm:space-y-6 w-full max-w-full min-w-0">
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-2xl font-display font-bold truncate">Packages</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">{allPackages.length} total packages sold</p>
       </div>
-      <Card className="glass-card">
-        <CardHeader>
-          <CardTitle>All Packages</CardTitle>
+      <Card className="glass-card overflow-hidden min-w-0 max-w-full">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">All Packages</CardTitle>
           <CardDescription>Packages across all businesses</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0">
           {loading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -29,7 +29,7 @@ export default function SuperAdminPackages() {
           ) : allPackages.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">No packages yet</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
               <Table>
                 <TableHeader>
                   <TableRow>

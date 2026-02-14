@@ -17,7 +17,7 @@ export default function SuperAdminLayout({ onChangePasswordClick }: SuperAdminLa
       <SuperAdminSidebar />
       <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-hidden h-full">
         <SuperAdminHeader onChangePasswordClick={onChangePasswordClick} />
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 scrollbar-thin min-w-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 scrollbar-thin min-w-0 max-w-full">
           <PageTransition key={location.pathname}>
             <Outlet />
           </PageTransition>

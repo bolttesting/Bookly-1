@@ -44,15 +44,15 @@ export default function SuperAdminPlans() {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Plans & Stripe</h1>
-        <p className="text-muted-foreground">Connect Stripe and manage subscription plans</p>
+    <div className="space-y-4 sm:space-y-6 w-full max-w-full min-w-0">
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-2xl font-display font-bold truncate">Plans & Stripe</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">Connect Stripe and manage subscription plans</p>
       </div>
 
-      <Card className="glass-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card className="glass-card overflow-hidden min-w-0 max-w-full">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex flex-wrap items-center gap-2 text-base sm:text-lg">
             <CreditCard className="h-5 w-5" />
             Stripe Integration & Subscriptions
           </CardTitle>
@@ -60,7 +60,7 @@ export default function SuperAdminPlans() {
             Connect your Stripe account to collect subscription payments from businesses
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 p-4 sm:p-6 pt-0">
           {/* Stripe Connection Status */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">

@@ -119,19 +119,19 @@ export default function SuperAdminBlog() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 w-full max-w-full min-w-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Blog</h1>
-          <p className="text-muted-foreground">Manage blog posts shown on the home page</p>
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-display font-bold truncate">Blog</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage blog posts shown on the home page</p>
         </div>
-        <Button onClick={openCreate} className="gap-2">
+        <Button onClick={openCreate} className="gap-2 shrink-0 w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           New Post
         </Button>
       </div>
 
-      <Card className="glass-card">
+      <Card className="glass-card overflow-hidden min-w-0 max-w-full">
         <CardHeader>
           <CardTitle>Blog Posts</CardTitle>
           <CardDescription>Published posts appear in the blog section on the landing page</CardDescription>
