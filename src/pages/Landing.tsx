@@ -181,11 +181,8 @@ const Landing = () => {
           {/* Desktop Actions */}
           <div className="hidden lg:flex items-center gap-3">
             <ThemeToggle />
-            <Button variant="ghost" asChild className="text-sm sm:text-base">
-              <Link to="/auth">Sign In</Link>
-            </Button>
             <Button asChild className="glow text-sm sm:text-base px-4">
-              <Link to="/auth">Sign Up</Link>
+              <Link to="/auth">Get started</Link>
             </Button>
           </div>
 
@@ -282,12 +279,9 @@ const Landing = () => {
                     <span className="text-sm font-medium">Theme</span>
                     <ThemeToggle />
                   </div>
-                  <div className="space-y-2 px-4">
-                    <Button variant="outline" className="w-full" asChild>
-                      <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>Sign In</Link>
-                    </Button>
+                  <div className="px-4">
                     <Button className="w-full glow" asChild>
-                      <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>Sign Up</Link>
+                      <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>Get started</Link>
                     </Button>
                   </div>
                 </div>
