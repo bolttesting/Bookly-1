@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -49,6 +49,8 @@ import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { CustomerDashboardSidebar, type CustomerDashboardTab } from '@/components/CustomerDashboardSidebar';
 import { RescheduleRequestDialog } from '@/components/appointments/RescheduleRequestDialog';
 import { ImageSlideshow } from '@/components/ImageSlideshow';
 
@@ -103,7 +105,7 @@ export default function MyAppointments() {
   const { user, loading: authLoading, signOut } = useAuth();
   const { format: formatCurrency } = useCurrency();
   const { profile, loading: profileLoading, uploadAvatar, updateProfile, isUploading } = useProfile();
-  const [activeTab, setActiveTab] = useState('appointments');
+  const [activeTab, setActiveTab] = useState<CustomerDashboardTab>('appointments');
   const [searchQuery, setSearchQuery] = useState('');
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
   const [selectedAppointmentForReschedule, setSelectedAppointmentForReschedule] = useState<{
@@ -1069,51 +1071,31 @@ export default function MyAppointments() {
   }, {} as Record<string, { business: Business; packages: PackageTemplate[] }>);
 
   return (
-    <div className="min-h-screen bg-background w-full max-w-full overflow-x-hidden">
-      {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50 min-w-0">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2 min-w-0">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
-              <Calendar className="h-5 w-5 text-primary-foreground" />
+    <SidebarProvider>
+      <div className="flex h-screen w-full bg-background overflow-hidden">
+        <CustomerDashboardSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          {/* Header */}
+          <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-40 shrink-0">
+            <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-3 sm:py-4 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <SidebarTrigger className="lg:hidden" />
+                <span className="text-lg sm:text-xl font-display font-bold truncate">My Dashboard</span>
+              </div>
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                <ThemeToggle />
+                <Button variant="ghost" onClick={handleSignOut} className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+                  <LogOut className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </Button>
+              </div>
             </div>
-            <span className="text-lg sm:text-xl font-display font-bold truncate">My Dashboard</span>
-          </div>
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            <ThemeToggle />
-            <Button variant="ghost" onClick={handleSignOut} className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
-              <LogOut className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </Button>
-          </div>
-        </div>
-      </header>
+          </header>
 
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-6xl w-full max-w-full min-w-0">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6 w-full min-w-0 overflow-hidden">
-          <div className="w-full max-w-full overflow-x-auto overflow-y-hidden scrollbar-thin touch-pan-x">
-            <TabsList className="inline-flex w-max min-w-full sm:min-w-0 gap-1 sm:gap-2 text-xs sm:text-sm flex-nowrap">
-              <TabsTrigger value="appointments" className="whitespace-nowrap px-3 sm:px-4 shrink-0">
-                <span className="hidden sm:inline">Appointments</span>
-                <span className="sm:hidden">Apts</span>
-              </TabsTrigger>
-              <TabsTrigger value="services" className="whitespace-nowrap px-3 sm:px-4 shrink-0">
-                <span className="hidden sm:inline">Book Service</span>
-                <span className="sm:hidden">Book</span>
-              </TabsTrigger>
-              <TabsTrigger value="packages" className="whitespace-nowrap px-3 sm:px-4 shrink-0">
-                <span className="hidden sm:inline">Buy Package</span>
-                <span className="sm:hidden">Buy</span>
-              </TabsTrigger>
-              <TabsTrigger value="my-packages" className="whitespace-nowrap px-3 sm:px-4 shrink-0">
-                <span className="hidden sm:inline">My Packages</span>
-                <span className="sm:hidden">My Pkg</span>
-              </TabsTrigger>
-              <TabsTrigger value="profile" className="whitespace-nowrap px-3 sm:px-4 shrink-0">Profile</TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="appointments" className="space-y-4 sm:space-y-6 min-w-0 overflow-hidden">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 scrollbar-thin min-w-0">
+            <div className="container mx-auto max-w-6xl w-full min-w-0">
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CustomerDashboardTab)} className="space-y-4 sm:space-y-6 w-full min-w-0 overflow-hidden">
+                <TabsContent value="appointments" className="space-y-4 sm:space-y-6 min-w-0 overflow-hidden mt-0">
         {appointments.length === 0 ? (
           <Card className="glass-card text-center py-8 sm:py-12">
             <CardContent>
@@ -2350,17 +2332,20 @@ export default function MyAppointments() {
               </Card>
             )}
           </TabsContent>
-        </Tabs>
-      </main>
+              </Tabs>
+            </div>
+          </main>
 
-        {selectedAppointmentForReschedule && (
-          <RescheduleRequestDialog
-            open={rescheduleDialogOpen}
-            onOpenChange={setRescheduleDialogOpen}
-            appointment={selectedAppointmentForReschedule}
-            rescheduleDeadlineHours={selectedAppointmentForReschedule.businessDeadlineHours}
-          />
-        )}
-    </div>
+          {selectedAppointmentForReschedule && (
+            <RescheduleRequestDialog
+              open={rescheduleDialogOpen}
+              onOpenChange={setRescheduleDialogOpen}
+              appointment={selectedAppointmentForReschedule}
+              rescheduleDeadlineHours={selectedAppointmentForReschedule.businessDeadlineHours}
+            />
+          )}
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 }
