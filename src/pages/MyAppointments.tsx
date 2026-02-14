@@ -1141,42 +1141,40 @@ export default function MyAppointments() {
                     <Card key={apt.id} className="glass-card hover:shadow-md transition-shadow">
                       <CardContent className="p-4 sm:p-6">
                         <div className="flex flex-col gap-3 sm:gap-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-                            <div className="space-y-2 min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="font-semibold text-base sm:text-lg truncate">{apt.service?.name || 'Service'}</h3>
+                          <div className="space-y-2 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold text-base sm:text-lg truncate">{apt.service?.name || 'Service'}</h3>
                               <Badge className={getStatusColor(apt.status)}>
                                 {apt.status}
                               </Badge>
+                              {apt.price && (
+                                <span className="whitespace-nowrap text-lg sm:text-xl font-bold text-primary ml-auto">
+                                  {formatCurrencySimple(Number(apt.price), apt.business?.currency || 'USD')}
+                                </span>
+                              )}
                             </div>
-                              <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                            <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                               <span className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                                  <span className="truncate">{format(new Date(apt.start_time), 'EEEE, MMMM d, yyyy')}</span>
+                                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                <span className="truncate">{format(new Date(apt.start_time), 'EEEE, MMMM d, yyyy')}</span>
                               </span>
                               <span className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                <Clock className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                                 {format(new Date(apt.start_time), 'h:mm a')}
                               </span>
-                                    {(apt as any).totalPeopleInSlot > 1 && (
-                                      <span className="flex items-center gap-1 text-primary">
-                                        <Users className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                                        {((apt as any).totalPeopleInSlot - 1)} {((apt as any).totalPeopleInSlot - 1) === 1 ? 'person' : 'people'} joining
-                                      </span>
-                                    )}
-                              </div>
+                              {(apt as any).totalPeopleInSlot > 1 && (
+                                <span className="flex items-center gap-1 text-primary">
+                                  <Users className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                  {((apt as any).totalPeopleInSlot - 1)} {((apt as any).totalPeopleInSlot - 1) === 1 ? 'person' : 'people'} joining
+                                </span>
+                              )}
+                            </div>
                             {apt.business && (
-                                <p className="text-xs sm:text-sm flex items-center gap-1 text-muted-foreground truncate">
-                                  <MapPin className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                              <p className="text-xs sm:text-sm flex items-center gap-1 text-muted-foreground truncate">
+                                <MapPin className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                                 {apt.business.name}
                               </p>
                             )}
-                          </div>
-                          {apt.price && (
-                              <div className="text-left sm:text-right shrink-0">
-                                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-primary">{formatCurrencySimple(Number(apt.price), apt.business?.currency || 'USD')}</p>
-                            </div>
-                          )}
                           </div>
                           <div className="flex gap-2">
                             {(() => {
