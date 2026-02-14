@@ -160,18 +160,18 @@ const Settings = () => {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 animate-fade-in w-full min-w-0 px-2 sm:px-0">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in w-full max-w-full min-w-0 overflow-x-hidden px-2 sm:px-0">
       {/* Header */}
-      <div>
+      <div className="min-w-0">
         <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">Settings</h1>
-        <p className="text-sm sm:text-base text-muted-foreground mt-1">
+        <p className="text-sm sm:text-base text-muted-foreground mt-1 break-words">
           Manage your account and business settings
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6 w-full min-w-0">
-        <div className="glass-card p-2 w-full min-w-0 overflow-x-auto overflow-y-hidden -mx-2 px-2 sm:mx-0 sm:px-0 scrollbar-thin [scrollbar-gutter:stable] touch-pan-x">
-          <TabsList className="inline-flex w-max sm:w-full sm:inline-grid sm:grid-cols-7 h-auto bg-transparent gap-1 flex-nowrap border-0 p-0">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6 w-full max-w-full min-w-0 overflow-hidden">
+        <div className="glass-card p-2 w-full max-w-full min-w-0 -mx-2 px-2 sm:mx-0 sm:px-0 overflow-x-auto overflow-y-hidden scrollbar-thin touch-pan-x overscroll-x-contain">
+          <TabsList className="inline-flex w-max min-w-full sm:w-full sm:inline-grid sm:grid-cols-7 h-auto bg-transparent gap-1 flex-nowrap border-0 p-0">
             <TabsTrigger value="booking" className="flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 px-3 sm:px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap shrink-0 sm:shrink">
               <Link2 className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
               <span className="hidden sm:inline">Booking</span>
@@ -208,26 +208,26 @@ const Settings = () => {
           </TabsList>
         </div>
 
-        <TabsContent value="booking" className="space-y-4 sm:space-y-6 w-full min-w-0 mt-4 sm:mt-6">
-          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
-          <div className="glass-card p-4 sm:p-6 overflow-hidden min-w-0">
-            <h2 className="text-lg font-semibold mb-4">Public Booking Page</h2>
-            <p className="text-muted-foreground mb-4">
+        <TabsContent value="booking" className="space-y-4 sm:space-y-6 w-full max-w-full min-w-0 mt-4 sm:mt-6 overflow-hidden">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 min-w-0">
+          <div className="glass-card p-4 sm:p-6 overflow-hidden min-w-0 max-w-full">
+            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 break-words">Public Booking Page</h2>
+            <p className="text-muted-foreground mb-3 sm:mb-4 text-sm sm:text-base break-words">
               Share this link with your customers so they can book appointments online.
             </p>
-            <div className="flex flex-wrap gap-2 items-stretch sm:items-center">
-              <div className="flex-1 min-w-0 w-full sm:w-auto sm:min-w-[200px]">
+            <div className="flex flex-col sm:flex-row gap-2 min-w-0">
+              <div className="min-w-0 flex-1 w-full">
                 <Input 
                   value={bookingUrl} 
                   readOnly 
-                  className="bg-secondary font-mono text-xs sm:text-sm w-full min-w-0 truncate"
+                  className="bg-secondary font-mono text-xs sm:text-sm w-full max-w-full min-w-0 overflow-x-auto"
                 />
               </div>
-              <div className="flex gap-2 shrink-0 w-full sm:w-auto justify-end sm:justify-start">
-                <Button variant="outline" size="icon" className="shrink-0" onClick={copyBookingLink}>
+              <div className="flex gap-2 shrink-0 justify-end sm:justify-start">
+                <Button variant="outline" size="icon" className="shrink-0 h-9 w-9" onClick={copyBookingLink}>
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 </Button>
-                <Button variant="outline" size="icon" className="shrink-0" asChild>
+                <Button variant="outline" size="icon" className="shrink-0 h-9 w-9" asChild>
                   <a href={bookingUrl} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-4 w-4" />
                   </a>
@@ -237,34 +237,32 @@ const Settings = () => {
           </div>
 
           {/* QR Code Section */}
-          <div className="glass-card p-6 min-w-0">
-            <div className="flex items-center gap-2 mb-4">
-              <QrCode className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Booking QR Code</h2>
+          <div className="glass-card p-4 sm:p-6 overflow-hidden min-w-0 max-w-full">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4 min-w-0">
+              <QrCode className="h-5 w-5 text-primary shrink-0" />
+              <h2 className="text-base sm:text-lg font-semibold break-words">Booking QR Code</h2>
             </div>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-muted-foreground mb-3 sm:mb-4 text-sm break-words">
               Print or share this QR code so customers can quickly access your booking page.
             </p>
-            <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center sm:items-start min-w-0">
               <div 
                 ref={qrRef}
-                className="bg-white p-4 rounded-lg shadow-md"
+                className="bg-white p-3 sm:p-4 rounded-lg shadow-md shrink-0"
               >
                 <QRCodeSVG 
                   value={bookingUrl || 'https://example.com'} 
-                  size={180}
+                  size={160}
                   level="H"
                   includeMargin={false}
                 />
               </div>
-              <div className="space-y-3 text-center sm:text-left">
-                <div>
-                  <p className="font-medium">Scan to book</p>
-                  <p className="text-sm text-muted-foreground">
-                    Customers can scan this code with their phone camera to open your booking page.
-                  </p>
-                </div>
-                <Button onClick={downloadQRCode} className="gap-2">
+              <div className="space-y-3 text-center sm:text-left min-w-0 flex-1">
+                <p className="font-medium">Scan to book</p>
+                <p className="text-sm text-muted-foreground break-words">
+                  Customers can scan this code with their phone camera to open your booking page.
+                </p>
+                <Button onClick={downloadQRCode} className="gap-2 w-full sm:w-auto">
                   <Download className="h-4 w-4" />
                   Download QR Code
                 </Button>
@@ -273,34 +271,34 @@ const Settings = () => {
           </div>
 
           {/* Embed Widget Section - full width */}
-          <div className="glass-card p-6 lg:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <Code2 className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Embed on Your Website</h2>
+          <div className="glass-card p-4 sm:p-6 overflow-hidden min-w-0 max-w-full lg:col-span-2">
+            <div className="flex flex-wrap items-center gap-2 mb-3 sm:mb-4 min-w-0">
+              <Code2 className="h-5 w-5 text-primary shrink-0" />
+              <h2 className="text-base sm:text-lg font-semibold break-words">Embed on Your Website</h2>
             </div>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-muted-foreground mb-3 sm:mb-4 text-sm break-words">
               Add your booking system to any website by copying and pasting this code.
             </p>
             
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6 min-w-0">
               {/* Full Widget Embed */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="font-medium">Full Booking Widget</Label>
+              <div className="min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                  <Label className="font-medium shrink-0">Full Booking Widget</Label>
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => copyEmbedCode(embedCode)}
-                    className="gap-2"
+                    className="gap-2 w-full sm:w-auto shrink-0"
                   >
                     {embedCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                     Copy
                   </Button>
                 </div>
-                <p className="text-sm text-muted-foreground mb-2">
+                <p className="text-sm text-muted-foreground mb-2 break-words">
                   Embeds the complete booking form directly on your page.
                 </p>
-                <pre className="bg-secondary p-4 rounded-lg overflow-x-auto text-xs font-mono">
+                <pre className="bg-secondary p-3 sm:p-4 rounded-lg overflow-x-auto text-xs font-mono max-w-full min-w-0 break-all whitespace-pre-wrap">
                   <code>{embedCode}</code>
                 </pre>
               </div>
@@ -308,31 +306,31 @@ const Settings = () => {
               <Separator />
 
               {/* Button Only Embed */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="font-medium">Book Now Button</Label>
+              <div className="min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                  <Label className="font-medium shrink-0">Book Now Button</Label>
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => copyEmbedCode(embedButtonCode)}
-                    className="gap-2"
+                    className="gap-2 w-full sm:w-auto shrink-0"
                   >
                     <Copy className="h-3 w-3" />
                     Copy
                   </Button>
                 </div>
-                <p className="text-sm text-muted-foreground mb-2">
+                <p className="text-sm text-muted-foreground mb-2 break-words">
                   A simple button that opens your booking page in a new tab.
                 </p>
-                <pre className="bg-secondary p-4 rounded-lg overflow-x-auto text-xs font-mono">
+                <pre className="bg-secondary p-3 sm:p-4 rounded-lg overflow-x-auto text-xs font-mono max-w-full min-w-0 break-all whitespace-pre-wrap">
                   <code>{embedButtonCode}</code>
                 </pre>
               </div>
 
               {/* Preview */}
-              <div>
+              <div className="min-w-0">
                 <Label className="font-medium mb-2 block">Button Preview</Label>
-                <div className="bg-secondary/50 p-4 rounded-lg">
+                <div className="bg-secondary/50 p-4 rounded-lg overflow-hidden">
                   <a 
                     href={bookingUrl} 
                     target="_blank"
@@ -346,13 +344,13 @@ const Settings = () => {
             </div>
           </div>
 
-          <div className="glass-card p-6 lg:col-span-2">
-            <h2 className="text-lg font-semibold mb-4">Booking Settings</h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-4">
+          <div className="glass-card p-4 sm:p-6 overflow-hidden min-w-0 max-w-full lg:col-span-2">
+            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 break-words">Booking Settings</h2>
+            <div className="space-y-4 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div className="space-y-1 flex-1 min-w-0">
                   <Label className="font-medium">Booking Page Theme</Label>
-                  <p className="text-sm text-muted-foreground">Light, dark, or match visitor&apos;s preference</p>
+                  <p className="text-sm text-muted-foreground break-words">Light, dark, or match visitor&apos;s preference</p>
                 </div>
                 <Select
                   value={business?.booking_theme || 'system'}
@@ -379,48 +377,46 @@ const Settings = () => {
                 </Select>
               </div>
               <Separator />
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="min-w-0">
                   <p className="font-medium">Online Booking</p>
-                  <p className="text-sm text-muted-foreground">Allow customers to book online</p>
+                  <p className="text-sm text-muted-foreground break-words">Allow customers to book online</p>
                 </div>
-                <Switch defaultChecked />
+                <Switch defaultChecked className="shrink-0" />
               </div>
               <Separator />
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="min-w-0">
                   <p className="font-medium">Require Deposit</p>
-                  <p className="text-sm text-muted-foreground">Collect deposit for bookings</p>
+                  <p className="text-sm text-muted-foreground break-words">Collect deposit for bookings</p>
                 </div>
-                <Switch />
+                <Switch className="shrink-0" />
               </div>
               <Separator />
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="min-w-0">
                   <p className="font-medium">Allow Cancellations</p>
-                  <p className="text-sm text-muted-foreground">Let customers cancel their bookings</p>
+                  <p className="text-sm text-muted-foreground break-words">Let customers cancel their bookings</p>
                 </div>
-                <Switch defaultChecked />
+                <Switch defaultChecked className="shrink-0" />
               </div>
               <Separator />
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="min-w-0">
                   <p className="font-medium">Auto-confirm Bookings</p>
-                  <p className="text-sm text-muted-foreground">Automatically confirm new bookings</p>
+                  <p className="text-sm text-muted-foreground break-words">Automatically confirm new bookings</p>
                 </div>
-                <Switch />
+                <Switch className="shrink-0" />
               </div>
               <Separator />
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="reschedule-deadline" className="font-medium">Reschedule Deadline</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Minimum hours before appointment that reschedule requests are allowed
-                    </p>
-                  </div>
+              <div className="space-y-2 min-w-0">
+                <div>
+                  <Label htmlFor="reschedule-deadline" className="font-medium">Reschedule Deadline</Label>
+                  <p className="text-sm text-muted-foreground break-words">
+                    Minimum hours before appointment that reschedule requests are allowed
+                  </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <Input
                     id="reschedule-deadline"
                     type="number"
@@ -445,7 +441,7 @@ const Settings = () => {
                   />
                   <span className="text-sm text-muted-foreground">hours before appointment</span>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground break-words">
                   {business?.reschedule_deadline_hours === 0 
                     ? 'Reschedule requests allowed anytime before appointment'
                     : business?.reschedule_deadline_hours === 24
