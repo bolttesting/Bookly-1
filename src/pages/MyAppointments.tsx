@@ -997,12 +997,12 @@ export default function MyAppointments() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/auth');
+    navigate('/customer-login');
   };
 
-  // Redirect unauthenticated users immediately (prevents flash of dashboard on refresh)
+  // Redirect unauthenticated users to customer login (they reach this page via a business's link)
   if (!authLoading && !user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/customer-login" replace />;
   }
 
   // Show loading until auth and critical data are ready

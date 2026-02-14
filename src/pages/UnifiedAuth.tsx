@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Loader2, Calendar, Building2, User, Eye, EyeOff, Home, KeyRound } from 'lucide-react';
+import { Loader2, Calendar, Building2, Eye, EyeOff, Home, KeyRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import {
@@ -44,7 +44,6 @@ export default function UnifiedAuth() {
   const redirectTo = searchParams.get('redirect');
   const { user, loading: authLoading, signIn, signUp, signInWithGoogle } = useAuth();
   
-  const [userType, setUserType] = useState<'business' | 'customer'>('business');
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -79,18 +78,16 @@ export default function UnifiedAuth() {
   const [resetConfirmPassword, setResetConfirmPassword] = useState('');
   const [settingResetPassword, setSettingResetPassword] = useState(false);
 
-  // Redirect if already logged in
+  // Redirect if already logged in (this page is for business only)
   useEffect(() => {
     if (user && !authLoading) {
       if (redirectTo) {
         navigate(redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`);
-      } else if (userType === 'business') {
-        navigate('/dashboard');
       } else {
-        navigate('/my-appointments');
+        navigate('/dashboard');
       }
     }
-  }, [user, authLoading, navigate, userType, redirectTo]);
+  }, [user, authLoading, navigate, redirectTo]);
 
   const resetRedirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/auth` : '';
 
@@ -141,7 +138,7 @@ export default function UnifiedAuth() {
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
-    const redirectPath = userType === 'customer' ? '/my-appointments' : '/dashboard';
+    const redirectPath = redirectTo ? (redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`) : '/dashboard';
     const { error } = await signInWithGoogle(redirectPath);
     if (error) {
       toast.error(error.message);
@@ -172,10 +169,8 @@ export default function UnifiedAuth() {
       toast.success('Welcome back!');
       if (redirectTo) {
         navigate(redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`);
-      } else if (userType === 'business') {
-        navigate('/dashboard');
       } else {
-        navigate('/my-appointments');
+        navigate('/dashboard');
       }
     }
   };
@@ -210,10 +205,8 @@ export default function UnifiedAuth() {
       toast.success('Account created successfully!');
       if (redirectTo) {
         navigate(redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`);
-      } else if (userType === 'business') {
-        navigate('/dashboard');
       } else {
-        navigate('/my-appointments');
+        navigate('/dashboard');
       }
     }
   };
@@ -245,14 +238,10 @@ export default function UnifiedAuth() {
             <span className="text-2xl xl:text-3xl font-display font-bold gradient-text">Bookly</span>
           </div>
           <h1 className="text-3xl xl:text-4xl 2xl:text-5xl font-display font-bold text-foreground mb-4 xl:mb-6 leading-tight">
-            {userType === 'business' 
-              ? 'Streamline your booking business'
-              : 'Your appointments, all in one place'}
+            Streamline your booking business
           </h1>
           <p className="text-base xl:text-lg text-muted-foreground max-w-md">
-            {userType === 'business'
-              ? 'The all-in-one platform for managing appointments, clients, and your team.'
-              : 'Sign in to view your upcoming appointments, reschedule bookings, and manage your profile.'}
+            The all-in-one platform for managing appointments, clients, and your team.
           </p>
         </div>
       </div>
@@ -343,32 +332,6 @@ export default function UnifiedAuth() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* User Type Selection */}
-              <div className="mb-6">
-                <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg">
-                  <Button
-                    type="button"
-                    variant={userType === 'business' ? 'default' : 'ghost'}
-                    className="w-full"
-                    onClick={() => setUserType('business')}
-                    disabled={isLoading || isGoogleLoading}
-                  >
-                    <Building2 className="h-4 w-4 mr-2" />
-                    Business
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={userType === 'customer' ? 'default' : 'ghost'}
-                    className="w-full"
-                    onClick={() => setUserType('customer')}
-                    disabled={isLoading || isGoogleLoading}
-                  >
-                    <User className="h-4 w-4 mr-2" />
-                    Customer
-                  </Button>
-                </div>
-              </div>
-
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'signup')} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-6">
                   <TabsTrigger value="login">Sign In</TabsTrigger>
@@ -549,7 +512,6 @@ export default function UnifiedAuth() {
                             placeholder="Doe"
                             value={signupLastName}
                             onChange={(e) => setSignupLastName(e.target.value)}
-                            required={userType === 'business'}
                             disabled={isLoading}
                           />
                         </div>

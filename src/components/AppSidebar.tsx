@@ -32,18 +32,18 @@ import { useDashboardRole } from "@/hooks/useDashboardRole";
 import { Badge } from "@/components/ui/badge";
 
 const navItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, adminOnly: false },
-  { title: "Calendar", url: "/calendar", icon: Calendar, adminOnly: false },
-  { title: "Attendance", url: "/attendance", icon: ClipboardCheck, adminOnly: false },
-  { title: "Services", url: "/services", icon: Briefcase, adminOnly: false },
-  { title: "Packages", url: "/packages", icon: Package, adminOnly: true },
-  { title: "Coupons", url: "/coupons", icon: Tag, adminOnly: true },
-  { title: "Customers", url: "/customers", icon: Users, adminOnly: false },
-  { title: "Staff", url: "/staff", icon: UserCircle, adminOnly: false },
-  { title: "Profile", url: "/profile", icon: User, adminOnly: false },
-  { title: "Team", url: "/team", icon: Shield, adminOnly: true },
-  { title: "Analytics", url: "/analytics", icon: BarChart3, adminOnly: true },
-  { title: "Settings", url: "/settings", icon: Settings, adminOnly: true },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, adminOnly: false, staffOnly: false },
+  { title: "Calendar", url: "/calendar", icon: Calendar, adminOnly: false, staffOnly: false },
+  { title: "Attendance", url: "/attendance", icon: ClipboardCheck, adminOnly: false, staffOnly: false },
+  { title: "Services", url: "/services", icon: Briefcase, adminOnly: false, staffOnly: false },
+  { title: "Packages", url: "/packages", icon: Package, adminOnly: true, staffOnly: false },
+  { title: "Coupons", url: "/coupons", icon: Tag, adminOnly: true, staffOnly: false },
+  { title: "Customers", url: "/customers", icon: Users, adminOnly: false, staffOnly: false },
+  { title: "Staff", url: "/staff", icon: UserCircle, adminOnly: false, staffOnly: false },
+  { title: "Profile", url: "/profile", icon: User, adminOnly: false, staffOnly: true },
+  { title: "Team", url: "/team", icon: Shield, adminOnly: true, staffOnly: false },
+  { title: "Analytics", url: "/analytics", icon: BarChart3, adminOnly: true, staffOnly: false },
+  { title: "Settings", url: "/settings", icon: Settings, adminOnly: true, staffOnly: false },
 ];
 
 export function AppSidebar() {
@@ -57,7 +57,11 @@ export function AppSidebar() {
   // Show all items while loading to avoid staff-view flash for admins on refresh
   const visibleNavItems = isLoading
     ? navItems
-    : navItems.filter((item) => !item.adminOnly || canAccessAdmin);
+    : navItems.filter((item) => {
+        const showAdminItem = !item.adminOnly || canAccessAdmin;
+        const hideStaffOnlyFromAdmin = item.staffOnly && canAccessAdmin;
+        return showAdminItem && !hideStaffOnlyFromAdmin;
+      });
   
   // Only show upgrade button if on free plan (price = 0)
   // Default to showing upgrade button if subscription data isn't loaded yet or plan is null
@@ -93,7 +97,7 @@ export function AppSidebar() {
               {visibleNavItems.map((item) => {
                 const isActive = location.pathname === item.url;
                 return (
-                  <SidebarMenuItem key={item.title}>
+                  <SidebarMenuItem key={item.title} className="min-w-0">
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
@@ -102,14 +106,14 @@ export function AppSidebar() {
                       <NavLink
                         to={item.url}
                         className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200",
+                          "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200 min-w-0",
                           isActive
                             ? "bg-primary/10 text-primary font-medium"
                             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         )}
                       >
-                        <item.icon className={cn("h-5 w-5", isActive && "text-primary")} />
-                        {!collapsed && <span>{item.title}</span>}
+                        <item.icon className={cn("h-5 w-5 shrink-0", isActive && "text-primary")} />
+                        {!collapsed && <span className="truncate">{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

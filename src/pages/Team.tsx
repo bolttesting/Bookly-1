@@ -26,6 +26,7 @@ import { Loader2, Shield, ShieldCheck, User, Trash2, Crown, Mail, Clock, X } fro
 import { Database } from '@/integrations/supabase/types';
 import { InviteTeamDialog } from '@/components/team/InviteTeamDialog';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 type AppRole = Database['public']['Enums']['app_role'];
 
@@ -75,23 +76,23 @@ export default function Team() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold">Team Management</h1>
-          <p className="text-muted-foreground mt-1">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in w-full min-w-0 px-1 sm:px-0">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-display font-bold truncate">Team Management</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Manage your team members and their roles
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
+          <Badge variant="outline" className="gap-2 w-fit">
             {currentUserRole && roleConfig[currentUserRole] && (
               <>
                 {(() => {
                   const Icon = roleConfig[currentUserRole].icon;
-                  return <Icon className="h-4 w-4" />;
+                  return <Icon className="h-4 w-4 shrink-0" />;
                 })()}
-                Your role: {roleConfig[currentUserRole].label}
+                <span className="truncate">Your role: {roleConfig[currentUserRole].label}</span>
               </>
             )}
           </Badge>
@@ -102,35 +103,35 @@ export default function Team() {
       </div>
 
       {/* Role explanation */}
-      <Card className="glass-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Role Permissions</CardTitle>
+      <Card className="glass-card overflow-hidden">
+        <CardHeader className="pb-3 p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">Role Permissions</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-warning/10">
+        <CardContent className="p-4 sm:p-6 pt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="p-2 rounded-lg bg-warning/10 shrink-0">
                 <Crown className="h-5 w-5 text-warning" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium">Owner</p>
                 <p className="text-sm text-muted-foreground">Full access including team management and billing</p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="p-2 rounded-lg bg-primary/10 shrink-0">
                 <ShieldCheck className="h-5 w-5 text-primary" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium">Admin</p>
                 <p className="text-sm text-muted-foreground">Can manage services, customers, and appointments</p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-secondary">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="p-2 rounded-lg bg-secondary shrink-0">
                 <User className="h-5 w-5 text-secondary-foreground" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium">Staff</p>
                 <p className="text-sm text-muted-foreground">Can view and manage their own appointments</p>
               </div>
@@ -141,42 +142,42 @@ export default function Team() {
 
       {/* Pending Invitations */}
       {invitations.length > 0 && (
-        <Card className="glass-card border-primary/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-primary" />
+        <Card className="glass-card border-primary/20 overflow-hidden">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Mail className="h-5 w-5 text-primary shrink-0" />
               Pending Invitations
             </CardTitle>
             <CardDescription>
               {invitations.length} pending invitation{invitations.length !== 1 ? 's' : ''}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <div className="space-y-3">
               {invitations.map((invitation) => {
                 const config = roleConfig[invitation.role];
                 return (
                   <div
                     key={invitation.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-dashed border-border"
+                    className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg bg-muted/30 border border-dashed border-border"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                         <Mail className="h-5 w-5 text-primary" />
                       </div>
-                      <div>
-                        <p className="font-medium">{invitation.email}</p>
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{invitation.email}</p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
+                          <Clock className="h-3 w-3 shrink-0" />
                           Expires {format(new Date(invitation.expires_at), 'MMM d, yyyy')}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="gap-1">
+                    <div className="flex items-center gap-2 shrink-0 sm:pl-2">
+                      <Badge variant="outline" className="gap-1 w-fit">
                         {(() => {
                           const Icon = config.icon;
-                          return <Icon className="h-3 w-3" />;
+                          return <Icon className="h-3 w-3 shrink-0" />;
                         })()}
                         {config.label}
                       </Badge>
@@ -200,52 +201,53 @@ export default function Team() {
       )}
 
       {/* Team members list */}
-      <Card className="glass-card">
-        <CardHeader>
-          <CardTitle>Team Members</CardTitle>
+      <Card className="glass-card overflow-hidden">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">Team Members</CardTitle>
           <CardDescription>
             {teamMembers.length} member{teamMembers.length !== 1 ? 's' : ''} in your team
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0">
           <div className="space-y-4">
             {teamMembers.map((member) => {
               const config = roleConfig[member.role];
               const Icon = config.icon;
-              
+              const displayName = member.profile?.first_name || member.profile?.last_name
+                ? `${member.profile?.first_name || ''} ${member.profile?.last_name || ''}`.trim()
+                : 'Unknown User';
+
               return (
                 <div
                   key={member.id}
-                  className="flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
+                  className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <Avatar className="h-10 w-10 sm:h-12 sm:w-12 shrink-0">
                       <AvatarImage src={member.profile?.avatar_url || undefined} />
-                      <AvatarFallback className="bg-primary/10 text-primary">
+                      <AvatarFallback className="bg-primary/10 text-primary text-sm">
                         {getInitials(member.profile?.first_name, member.profile?.last_name)}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
-                      <p className="font-medium">
-                        {member.profile?.first_name || member.profile?.last_name
-                          ? `${member.profile?.first_name || ''} ${member.profile?.last_name || ''}`.trim()
-                          : 'Unknown User'}
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">
+                        {displayName}
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs sm:text-sm text-muted-foreground truncate">
                         {member.profile?.email || 'No email'}
                       </p>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-3">
+
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 sm:pl-2 border-t border-border/50 pt-3 sm:border-0 sm:pt-0">
                     {canChangeRole(member.role) ? (
                       <Select
                         value={member.role}
-                        onValueChange={(value: AppRole) => 
+                        onValueChange={(value: AppRole) =>
                           updateRole({ userId: member.user_id, newRole: value })
                         }
                       >
-                        <SelectTrigger className="w-32">
+                        <SelectTrigger className="w-full sm:w-32 min-w-0">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -264,24 +266,24 @@ export default function Team() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Badge className={config.color}>
-                        <Icon className="h-3 w-3 mr-1" />
+                      <Badge className={cn(config.color, 'shrink-0')}>
+                        <Icon className="h-3 w-3 mr-1 shrink-0" />
                         {config.label}
                       </Badge>
                     )}
-                    
+
                     {canRemoveMember(member.role) && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 text-destructive hover:text-destructive shrink-0">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent>
+                        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
                           <AlertDialogHeader>
                             <AlertDialogTitle>Remove team member?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will remove {member.profile?.first_name || 'this user'} from your team. 
+                              This will remove {member.profile?.first_name || 'this user'} from your team.
                               They will no longer have access to your business.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
@@ -301,13 +303,13 @@ export default function Team() {
                 </div>
               );
             })}
-            
+
             {teamMembers.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-8 text-muted-foreground px-2">
                 <User className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p>No team members yet</p>
                 {isOwner && (
-                  <p className="text-sm mt-1">Click "Invite Team Member" to add your first team member</p>
+                  <p className="text-sm mt-1">Click &quot;Invite Team Member&quot; to add your first team member</p>
                 )}
               </div>
             )}
