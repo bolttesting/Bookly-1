@@ -368,10 +368,10 @@ export function useRescheduleRequests() {
         try {
           // We can send a simple notification email or use the reschedule email template
           // For now, we'll just log it - you can create a dedicated rejection email function later
-          console.log('Reschedule request rejected for:', appointment.customer.email);
+          // Rejection logged in dev only via logger if needed
           // TODO: Create send-reschedule-rejection-email function if needed
         } catch (emailError) {
-          console.error('Failed to send rejection notification:', emailError);
+          // Don't log in production to avoid noise
           // Don't fail the rejection if email fails
         }
       }

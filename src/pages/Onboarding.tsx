@@ -92,7 +92,7 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-screen flex min-w-0 max-w-full overflow-x-hidden bg-background">
       {/* Left side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <div className="absolute inset-0 animated-gradient opacity-20" />

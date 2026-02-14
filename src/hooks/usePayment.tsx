@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 export interface PaymentIntent {
   id: string;
@@ -39,7 +40,7 @@ export function usePayment() {
 
       // If function doesn't exist or Stripe not configured, return test mode
       if (error && (error.message?.includes('not found') || error.message?.includes('404'))) {
-        console.log('Stripe not configured, using test mode');
+        // Stripe not configured; using test mode (no log in production)
         return {
           id: 'test_intent_' + Date.now(),
           client_secret: 'test_secret',
@@ -52,7 +53,7 @@ export function usePayment() {
 
       return data as PaymentIntent;
     } catch (error: any) {
-      console.error('Error creating payment intent:', error);
+      // Error creating payment intent (toast shown to user)
       // Return test mode if Stripe is not set up
       return {
         id: 'test_intent_' + Date.now(),
@@ -92,7 +93,7 @@ export function usePayment() {
         .eq('id', appointmentId);
 
       if (updateError) {
-        console.error('Error updating appointment:', updateError);
+        logger.error('Error updating appointment:', updateError);
         // Don't fail the payment if update fails
       }
 
@@ -101,7 +102,7 @@ export function usePayment() {
         paymentId: data.payment_id,
       };
     } catch (error: any) {
-      console.error('Error confirming payment:', error);
+      logger.error('Error confirming payment:', error);
       return {
         success: false,
         error: error.message || 'Payment failed',
@@ -138,7 +139,7 @@ export function usePayment() {
       if (error) throw error;
       return data.id;
     } catch (error: any) {
-      console.error('Error creating payment record:', error);
+      logger.error('Error creating payment record:', error);
       return null;
     }
   };

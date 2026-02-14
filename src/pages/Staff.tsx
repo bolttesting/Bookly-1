@@ -109,24 +109,24 @@ const Staff = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="min-w-0 max-w-full overflow-x-hidden space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">Staff</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground truncate">Staff</h1>
           <p className="text-muted-foreground mt-1">
             Manage your team members and schedules
           </p>
         </div>
-        <Button className="animated-gradient text-primary-foreground" onClick={handleAddStaff}>
+        <Button className="animated-gradient text-primary-foreground shrink-0 w-full sm:w-auto" onClick={handleAddStaff}>
           <Plus className="h-4 w-4 mr-2" />
           Add Staff Member
         </Button>
       </div>
 
       {/* Search */}
-      <div className="glass-card p-4">
-        <div className="relative max-w-md">
+      <div className="glass-card p-3 sm:p-4">
+        <div className="relative max-w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search staff..."

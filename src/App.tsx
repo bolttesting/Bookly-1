@@ -10,6 +10,7 @@ import { ThemeProvider } from "@/hooks/useTheme";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import RequiresBusiness from "@/components/RequiresBusiness";
 import RequiresAdmin from "@/components/RequiresAdmin";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import DashboardLayout from "./layouts/DashboardLayout";
 import { PageTransition } from "@/components/PageTransition";
 import { Loader2 } from "lucide-react";
@@ -137,7 +138,9 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <AppRoutes />
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

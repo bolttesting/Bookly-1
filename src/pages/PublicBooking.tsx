@@ -30,6 +30,7 @@ import { useAppointmentReminders } from '@/hooks/useReminders';
 import { useAuth } from '@/hooks/useAuth';
 import { notifyBusinessUsers } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { ImageSlideshow } from '@/components/ImageSlideshow';
 
 interface Business {
@@ -413,7 +414,7 @@ export default function PublicBooking() {
         }
         setServiceSchedules(scheduleMap);
       } catch (error) {
-        console.error('Error fetching business:', error);
+        logger.error('Error fetching business:', error);
         toast.error('Failed to load booking page');
       } finally {
         setLoading(false);
@@ -658,8 +659,8 @@ export default function PublicBooking() {
   };
 
   const handleSubmit = async () => {
-    console.log('🚀 BOOKING SUBMITTED - Starting booking process');
-    console.log('Form state:', {
+    logger.debug('🚀 BOOKING SUBMITTED - Starting booking process');
+    logger.debug('Form state:', {
       business: !!business,
       selectedService: !!selectedService,
       selectedDate: !!selectedDate,
@@ -669,7 +670,7 @@ export default function PublicBooking() {
     });
     
     if (!business || !effectiveService || !selectedDate || !selectedTime) {
-      console.error('❌ Missing required fields:', {
+      logger.error('❌ Missing required fields:', {
         business: !business,
         effectiveService: !effectiveService,
         selectedDate: !selectedDate,
@@ -692,12 +693,12 @@ export default function PublicBooking() {
     });
 
     if (!validation.success) {
-      console.error('❌ Validation failed:', validation.error.errors);
+      logger.error('❌ Validation failed:', validation.error.errors);
       toast.error(validation.error.errors[0].message);
       return;
     }
 
-    console.log('✅ Validation passed, starting booking...');
+    logger.debug('✅ Validation passed, starting booking...');
     setSubmitting(true);
     try {
       // Create or find customer
@@ -720,14 +721,14 @@ export default function PublicBooking() {
             .eq('id', existingCustomer.id);
           
           if (updateError) {
-            console.error('Error updating customer:', updateError);
+            logger.error('Error updating customer:', updateError);
             // Don't fail booking if update fails, just log it
           }
         }
       } else {
         // Log auth state for debugging
         const { data: { session } } = await supabase.auth.getSession();
-        console.log('Auth state:', {
+        logger.debug('Auth state:', {
           hasSession: !!session,
           userId: session?.user?.id,
           loggedInUser: loggedInUser?.id,
@@ -743,7 +744,7 @@ export default function PublicBooking() {
             user_id: loggedInUser?.id || null,
         };
         
-        console.log('Attempting to create customer with data:', customerData);
+        logger.debug('Attempting to create customer with data:', customerData);
 
         // Try direct insert first
         let newCustomer;
@@ -758,7 +759,7 @@ export default function PublicBooking() {
         newCustomer = insertResult.data;
         customerError = insertResult.error;
 
-        console.log('Customer insert result:', {
+        logger.debug('Customer insert result:', {
           success: !!newCustomer,
           customerId: newCustomer?.id,
           error: customerError ? {
@@ -771,7 +772,7 @@ export default function PublicBooking() {
 
         // If direct insert fails with RLS error, try using RPC function as fallback
         if (customerError && (customerError.code === '42501' || customerError.message?.includes('row-level security'))) {
-          console.log('Direct insert failed with RLS error, trying RPC function...');
+          logger.debug('Direct insert failed with RLS error, trying RPC function...');
           
           const rpcResult = await supabase.rpc('create_customer_for_booking', {
             p_business_id: business.id,
@@ -782,7 +783,7 @@ export default function PublicBooking() {
             p_user_id: loggedInUser?.id || null,
           });
 
-          console.log('RPC function result:', {
+          logger.debug('RPC function result:', {
             success: !rpcResult.error,
             data: rpcResult.data,
             error: rpcResult.error ? {
@@ -793,19 +794,19 @@ export default function PublicBooking() {
           });
 
           if (rpcResult.error) {
-            console.error('RPC function also failed:', rpcResult.error);
+            logger.error('RPC function also failed:', rpcResult.error);
             customerError = rpcResult.error;
           } else {
             // RPC succeeded
             customerId = rpcResult.data;
             newCustomer = { id: rpcResult.data };
             customerError = null;
-            console.log('✅ Customer created via RPC, ID:', customerId);
+            logger.debug('✅ Customer created via RPC, ID:', customerId);
           }
         }
 
         if (customerError) {
-          console.error('❌ Customer creation error details:', {
+          logger.error('❌ Customer creation error details:', {
             message: customerError.message,
             details: customerError.details,
             hint: customerError.hint,
@@ -817,7 +818,7 @@ export default function PublicBooking() {
         
         if (newCustomer?.id) {
         customerId = newCustomer.id;
-          console.log('✅ Customer created successfully, ID:', customerId);
+          logger.debug('✅ Customer created successfully, ID:', customerId);
           
           // Create notification for business owners/admins about new customer
           try {
@@ -828,20 +829,20 @@ export default function PublicBooking() {
               link: '/customers',
             });
           } catch (notifError) {
-            console.error('Failed to create customer notification:', notifError);
+            logger.error('Failed to create customer notification:', notifError);
             // Don't fail booking if notification fails
           }
         } else {
-          console.error('❌ Customer creation succeeded but no ID returned!', newCustomer);
+          logger.error('❌ Customer creation succeeded but no ID returned!', newCustomer);
           throw new Error('Customer creation failed: No ID returned');
         }
       }
 
-      console.log('✅ Customer ID obtained:', customerId);
-      console.log('Customer ID is valid:', !!customerId && customerId !== 'undefined' && customerId !== 'null');
+      logger.debug('✅ Customer ID obtained:', customerId);
+      logger.debug('Customer ID is valid:', !!customerId && customerId !== 'undefined' && customerId !== 'null');
 
       if (!customerId) {
-        console.error('❌ Customer ID is missing! Cannot create appointment.');
+        logger.error('❌ Customer ID is missing! Cannot create appointment.');
         throw new Error('Failed to create or find customer');
       }
 
@@ -874,7 +875,7 @@ export default function PublicBooking() {
       const startTime = setMinutes(setHours(selectedDate, hours), minutes);
       const endTime = addMinutes(startTime, effectiveService.duration);
 
-      console.log('📅 Appointment timing:', {
+      logger.debug('📅 Appointment timing:', {
         selectedDate: selectedDate.toISOString(),
         selectedTime,
         startTime: startTime.toISOString(),
@@ -900,8 +901,8 @@ export default function PublicBooking() {
       const paymentTiming = business.payment_timing || 'advance';
       const requiresPayment = business.require_payment && hasStripe && finalPrice > 0;
       
-      console.log('=== BOOKING DEBUG ===');
-      console.log('Payment check:', {
+      logger.debug('=== BOOKING DEBUG ===');
+      logger.debug('Payment check:', {
         require_payment: business.require_payment,
         stripe_connected: hasStripe,
         servicePrice,
@@ -930,7 +931,7 @@ export default function PublicBooking() {
         }
       }
       
-      console.log('Payment decision:', {
+      logger.debug('Payment decision:', {
         paymentStatus,
         requiresAdvancePayment,
         advanceAmount,
@@ -939,7 +940,7 @@ export default function PublicBooking() {
 
       // If recurring, create a series instead of a single appointment
       if (isRecurring && !selectedPackage) {
-        console.log('📅 Creating recurring appointment series...');
+        logger.debug('📅 Creating recurring appointment series...');
         try {
           // Create recurring series directly
           const { data: newSeries, error: seriesError } = await supabase
@@ -976,7 +977,7 @@ export default function PublicBooking() {
           });
 
           if (generateError) {
-            console.error('Error generating initial appointments:', generateError);
+            logger.error('Error generating initial appointments:', generateError);
             toast.warning('Series created but some appointments could not be generated. Please check availability.');
           }
 
@@ -992,7 +993,7 @@ export default function PublicBooking() {
                 _discount_amount: discountAmount,
               });
             } catch (couponErr) {
-              console.error('Failed to record coupon usage:', couponErr);
+              logger.error('Failed to record coupon usage:', couponErr);
             }
           }
           
@@ -1001,7 +1002,7 @@ export default function PublicBooking() {
           setSubmitting(false);
           return;
         } catch (seriesError: any) {
-          console.error('❌ Recurring series creation error:', seriesError);
+          logger.error('❌ Recurring series creation error:', seriesError);
           toast.error(seriesError.message || 'Failed to create recurring series');
           setSubmitting(false);
           return;
@@ -1023,10 +1024,10 @@ export default function PublicBooking() {
           package_id: customerPackageId,
       };
       
-      console.log('📝 Attempting to create appointment with data:', appointmentData);
-      console.log('Customer ID:', customerId);
-      console.log('Customer ID type:', typeof customerId);
-      console.log('Customer ID value:', customerId);
+      logger.debug('📝 Attempting to create appointment with data:', appointmentData);
+      logger.debug('Customer ID:', customerId);
+      logger.debug('Customer ID type:', typeof customerId);
+      logger.debug('Customer ID value:', customerId);
 
       const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
@@ -1035,16 +1036,16 @@ export default function PublicBooking() {
         .single();
 
       if (appointmentError) {
-        console.error('❌ Appointment creation error:', appointmentError);
-        console.error('Error code:', appointmentError.code);
-        console.error('Error message:', appointmentError.message);
-        console.error('Error details:', appointmentError.details);
-        console.error('Error hint:', appointmentError.hint);
-        console.error('Full error object:', JSON.stringify(appointmentError, null, 2));
+        logger.error('❌ Appointment creation error:', appointmentError);
+        logger.error('Error code:', appointmentError.code);
+        logger.error('Error message:', appointmentError.message);
+        logger.error('Error details:', appointmentError.details);
+        logger.error('Error hint:', appointmentError.hint);
+        logger.error('Full error object:', JSON.stringify(appointmentError, null, 2));
         throw appointmentError;
       }
 
-      console.log('✅ Appointment created successfully:', appointment.id);
+      logger.debug('✅ Appointment created successfully:', appointment.id);
 
       // Record coupon usage when booking completes without advance payment
       if (appliedCoupon?.couponId && customerId && !requiresAdvancePayment) {
@@ -1058,13 +1059,13 @@ export default function PublicBooking() {
             _discount_amount: discountAmount,
           });
         } catch (couponErr) {
-          console.error('Failed to record coupon usage:', couponErr);
+          logger.error('Failed to record coupon usage:', couponErr);
           // Don't fail booking if coupon recording fails
         }
       }
 
       if (requiresAdvancePayment) {
-        console.log('💰 Payment required - showing payment screen');
+        logger.debug('💰 Payment required - showing payment screen');
         // Store appointment and customer IDs for payment
         setCreatedAppointmentId(appointment.id);
         setCreatedCustomerId(customerId);
@@ -1072,7 +1073,7 @@ export default function PublicBooking() {
         return; // Don't complete booking yet, wait for payment
       }
 
-      console.log('📧 No payment required - proceeding to send email');
+      logger.debug('📧 No payment required - proceeding to send email');
 
       // Check if this is customer's first booking and send welcome email
       try {
@@ -1106,15 +1107,15 @@ export default function PublicBooking() {
                   bookingUrl: `${window.location.origin}/book/${business.slug}`,
                 },
               });
-              console.log('✅ Welcome email sent to new customer');
+              logger.debug('✅ Welcome email sent to new customer');
             } catch (welcomeEmailError) {
-              console.error('Failed to send welcome email:', welcomeEmailError);
+              logger.error('Failed to send welcome email:', welcomeEmailError);
               // Don't fail the booking if welcome email fails
             }
           }
         }
       } catch (welcomeCheckError) {
-        console.error('Failed to check for welcome email:', welcomeCheckError);
+        logger.error('Failed to check for welcome email:', welcomeCheckError);
         // Don't fail the booking if welcome check fails
       }
 
@@ -1122,7 +1123,7 @@ export default function PublicBooking() {
       try {
         await createReminders.mutateAsync(appointment.id);
       } catch (reminderError) {
-        console.error('Failed to create reminders:', reminderError);
+        logger.error('Failed to create reminders:', reminderError);
         // Don't fail the booking if reminders fail
       }
 
@@ -1138,13 +1139,13 @@ export default function PublicBooking() {
         const shouldSendEmail = emailSettings?.send_booking_confirmation !== false; // Default to true if not set
 
         if (!shouldSendEmail) {
-          console.log('📧 Booking confirmation email is disabled in settings');
+          logger.debug('📧 Booking confirmation email is disabled in settings');
           // Don't send email, but continue with booking
         } else {
-          console.log('=== EMAIL DEBUG START ===');
-          console.log('Attempting to send confirmation email to:', customerEmail);
-          console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-          console.log('Function payload:', {
+          logger.debug('=== EMAIL DEBUG START ===');
+          logger.debug('Attempting to send confirmation email to:', customerEmail);
+          logger.debug('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+          logger.debug('Function payload:', {
             appointmentId: appointment.id,
             customerEmail,
             customerName,
@@ -1166,11 +1167,11 @@ export default function PublicBooking() {
           },
         });
           
-          console.log('=== EMAIL FUNCTION RESULT ===');
-          console.log('Full result:', emailResult);
-          console.log('Data:', emailResult.data);
-          console.log('Error:', emailResult.error);
-          console.log('Error details:', emailResult.error ? {
+          logger.debug('=== EMAIL FUNCTION RESULT ===');
+          logger.debug('Full result:', emailResult);
+          logger.debug('Data:', emailResult.data);
+          logger.debug('Error:', emailResult.error);
+          logger.debug('Error details:', emailResult.error ? {
             message: emailResult.error.message,
             status: emailResult.error.status,
             context: emailResult.error.context,
@@ -1178,24 +1179,24 @@ export default function PublicBooking() {
           } : 'No error');
           
           if (emailResult.error) {
-            console.error('❌ Email function error:', emailResult.error);
+            logger.error('❌ Email function error:', emailResult.error);
             toast.error(`Email failed: ${emailResult.error.message || 'Unknown error'}`);
           } else {
-            console.log('✅ Email function success:', emailResult.data);
+            logger.debug('✅ Email function success:', emailResult.data);
             if (emailResult.data?.success) {
-              console.log('✅ Email sent successfully!');
+              logger.debug('✅ Email sent successfully!');
             } else {
-              console.warn('⚠️ Function returned but success is false:', emailResult.data);
+              logger.warn('⚠️ Function returned but success is false:', emailResult.data);
             }
           }
-          console.log('=== EMAIL DEBUG END ===');
+          logger.debug('=== EMAIL DEBUG END ===');
         }
       } catch (emailError: any) {
-        console.error('=== EMAIL EXCEPTION ===');
-        console.error('Exception type:', emailError?.constructor?.name);
-        console.error('Exception message:', emailError?.message);
-        console.error('Exception stack:', emailError?.stack);
-        console.error('Full exception:', emailError);
+        logger.error('=== EMAIL EXCEPTION ===');
+        logger.error('Exception type:', emailError?.constructor?.name);
+        logger.error('Exception message:', emailError?.message);
+        logger.error('Exception stack:', emailError?.stack);
+        logger.error('Full exception:', emailError);
         toast.error(`Email exception: ${emailError?.message || 'Unknown error'}`);
         // Don't fail the booking if email fails
       }
@@ -1222,14 +1223,14 @@ export default function PublicBooking() {
           link: '/calendar',
         });
       } catch (notifError) {
-        console.error('Failed to create notification:', notifError);
+        logger.error('Failed to create notification:', notifError);
         // Don't fail the booking if notification fails
       }
 
       setBookingComplete(true);
       toast.success('Appointment booked successfully!');
     } catch (error: any) {
-      console.error('Error booking appointment:', error);
+      logger.error('Error booking appointment:', error);
       // Show more detailed error message
       const errorMessage = error?.message || error?.error?.message || 'Failed to book appointment. Please try again.';
       toast.error(errorMessage);
@@ -1286,7 +1287,7 @@ export default function PublicBooking() {
             _discount_amount: discountAmount,
           });
         } catch (couponErr) {
-          console.error('Failed to record coupon usage:', couponErr);
+          logger.error('Failed to record coupon usage:', couponErr);
         }
       }
 
@@ -1294,15 +1295,15 @@ export default function PublicBooking() {
       try {
         await createReminders.mutateAsync(createdAppointmentId);
       } catch (reminderError) {
-        console.error('Failed to create reminders:', reminderError);
+        logger.error('Failed to create reminders:', reminderError);
       }
 
       // Send confirmation email
       try {
-        console.log('=== EMAIL DEBUG START (PAYMENT SUCCESS) ===');
-        console.log('Attempting to send confirmation email to:', customerEmail);
-        console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-        console.log('Function payload:', {
+        logger.debug('=== EMAIL DEBUG START (PAYMENT SUCCESS) ===');
+        logger.debug('Attempting to send confirmation email to:', customerEmail);
+        logger.debug('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+        logger.debug('Function payload:', {
           appointmentId: createdAppointmentId,
           customerEmail,
           customerName,
@@ -1328,24 +1329,24 @@ export default function PublicBooking() {
           },
         });
         
-        console.log('=== EMAIL FUNCTION RESULT (PAYMENT SUCCESS) ===');
-        console.log('Full result:', emailResult);
-        console.log('Data:', emailResult.data);
-        console.log('Error:', emailResult.error);
+        logger.debug('=== EMAIL FUNCTION RESULT (PAYMENT SUCCESS) ===');
+        logger.debug('Full result:', emailResult);
+        logger.debug('Data:', emailResult.data);
+        logger.debug('Error:', emailResult.error);
         
         if (emailResult.error) {
-          console.error('❌ Email function error:', emailResult.error);
+          logger.error('❌ Email function error:', emailResult.error);
           toast.error(`Email failed: ${emailResult.error.message || 'Unknown error'}`);
         } else {
-          console.log('✅ Email function success:', emailResult.data);
+          logger.debug('✅ Email function success:', emailResult.data);
           if (emailResult.data?.success) {
-            console.log('✅ Email sent successfully!');
+            logger.debug('✅ Email sent successfully!');
           }
         }
-        console.log('=== EMAIL DEBUG END (PAYMENT SUCCESS) ===');
+        logger.debug('=== EMAIL DEBUG END (PAYMENT SUCCESS) ===');
       } catch (emailError: any) {
-        console.error('=== EMAIL EXCEPTION (PAYMENT SUCCESS) ===');
-        console.error('Exception:', emailError);
+        logger.error('=== EMAIL EXCEPTION (PAYMENT SUCCESS) ===');
+        logger.error('Exception:', emailError);
         toast.error(`Email exception: ${emailError?.message || 'Unknown error'}`);
       }
 
@@ -1353,7 +1354,7 @@ export default function PublicBooking() {
       setBookingComplete(true);
       toast.success('Payment successful! Appointment booked.');
     } catch (error) {
-      console.error('Error completing booking:', error);
+      logger.error('Error completing booking:', error);
       toast.error('Payment successful but failed to complete booking. Please contact support.');
     }
   };
