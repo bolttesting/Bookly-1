@@ -145,11 +145,11 @@ const Services = () => {
           )}
         </div>
       ) : (
-        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-w-0">
           {filteredServices.map((service) => (
             <div
               key={service.id}
-              className="glass-card overflow-hidden p-0 hover-lift group"
+              className="glass-card overflow-hidden p-0 hover-lift group min-w-0"
             >
               <ImageSlideshow
                 imageUrls={service.image_urls}
@@ -215,12 +215,16 @@ const Services = () => {
 
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>{service.duration} min</span>
+                  <Clock className="h-4 w-4 shrink-0" />
+                  <span>{service.duration != null ? `${service.duration} min` : '—'}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <DollarSign className="h-4 w-4" />
-                  <span>{Number(service.price) === 0 ? "Free" : format(Number(service.price))}</span>
+                  <DollarSign className="h-4 w-4 shrink-0" />
+                  <span className="whitespace-nowrap">
+                    {service.price != null && !Number.isNaN(Number(service.price))
+                      ? Number(service.price) === 0 ? 'Free' : format(Number(service.price))
+                      : '—'}
+                  </span>
                 </div>
               </div>
 

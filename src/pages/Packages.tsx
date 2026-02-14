@@ -70,9 +70,9 @@ const Packages = () => {
   };
 
   const formatDuration = (pkg: PackageTemplate) => {
-    const value = pkg.duration_value;
-    const type = pkg.duration_type;
-    const plural = value > 1 ? 's' : '';
+    const value = pkg.duration_value ?? 0;
+    const type = pkg.duration_type ?? 'month';
+    const plural = value !== 1 ? 's' : '';
     return `${value} ${type}${plural}`;
   };
 
@@ -135,11 +135,11 @@ const Packages = () => {
           )}
         </div>
       ) : (
-        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-w-0">
           {filteredPackages.map((pkg) => (
             <div
               key={pkg.id}
-              className="glass-card overflow-hidden p-0 hover-lift group"
+              className="glass-card overflow-hidden p-0 hover-lift group min-w-0"
             >
               <ImageSlideshow
                 imageUrls={pkg.image_urls}
@@ -198,17 +198,23 @@ const Packages = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <DollarSign className="h-4 w-4" />
-                    <span className="text-lg font-bold text-primary">{format(Number(pkg.price))}</span>
+                    <span className="text-lg font-bold text-primary whitespace-nowrap">
+                      {pkg.price != null && !Number.isNaN(Number(pkg.price)) ? format(Number(pkg.price)) : '—'}
+                    </span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-4 text-sm">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    <span>{pkg.booking_limit} booking{pkg.booking_limit !== 1 ? 's' : ''}</span>
+                    <Calendar className="h-4 w-4 shrink-0" />
+                    <span>
+                      {pkg.booking_limit != null && !Number.isNaN(Number(pkg.booking_limit))
+                        ? `${pkg.booking_limit} booking${Number(pkg.booking_limit) !== 1 ? 's' : ''}`
+                        : '—'}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Clock className="h-4 w-4" />
+                    <Clock className="h-4 w-4 shrink-0" />
                     <span>{formatDuration(pkg)}</span>
                   </div>
                 </div>

@@ -40,7 +40,7 @@ export function ImageSlideshow({
     return (
       <div
         className={cn(
-          'flex items-center justify-center bg-muted rounded-lg',
+          'flex items-center justify-center bg-muted rounded-lg min-w-0 max-w-full',
           aspectClass,
           className
         )}
@@ -53,7 +53,7 @@ export function ImageSlideshow({
   if (urls.length === 1) {
     const validUrl = urls[0] && !failedIndexes.has(0);
     return (
-      <div className={cn('overflow-hidden rounded-lg', aspectClass, className)}>
+      <div className={cn('overflow-hidden rounded-lg min-w-0 max-w-full', aspectClass, className)}>
         {validUrl ? (
           <img
             src={urls[0]}
@@ -71,11 +71,11 @@ export function ImageSlideshow({
   }
 
   return (
-    <Carousel className={cn('w-full', className)} opts={{ loop: true }}>
-      <CarouselContent className="-ml-0">
+    <Carousel className={cn('w-full min-w-0 max-w-full', className)} opts={{ loop: true }}>
+      <CarouselContent className="-ml-0 min-w-0">
         {urls.map((url, index) => (
-          <CarouselItem key={index} className="pl-0">
-            <div className={cn('overflow-hidden rounded-lg', aspectClass)}>
+          <CarouselItem key={index} className="pl-0 min-w-0">
+            <div className={cn('overflow-hidden rounded-lg min-w-0', aspectClass)}>
               {!failedIndexes.has(index) ? (
                 <img
                   src={url}
