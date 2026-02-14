@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,7 @@ const signupSchema = z.object({
 
 export default function CustomerAuth() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, loading, signIn, signUp, signInWithGoogle } = useAuth();
   
   const [isLoading, setIsLoading] = useState(false);
@@ -75,6 +76,17 @@ export default function CustomerAuth() {
   const [settingResetPassword, setSettingResetPassword] = useState(false);
 
   const resetRedirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/customer-login` : '';
+
+  // Open forgot password dialog when arriving with ?open=forgot (e.g. from booking page)
+  useEffect(() => {
+    if (searchParams.get('open') === 'forgot') {
+      setForgotPasswordOpen(true);
+      setSearchParams((p) => {
+        p.delete('open');
+        return p;
+      }, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!loading && user) {
