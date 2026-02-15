@@ -122,11 +122,23 @@ export function useDashboard() {
         .gte('start_time', todayStart.toISOString())
         .lte('start_time', todayEnd.toISOString());
 
-      const todayRevenue = (todayAppointments || []).reduce((sum, apt) => {
+      let todayRevenue = (todayAppointments || []).reduce((sum, apt) => {
         if (isPaidOrCompleted(apt.status, apt.payment_status) && apt.price) {
           return sum + Number(apt.price);
         }
         return sum;
+      }, 0);
+
+      // Add today's package sales (customer_packages purchased today)
+      const { data: todayPackages } = await supabase
+        .from('customer_packages')
+        .select('package_templates(price)')
+        .eq('business_id', business.id)
+        .gte('purchased_at', todayStart.toISOString())
+        .lte('purchased_at', todayEnd.toISOString());
+      todayRevenue += (todayPackages || []).reduce((sum, cp: any) => {
+        const price = cp.package_templates?.price;
+        return sum + (price != null ? Number(price) : 0);
       }, 0);
 
       // Fetch this week's appointments for completion rate and revenue chart
@@ -152,6 +164,21 @@ export function useDashboard() {
           if (revenueByDay[dayName] !== undefined) {
             revenueByDay[dayName] += Number(apt.price);
           }
+        }
+      });
+
+      // Add weekly package sales by day
+      const { data: weekPackages } = await supabase
+        .from('customer_packages')
+        .select('purchased_at, package_templates(price)')
+        .eq('business_id', business.id)
+        .gte('purchased_at', weekStart.toISOString())
+        .lte('purchased_at', weekEnd.toISOString());
+      (weekPackages || []).forEach((cp: any) => {
+        const dayName = format(new Date(cp.purchased_at), 'EEE');
+        const price = cp.package_templates?.price;
+        if (revenueByDay[dayName] !== undefined && price != null) {
+          revenueByDay[dayName] += Number(price);
         }
       });
 
