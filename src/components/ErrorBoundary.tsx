@@ -37,10 +37,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             )}
             <button
               type="button"
-              onClick={() => {
-                this.setState({ hasError: false, error: null });
-                window.location.href = '/';
-              }}
+              onClick={() => this.setState({ hasError: false, error: null })}
               className="text-primary underline hover:text-primary/90"
             >
               Try again

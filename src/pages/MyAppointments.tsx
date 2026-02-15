@@ -442,10 +442,7 @@ export default function MyAppointments() {
           package_templates (
             id,
             name,
-            description,
-            package_services (
-              service_id
-            )
+            description
           )
         `)
         .in('customer_id', customerIds)
@@ -1101,21 +1098,30 @@ export default function MyAppointments() {
   }, {} as Record<string, { business: Business; packages: PackageTemplate[] }>);
 
   // Packages the customer can use for the current service booking (same business, has credits, includes this service)
+  // Use "packages" (package_templates with package_services) to know which services each template includes
   const applicablePackagesForBooking = useMemo(() => {
-    if (!selectedBusiness?.id || !selectedService?.id || !myPackages.length) return [];
+    if (!selectedBusiness?.id || !selectedService?.id || !myPackages.length || !Array.isArray(packages)) return [];
     const now = new Date();
     return myPackages.filter((cp: any) => {
       if (cp.business_id !== selectedBusiness.id) return false;
       if (cp.status !== 'active') return false;
-      if (cp.bookings_remaining == null || cp.bookings_remaining <= 0) return false;
-      if (new Date(cp.expires_at) < now) return false;
-      const psList = cp.package_templates?.package_services;
+      const remaining = cp.bookings_remaining ?? 0;
+      if (remaining <= 0) return false;
+      try {
+        if (cp.expires_at && new Date(cp.expires_at) < now) return false;
+      } catch {
+        return false;
+      }
+      const templateId = cp.package_template_id ?? cp.package_templates?.id;
+      if (!templateId) return false;
+      const template = packages.find((p: any) => p.id === templateId);
+      const psList = template?.package_services;
       const serviceIds = Array.isArray(psList)
         ? psList.map((ps: any) => ps?.service_id).filter(Boolean)
         : [];
       return serviceIds.includes(selectedService.id);
     });
-  }, [myPackages, selectedBusiness?.id, selectedService?.id]);
+  }, [myPackages, packages, selectedBusiness?.id, selectedService?.id]);
 
   return (
     <SidebarProvider>
@@ -1641,7 +1647,7 @@ export default function MyAppointments() {
                             </>
                           )}
                         </div>
-                        {applicablePackagesForBooking.length > 0 && (
+                        {Array.isArray(applicablePackagesForBooking) && applicablePackagesForBooking.length > 0 && (
                           <div className="space-y-2 pt-2 border-t">
                             <Label className="text-sm">Use a package?</Label>
                             <div className="flex flex-col gap-2">
@@ -1670,7 +1676,7 @@ export default function MyAppointments() {
                                   }}
                                 >
                                   <Package className="h-4 w-4 mr-2 shrink-0" />
-                                  {cp.package_templates?.name ?? 'Package'} ({cp.bookings_remaining} credit{cp.bookings_remaining !== 1 ? 's' : ''} left)
+                                  {cp.package_templates?.name ?? 'Package'} ({(cp.bookings_remaining ?? 0)} credit{(cp.bookings_remaining ?? 0) !== 1 ? 's' : ''} left)
                                 </Button>
                               ))}
                             </div>
