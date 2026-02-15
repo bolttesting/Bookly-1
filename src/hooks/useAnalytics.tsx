@@ -152,18 +152,25 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
       
       let totalRevenue = revenueAppointments.reduce((sum, apt) => sum + (Number(apt.price) || 0), 0);
 
-      // Add package sales in date range (customer_packages.purchased_at)
-      const { data: packageSales } = await supabase
-        .from('customer_packages')
-        .select('purchased_at, package_templates(price)')
-        .eq('business_id', business.id)
-        .gte('purchased_at', dateRange.start.toISOString())
-        .lte('purchased_at', dateRange.end.toISOString());
-      const packageRevenueTotal = (packageSales || []).reduce((sum, cp: any) => {
-        const price = cp.package_templates?.price;
-        return sum + (price != null ? Number(price) : 0);
-      }, 0);
-      totalRevenue += packageRevenueTotal;
+      // Add package sales in date range (customer_packages.purchased_at) - skip if query fails
+      let packageSales: any[] | null = null;
+      let packageRevenueTotal = 0;
+      try {
+        const { data: packageSalesData } = await supabase
+          .from('customer_packages')
+          .select('purchased_at, package_templates(price)')
+          .eq('business_id', business.id)
+          .gte('purchased_at', dateRange.start.toISOString())
+          .lte('purchased_at', dateRange.end.toISOString());
+        packageSales = packageSalesData || [];
+        packageRevenueTotal = packageSales.reduce((sum, cp: any) => {
+          const price = cp.package_templates?.price;
+          return sum + (price != null ? Number(price) : 0);
+        }, 0);
+        totalRevenue += packageRevenueTotal;
+      } catch {
+        packageSales = [];
+      }
       const totalAppointments = appointments?.length || 0;
       const completedAppointments = completed.length;
       const cancelledAppointments = cancelled.length;
@@ -184,14 +191,17 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
         }
       });
       (packageSales || []).forEach((cp: any) => {
-        const dateKey = format(new Date(cp.purchased_at), 'yyyy-MM-dd');
-        const price = cp.package_templates?.price;
-        if (price != null) {
-          if (!revenueByDayMap[dateKey]) {
-            revenueByDayMap[dateKey] = { revenue: 0, appointments: 0 };
+        try {
+          const dateKey = format(new Date(cp.purchased_at ?? 0), 'yyyy-MM-dd');
+          const price = cp.package_templates?.price;
+          if (price != null) {
+            if (!revenueByDayMap[dateKey]) {
+              revenueByDayMap[dateKey] = { revenue: 0, appointments: 0 };
+            }
+            revenueByDayMap[dateKey].revenue += Number(price);
           }
-          revenueByDayMap[dateKey].revenue += Number(price);
-          // appointments count stays 0 for package-only days or we could add a separate metric; keeping appointments as appointment count only
+        } catch {
+          // skip invalid row
         }
       });
 
@@ -212,11 +222,11 @@ export function useAnalytics(filter: DateRangeFilter = { type: 'month' }) {
       });
 
       // Add package sales as a "service" line so it appears in revenue breakdown
-      if (packageRevenueTotal > 0) {
+      if (packageRevenueTotal > 0 && packageSales) {
         revenueByServiceMap['__packages__'] = {
           serviceName: 'Package sales',
           revenue: packageRevenueTotal,
-          appointments: packageSales?.length || 0,
+          appointments: packageSales.length,
         };
       }
       const revenueByService = Object.values(revenueByServiceMap)

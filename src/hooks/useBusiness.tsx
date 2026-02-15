@@ -30,21 +30,32 @@ interface Business {
 type AppRole = 'owner' | 'admin' | 'staff';
 
 async function fetchBusinessAndRole(userId: string): Promise<{ business: Business | null; role: AppRole | null }> {
-  const { data: roleData, error: roleError } = await supabase
-    .from('user_roles')
-    .select('business_id, role')
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (roleError) throw roleError;
-  if (!roleData?.business_id) return { business: null, role: null };
+  try {
+    const { data: roleData, error: roleError } = await supabase
+      .from('user_roles')
+      .select('business_id, role')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (roleError) {
+      console.warn('[useBusiness] user_roles fetch failed:', roleError.message);
+      return { business: null, role: null };
+    }
+    if (!roleData?.business_id) return { business: null, role: null };
 
-  const { data: businessData, error: businessError } = await supabase
-    .from('businesses')
-    .select('*')
-    .eq('id', roleData.business_id)
-    .single();
-  if (businessError) throw businessError;
-  return { business: businessData, role: (roleData.role as AppRole) ?? null };
+    const { data: businessData, error: businessError } = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('id', roleData.business_id)
+      .single();
+    if (businessError) {
+      console.warn('[useBusiness] businesses fetch failed:', businessError.message);
+      return { business: null, role: null };
+    }
+    return { business: businessData, role: (roleData.role as AppRole) ?? null };
+  } catch (e) {
+    console.warn('[useBusiness] unexpected error:', e);
+    return { business: null, role: null };
+  }
 }
 
 export function useBusiness() {
