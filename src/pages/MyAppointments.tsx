@@ -166,6 +166,12 @@ export default function MyAppointments() {
   const [recurrenceMaxOccurrences, setRecurrenceMaxOccurrences] = useState<number | null>(null);
   const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'date' | 'occurrences'>('never');
   const [selectedCustomerPackageId, setSelectedCustomerPackageId] = useState<string | null>(null);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setHasMounted(true), 0);
+    return () => clearTimeout(t);
+  }, []);
 
   // Get businesses customer is associated with
   const { data: businesses = [], refetch: refetchBusinesses } = useQuery({
@@ -1034,8 +1040,8 @@ export default function MyAppointments() {
     return <Navigate to="/customer-login" replace />;
   }
 
-  // Show loading until auth and critical data are ready
-  if (authLoading || isLoading) {
+  // Show loading until auth and critical data are ready (hasMounted avoids first-paint crash after login)
+  if (!hasMounted || authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -1043,10 +1049,14 @@ export default function MyAppointments() {
     );
   }
 
-  const upcomingAppointments = appointments.filter(apt => 
+  const safeAppointments = Array.isArray(appointments) ? appointments : [];
+  const safeBusinesses = Array.isArray(businesses) ? businesses : [];
+  const safeServices = Array.isArray(services) ? services : [];
+  const safePackages = Array.isArray(packages) ? packages : [];
+  const upcomingAppointments = safeAppointments.filter(apt => 
     isFuture(new Date(apt.start_time)) || isToday(new Date(apt.start_time))
   );
-  const pastAppointments = appointments.filter(apt => 
+  const pastAppointments = safeAppointments.filter(apt => 
     isPast(new Date(apt.start_time)) && !isToday(new Date(apt.start_time))
   );
 
@@ -1060,7 +1070,7 @@ export default function MyAppointments() {
     }
   };
 
-  const filteredServices = services.filter(service => {
+  const filteredServices = safeServices.filter(service => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return service.name.toLowerCase().includes(query) ||
@@ -1068,7 +1078,7 @@ export default function MyAppointments() {
            service.category?.toLowerCase().includes(query);
   });
 
-  const filteredPackages = packages.filter(pkg => {
+  const filteredPackages = safePackages.filter(pkg => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return pkg.name.toLowerCase().includes(query) ||
@@ -1077,7 +1087,7 @@ export default function MyAppointments() {
 
   // Group services by business
   const servicesByBusiness = filteredServices.reduce((acc, service) => {
-    const business = businesses.find(b => b.id === service.business_id);
+    const business = safeBusinesses.find(b => b.id === service.business_id);
     if (!business) return acc;
     if (!acc[business.id]) {
       acc[business.id] = { business, services: [] };
@@ -1088,7 +1098,7 @@ export default function MyAppointments() {
 
   // Group packages by business
   const packagesByBusiness = filteredPackages.reduce((acc, pkg) => {
-    const business = businesses.find(b => b.id === pkg.business_id);
+    const business = safeBusinesses.find(b => b.id === pkg.business_id);
     if (!business) return acc;
     if (!acc[business.id]) {
       acc[business.id] = { business, packages: [] };
@@ -1149,7 +1159,7 @@ export default function MyAppointments() {
             <div className="container mx-auto max-w-6xl w-full min-w-0">
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CustomerDashboardTab)} className="space-y-4 sm:space-y-6 w-full min-w-0 overflow-hidden">
                 <TabsContent value="appointments" className="space-y-4 sm:space-y-6 min-w-0 overflow-hidden mt-0">
-        {appointments.length === 0 ? (
+        {safeAppointments.length === 0 ? (
           <Card className="glass-card text-center py-8 sm:py-12">
             <CardContent>
               <Calendar className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-3 sm:mb-4 text-muted-foreground/50" />
@@ -1293,7 +1303,7 @@ export default function MyAppointments() {
           </TabsContent>
 
           <TabsContent value="services" className="space-y-4 sm:space-y-6 min-w-0 overflow-hidden">
-            {businesses.length === 0 ? (
+            {safeBusinesses.length === 0 ? (
               <Card className="glass-card text-center py-8 sm:py-12">
                 <CardContent>
                   <Briefcase className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-3 sm:mb-4 text-muted-foreground/50" />
@@ -1918,7 +1928,7 @@ export default function MyAppointments() {
           </TabsContent>
 
           <TabsContent value="packages" className="space-y-4 sm:space-y-6 min-w-0 overflow-hidden">
-            {businesses.length === 0 ? (
+            {safeBusinesses.length === 0 ? (
               <Card className="glass-card text-center py-12">
                 <CardContent>
                   <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
