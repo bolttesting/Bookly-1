@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -165,6 +165,7 @@ export default function MyAppointments() {
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | null>(null);
   const [recurrenceMaxOccurrences, setRecurrenceMaxOccurrences] = useState<number | null>(null);
   const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'date' | 'occurrences'>('never');
+  const [selectedCustomerPackageId, setSelectedCustomerPackageId] = useState<string | null>(null);
 
   // Get businesses customer is associated with
   const { data: businesses = [], refetch: refetchBusinesses } = useQuery({
@@ -441,7 +442,10 @@ export default function MyAppointments() {
           package_templates (
             id,
             name,
-            description
+            description,
+            package_services (
+              service_id
+            )
           )
         `)
         .in('customer_id', customerIds)
@@ -776,7 +780,29 @@ export default function MyAppointments() {
 
       const basePrice = Number(selectedService.price);
       let finalPrice = basePrice;
-      if (appliedCoupon) {
+      const usingPackage = !!selectedCustomerPackageId;
+
+      if (usingPackage) {
+        // Validate and consume one package credit
+        const { data: pkgRow, error: pkgErr } = await supabase
+          .from('customer_packages')
+          .select('id, bookings_remaining, bookings_used')
+          .eq('id', selectedCustomerPackageId)
+          .single();
+        if (pkgErr || !pkgRow || (pkgRow.bookings_remaining ?? 0) <= 0) {
+          throw new Error('This package has no credits left. Please book without package or choose another.');
+        }
+        const { error: updateErr } = await supabase
+          .from('customer_packages')
+          .update({
+            bookings_remaining: Math.max(0, (pkgRow.bookings_remaining ?? 0) - 1),
+            bookings_used: (pkgRow.bookings_used ?? 0) + 1,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', selectedCustomerPackageId);
+        if (updateErr) throw updateErr;
+        finalPrice = 0;
+      } else if (appliedCoupon) {
         if (appliedCoupon.discountType === 'percentage') {
           finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
         } else {
@@ -889,6 +915,9 @@ export default function MyAppointments() {
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ['my-appointments'] });
       queryClient.invalidateQueries({ queryKey: ['appointments-availability'] });
+      if (selectedCustomerPackageId) {
+        queryClient.invalidateQueries({ queryKey: ['my-packages'] });
+      }
       if (result?.isRecurring) {
         toast.success('Recurring appointment series created successfully!');
       } else {
@@ -903,6 +932,7 @@ export default function MyAppointments() {
       setCouponCode('');
       setAppliedCoupon(null);
       setCouponError('');
+      setSelectedCustomerPackageId(null);
       setIsRecurring(false);
       setRecurrencePattern('weekly');
       setRecurrenceFrequency(1);
@@ -1069,6 +1099,20 @@ export default function MyAppointments() {
     acc[business.id].packages.push(pkg);
     return acc;
   }, {} as Record<string, { business: Business; packages: PackageTemplate[] }>);
+
+  // Packages the customer can use for the current service booking (same business, has credits, includes this service)
+  const applicablePackagesForBooking = useMemo(() => {
+    if (!selectedBusiness?.id || !selectedService?.id || !myPackages.length) return [];
+    const now = new Date();
+    return myPackages.filter((cp: any) => {
+      if (cp.business_id !== selectedBusiness.id) return false;
+      if (cp.status !== 'active') return false;
+      if (cp.bookings_remaining == null || cp.bookings_remaining <= 0) return false;
+      if (new Date(cp.expires_at) < now) return false;
+      const serviceIds = cp.package_templates?.package_services?.map((ps: any) => ps.service_id) ?? [];
+      return serviceIds.includes(selectedService.id);
+    });
+  }, [myPackages, selectedBusiness?.id, selectedService?.id]);
 
   return (
     <SidebarProvider>
@@ -1340,6 +1384,7 @@ export default function MyAppointments() {
                                 setCouponCode('');
                                 setAppliedCoupon(null);
                                 setCouponError('');
+                                setSelectedCustomerPackageId(null);
                                 setIsBooking(true);
                               }}
                             >
@@ -1400,6 +1445,7 @@ export default function MyAppointments() {
                         setCouponCode('');
                         setAppliedCoupon(null);
                         setCouponError('');
+                        setSelectedCustomerPackageId(null);
                       }} className="w-full sm:w-auto">
                         <ArrowRight className="h-4 w-4 mr-2 rotate-180" />
                         Back
@@ -1558,21 +1604,28 @@ export default function MyAppointments() {
                               <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Price</span>
                                 <span className="font-medium">
-                                  {(() => {
-                                    const basePrice = Number(selectedService?.price ?? 0);
-                                    let finalPrice = basePrice;
-                                    if (appliedCoupon) {
-                                      if (appliedCoupon.discountType === 'percentage') {
-                                        finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
-                                      } else {
-                                        finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
-                                      }
-                                    }
-                                    return formatCurrencySimple(finalPrice, selectedBusiness?.currency || 'USD');
-                                  })()}
+                                  {selectedCustomerPackageId
+                                    ? (() => {
+                                        const pkg = applicablePackagesForBooking.find((cp: any) => cp.id === selectedCustomerPackageId);
+                                        return pkg ? (
+                                          <span className="text-primary">Using package: {pkg.package_templates?.name} (1 credit)</span>
+                                        ) : formatCurrencySimple(0, selectedBusiness?.currency || 'USD');
+                                      })()
+                                    : (() => {
+                                        const basePrice = Number(selectedService?.price ?? 0);
+                                        let finalPrice = basePrice;
+                                        if (appliedCoupon) {
+                                          if (appliedCoupon.discountType === 'percentage') {
+                                            finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
+                                          } else {
+                                            finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
+                                          }
+                                        }
+                                        return formatCurrencySimple(finalPrice, selectedBusiness?.currency || 'USD');
+                                      })()}
                                 </span>
                               </div>
-                              {appliedCoupon && (
+                              {appliedCoupon && !selectedCustomerPackageId && (
                                 <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
                                   <span>Discount ({appliedCoupon.code})</span>
                                   <span>
@@ -1585,6 +1638,42 @@ export default function MyAppointments() {
                             </>
                           )}
                         </div>
+                        {applicablePackagesForBooking.length > 0 && (
+                          <div className="space-y-2 pt-2 border-t">
+                            <Label className="text-sm">Use a package?</Label>
+                            <div className="flex flex-col gap-2">
+                              <Button
+                                type="button"
+                                variant={selectedCustomerPackageId === null ? 'default' : 'outline'}
+                                size="sm"
+                                className="justify-start"
+                                onClick={() => setSelectedCustomerPackageId(null)}
+                              >
+                                Pay full price
+                              </Button>
+                              {applicablePackagesForBooking.map((cp: any) => (
+                                <Button
+                                  key={cp.id}
+                                  type="button"
+                                  variant={selectedCustomerPackageId === cp.id ? 'default' : 'outline'}
+                                  size="sm"
+                                  className="justify-start"
+                                  onClick={() => {
+                                    setSelectedCustomerPackageId(cp.id);
+                                    setAppliedCoupon(null);
+                                    setCouponCode('');
+                                    setCouponError('');
+                                    setIsRecurring(false);
+                                  }}
+                                >
+                                  <Package className="h-4 w-4 mr-2 shrink-0" />
+                                  {cp.package_templates?.name ?? 'Package'} ({cp.bookings_remaining} credit{cp.bookings_remaining !== 1 ? 's' : ''} left)
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {!selectedCustomerPackageId && (
                         <div className="space-y-2 pt-2 border-t">
                           <Label className="text-sm">Have a coupon code?</Label>
                           {appliedCoupon ? (
@@ -1659,6 +1748,7 @@ export default function MyAppointments() {
                           )}
                           {couponError && <p className="text-xs text-red-600 dark:text-red-400">{couponError}</p>}
                         </div>
+                        )}
                       </CardContent>
                     </Card>
 
@@ -1676,7 +1766,7 @@ export default function MyAppointments() {
                       </CardContent>
                     </Card>
 
-                    {/* Recurring Appointment Options */}
+                    {/* Recurring Appointment Options - not available when using a package (1 credit = 1 booking) */}
                     <Card className="glass-card">
                       <CardHeader>
                         <CardTitle>Recurring Appointment</CardTitle>
@@ -1690,6 +1780,7 @@ export default function MyAppointments() {
                           <Switch
                             checked={isRecurring}
                             onCheckedChange={setIsRecurring}
+                            disabled={!!selectedCustomerPackageId}
                           />
                         </div>
                         
