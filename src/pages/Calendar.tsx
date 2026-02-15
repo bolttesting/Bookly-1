@@ -212,46 +212,48 @@ const Calendar = () => {
         </div>
       </div>
 
-      {/* Calendar Grid */}
+      {/* Calendar Grid - one horizontal scroll so all 7 days show on mobile */}
       <div className="glass-card overflow-hidden">
-        {/* Day Headers - date/day clear on mobile */}
-        <div className="grid grid-cols-8 border-b border-border min-w-[600px]">
-          <div className="p-2 sm:p-3 border-r border-border hidden sm:block sticky left-0 z-10 bg-inherit" />
-          <div className="p-2 sm:p-3 border-r border-border sm:hidden sticky left-0 z-10 bg-inherit" />
-          {weekDates.map((date, index) => {
-            const isToday = isSameDay(date, today);
-            return (
-              <div
-                key={index}
-                className={cn(
-                  "p-2 sm:p-3 text-center border-r border-border last:border-r-0 cursor-pointer hover:bg-secondary/50 transition-colors min-w-[72px]",
-                  isToday && "bg-primary/10"
-                )}
-                onClick={() => handleAddAppointment(date)}
-              >
-                <div className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-tight">
-                  {daysOfWeek[date.getDay()]}
-                </div>
-                <div
-                  className={cn(
-                    "text-sm sm:text-lg font-semibold mt-0.5 sm:mt-1",
-                    isToday && "text-primary"
-                  )}
-                >
-                  {date.getDate()}
-                </div>
-                <div className="text-[10px] sm:hidden text-muted-foreground/80 mt-0.5">
-                  {format(date, 'MMM')}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <div className="overflow-x-auto scrollbar-thin">
+          <div className="min-w-[600px]">
+            {/* Day Headers - date/day clear on mobile */}
+            <div className="grid grid-cols-8 border-b border-border">
+              <div className="p-2 sm:p-3 border-r border-border hidden sm:block sticky left-0 z-10 bg-inherit" />
+              <div className="p-2 sm:p-3 border-r border-border sm:hidden sticky left-0 z-10 bg-inherit" />
+              {weekDates.map((date, index) => {
+                const isToday = isSameDay(date, today);
+                return (
+                  <div
+                    key={index}
+                    className={cn(
+                      "p-2 sm:p-3 text-center border-r border-border last:border-r-0 cursor-pointer hover:bg-secondary/50 transition-colors min-w-[72px]",
+                      isToday && "bg-primary/10"
+                    )}
+                    onClick={() => handleAddAppointment(date)}
+                  >
+                    <div className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-tight">
+                      {daysOfWeek[date.getDay()]}
+                    </div>
+                    <div
+                      className={cn(
+                        "text-sm sm:text-lg font-semibold mt-0.5 sm:mt-1",
+                        isToday && "text-primary"
+                      )}
+                    >
+                      {date.getDate()}
+                    </div>
+                    <div className="text-[10px] sm:hidden text-muted-foreground/80 mt-0.5">
+                      {format(date, 'MMM')}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
-        {/* Time Grid - sticky time column on mobile so date context stays visible */}
-        <div className="max-h-[400px] sm:max-h-[500px] md:max-h-[600px] overflow-y-auto scrollbar-thin overflow-x-auto">
-          {hours.map((hour) => (
-            <div key={hour} className="grid grid-cols-8 border-b border-border last:border-b-0 min-w-[600px]">
+            {/* Time Grid - sticky time column on mobile so date context stays visible */}
+            <div className="max-h-[400px] sm:max-h-[500px] md:max-h-[600px] overflow-y-auto scrollbar-thin">
+              {hours.map((hour) => (
+                <div key={hour} className="grid grid-cols-8 border-b border-border last:border-b-0">
               <div className="p-2 sm:p-3 text-xs text-muted-foreground border-r border-border hidden sm:block sticky left-0 z-10 bg-background shrink-0 w-14">
                 {format(new Date().setHours(hour, 0), 'h a')}
               </div>
@@ -322,6 +324,8 @@ const Calendar = () => {
               })}
             </div>
           ))}
+            </div>
+          </div>
         </div>
       </div>
 
