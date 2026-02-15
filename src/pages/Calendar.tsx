@@ -214,46 +214,49 @@ const Calendar = () => {
 
       {/* Calendar Grid */}
       <div className="glass-card overflow-hidden">
-        {/* Day Headers */}
-        <div className="grid grid-cols-8 border-b border-border">
-          <div className="p-2 sm:p-3 border-r border-border hidden sm:block" />
-          <div className="p-2 sm:p-3 border-r border-border sm:hidden" />
+        {/* Day Headers - date/day clear on mobile */}
+        <div className="grid grid-cols-8 border-b border-border min-w-[600px]">
+          <div className="p-2 sm:p-3 border-r border-border hidden sm:block sticky left-0 z-10 bg-inherit" />
+          <div className="p-2 sm:p-3 border-r border-border sm:hidden sticky left-0 z-10 bg-inherit" />
           {weekDates.map((date, index) => {
             const isToday = isSameDay(date, today);
             return (
               <div
                 key={index}
                 className={cn(
-                  "p-2 sm:p-3 text-center border-r border-border last:border-r-0 cursor-pointer hover:bg-secondary/50 transition-colors",
+                  "p-2 sm:p-3 text-center border-r border-border last:border-r-0 cursor-pointer hover:bg-secondary/50 transition-colors min-w-[72px]",
                   isToday && "bg-primary/10"
                 )}
                 onClick={() => handleAddAppointment(date)}
               >
-                <div className="text-xs text-muted-foreground uppercase">
+                <div className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-tight">
                   {daysOfWeek[date.getDay()]}
                 </div>
                 <div
                   className={cn(
-                    "text-base sm:text-lg font-semibold mt-1",
+                    "text-sm sm:text-lg font-semibold mt-0.5 sm:mt-1",
                     isToday && "text-primary"
                   )}
                 >
                   {date.getDate()}
+                </div>
+                <div className="text-[10px] sm:hidden text-muted-foreground/80 mt-0.5">
+                  {format(date, 'MMM')}
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Time Grid */}
+        {/* Time Grid - sticky time column on mobile so date context stays visible */}
         <div className="max-h-[400px] sm:max-h-[500px] md:max-h-[600px] overflow-y-auto scrollbar-thin overflow-x-auto">
           {hours.map((hour) => (
             <div key={hour} className="grid grid-cols-8 border-b border-border last:border-b-0 min-w-[600px]">
-              <div className="p-2 sm:p-3 text-xs text-muted-foreground border-r border-border hidden sm:block">
+              <div className="p-2 sm:p-3 text-xs text-muted-foreground border-r border-border hidden sm:block sticky left-0 z-10 bg-background shrink-0 w-14">
                 {format(new Date().setHours(hour, 0), 'h a')}
               </div>
-              <div className="p-2 sm:p-3 text-xs text-muted-foreground border-r border-border sm:hidden">
-                {format(new Date().setHours(hour, 0), 'h')}
+              <div className="p-2 sm:p-3 text-xs text-muted-foreground border-r border-border sm:hidden sticky left-0 z-10 bg-background shrink-0 w-10">
+                {format(new Date().setHours(hour, 0), 'h a')}
               </div>
               {weekDates.map((date, dayIndex) => {
                 const slotAppointments = getAppointmentsForSlot(date, hour);
@@ -269,7 +272,9 @@ const Calendar = () => {
                       }
                     }}
                   >
-                    {slotAppointments.map((appointment) => (
+                    {slotAppointments.map((appointment) => {
+                      const aptStart = parseISO(appointment.start_time);
+                      return (
                       <DropdownMenu key={appointment.id}>
                         <DropdownMenuTrigger asChild>
                           <div
@@ -286,8 +291,14 @@ const Calendar = () => {
                             <div className="opacity-80 truncate">
                               {appointment.customer?.name || 'Customer'}
                             </div>
-                            <div className="opacity-80">
-                              {format(parseISO(appointment.start_time), 'h:mm a')}
+                            {/* Date + time together so it's clear which day the booking is on (helps mobile) */}
+                            <div className="opacity-90 mt-1 flex flex-col sm:block gap-0.5">
+                              <span className="sm:hidden font-medium">
+                                {format(aptStart, 'EEE d MMM')}
+                              </span>
+                              <span>
+                                {format(aptStart, 'h:mm a')}
+                              </span>
                             </div>
                           </div>
                         </DropdownMenuTrigger>
@@ -305,7 +316,7 @@ const Calendar = () => {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    ))}
+                    );})}
                   </div>
                 );
               })}
