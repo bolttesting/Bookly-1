@@ -1109,7 +1109,10 @@ export default function MyAppointments() {
       if (cp.status !== 'active') return false;
       if (cp.bookings_remaining == null || cp.bookings_remaining <= 0) return false;
       if (new Date(cp.expires_at) < now) return false;
-      const serviceIds = cp.package_templates?.package_services?.map((ps: any) => ps.service_id) ?? [];
+      const psList = cp.package_templates?.package_services;
+      const serviceIds = Array.isArray(psList)
+        ? psList.map((ps: any) => ps?.service_id).filter(Boolean)
+        : [];
       return serviceIds.includes(selectedService.id);
     });
   }, [myPackages, selectedBusiness?.id, selectedService?.id]);
