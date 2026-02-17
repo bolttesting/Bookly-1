@@ -116,7 +116,7 @@ export function useSuperAdmin() {
           id: row.id,
           name: template?.name ?? 'Package',
           price: template?.price ?? 0,
-          total_credits: totalCredits || template?.booking_limit ?? 0,
+          total_credits: totalCredits || (template?.booking_limit ?? 0),
           used_credits: row.bookings_used ?? 0,
           status: row.status ?? 'active',
           expires_at: row.expires_at ?? null,
