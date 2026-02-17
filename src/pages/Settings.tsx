@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { User, Building2, CreditCard, Bell, Link2, Copy, Check, ExternalLink, Clock, Download, QrCode, Code2, MapPin, DollarSign, CheckCircle, Package, Loader2, Upload, X } from "lucide-react";
+import { User, Building2, CreditCard, Bell, Link2, Copy, Check, ExternalLink, Clock, Download, QrCode, Code2, MapPin, DollarSign, CheckCircle, Package, Loader2, Upload, X, Mail, MessageSquare } from "lucide-react";
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 import { useBusinessSubscription } from '@/hooks/useBusinessSubscription';
 import { useReminderSettings } from '@/hooks/useReminders';
+import { useBusinessChannelConfig } from '@/hooks/useBusinessChannelConfig';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { FunctionsHttpError } from '@supabase/supabase-js';
@@ -37,7 +38,14 @@ const Settings = () => {
   const { plans: subscriptionPlans, isLoading: plansLoading } = useSubscriptionPlans();
   const { subscription, isLoading: subscriptionLoading, updateSubscription } = useBusinessSubscription();
   const { settings: reminderSettings, isLoading: reminderSettingsLoading, updateSettings: updateReminderSettings } = useReminderSettings();
+  const { emailConfig, smsConfig, isLoading: channelConfigLoading, saveEmail, saveSms, removeEmailConfig, removeSmsConfig, isSavingEmail, isSavingSms } = useBusinessChannelConfig();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [emailFromName, setEmailFromName] = useState('');
+  const [emailFromEmail, setEmailFromEmail] = useState('');
+  const [emailApiKey, setEmailApiKey] = useState('');
+  const [smsFromNumber, setSmsFromNumber] = useState('');
+  const [smsAccountSid, setSmsAccountSid] = useState('');
+  const [smsAuthToken, setSmsAuthToken] = useState('');
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -89,6 +97,21 @@ const Settings = () => {
       });
     })();
   }, [searchParams, queryClient, setSearchParams, refetchBusiness]);
+
+  useEffect(() => {
+    if (emailConfig) {
+      setEmailFromName(emailConfig.from_name);
+      setEmailFromEmail(emailConfig.from_email);
+      setEmailApiKey('');
+    }
+  }, [emailConfig?.from_name, emailConfig?.from_email]);
+  useEffect(() => {
+    if (smsConfig) {
+      setSmsFromNumber(smsConfig.from_number);
+      setSmsAccountSid(smsConfig.twilio_account_sid);
+      setSmsAuthToken('');
+    }
+  }, [smsConfig?.from_number, smsConfig?.twilio_account_sid]);
   
   // Get active tab from URL params, default to 'booking'
   const activeTab = searchParams.get('tab') || 'booking';
@@ -877,6 +900,149 @@ const Settings = () => {
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 Failed to load reminder settings
+              </div>
+            )}
+          </div>
+
+          {/* Your email & SMS – use business's own Resend/Twilio */}
+          <div className="glass-card p-4 sm:p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Mail className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Your email & SMS</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-6">
+              Use your own Resend and Twilio so reminders and notifications come from your business name and address.
+            </p>
+            {channelConfigLoading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="space-y-8">
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <Mail className="h-4 w-4" /> Email (Resend)
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Get an API key at <a href="https://resend.com" target="_blank" rel="noreferrer" className="text-primary underline">resend.com</a>. Emails will be sent from your address.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="email-from-name">From name</Label>
+                      <Input
+                        id="email-from-name"
+                        placeholder="e.g. My Salon"
+                        value={emailFromName}
+                        onChange={(e) => setEmailFromName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email-from-email">From email</Label>
+                      <Input
+                        id="email-from-email"
+                        type="email"
+                        placeholder="bookings@yourdomain.com"
+                        value={emailFromEmail}
+                        onChange={(e) => setEmailFromEmail(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email-api-key">Resend API key {emailConfig?.api_key_set && <span className="text-muted-foreground font-normal">(leave blank to keep current)</span>}</Label>
+                    <Input
+                      id="email-api-key"
+                      type="password"
+                      placeholder={emailConfig?.api_key_set ? "••••••••" : "re_..."}
+                      value={emailApiKey}
+                      onChange={(e) => setEmailApiKey(e.target.value)}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={async () => {
+                        try {
+                          await saveEmail({ from_name: emailFromName, from_email: emailFromEmail, resend_api_key: emailApiKey || undefined });
+                          setEmailApiKey('');
+                          toast.success('Email settings saved');
+                        } catch (e: unknown) {
+                          toast.error(e instanceof Error ? e.message : 'Failed to save');
+                        }
+                      }}
+                      disabled={isSavingEmail || !emailFromName.trim() || !emailFromEmail.trim() || (!emailConfig?.api_key_set && !emailApiKey.trim())}
+                    >
+                      {isSavingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {emailConfig ? 'Update email' : 'Save email'}
+                    </Button>
+                    {emailConfig && (
+                      <Button variant="outline" onClick={async () => { try { await removeEmailConfig(); toast.success('Email config removed'); setEmailFromName(''); setEmailFromEmail(''); } catch { toast.error('Failed to remove'); } }}>
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <Separator />
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" /> SMS (Twilio)
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Get credentials at <a href="https://twilio.com" target="_blank" rel="noreferrer" className="text-primary underline">twilio.com</a>. SMS will be sent from your number.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="sms-from-number">From number</Label>
+                      <Input
+                        id="sms-from-number"
+                        placeholder="+1234567890"
+                        value={smsFromNumber}
+                        onChange={(e) => setSmsFromNumber(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sms-account-sid">Twilio Account SID</Label>
+                      <Input
+                        id="sms-account-sid"
+                        placeholder="AC..."
+                        value={smsAccountSid}
+                        onChange={(e) => setSmsAccountSid(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sms-auth-token">Auth token {smsConfig?.auth_token_set && <span className="text-muted-foreground font-normal">(leave blank to keep current)</span>}</Label>
+                    <Input
+                      id="sms-auth-token"
+                      type="password"
+                      placeholder={smsConfig?.auth_token_set ? "••••••••" : "Your Twilio auth token"}
+                      value={smsAuthToken}
+                      onChange={(e) => setSmsAuthToken(e.target.value)}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={async () => {
+                        try {
+                          await saveSms({ from_number: smsFromNumber, twilio_account_sid: smsAccountSid, twilio_auth_token: smsAuthToken || undefined });
+                          setSmsAuthToken('');
+                          toast.success('SMS settings saved');
+                        } catch (e: unknown) {
+                          toast.error(e instanceof Error ? e.message : 'Failed to save');
+                        }
+                      }}
+                      disabled={isSavingSms || !smsFromNumber.trim() || !smsAccountSid.trim() || (!smsConfig?.auth_token_set && !smsAuthToken.trim())}
+                    >
+                      {isSavingSms && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {smsConfig ? 'Update SMS' : 'Save SMS'}
+                    </Button>
+                    {smsConfig && (
+                      <Button variant="outline" onClick={async () => { try { await removeSmsConfig(); toast.success('SMS config removed'); setSmsFromNumber(''); setSmsAccountSid(''); } catch { toast.error('Failed to remove'); } }}>
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>

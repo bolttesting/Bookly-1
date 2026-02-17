@@ -99,6 +99,7 @@ serve(async (req) => {
             try {
               await supabaseClient.functions.invoke("send-reminder-email", {
                 body: {
+                  business_id: reminder.business_id,
                   customerEmail: customer.email,
                   customerName: customer.name,
                   serviceName: service?.name || "Appointment",

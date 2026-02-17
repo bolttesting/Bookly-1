@@ -1,7 +1,8 @@
 // Supabase Edge Function to send reminder emails
-// Uses Resend API (same as booking confirmation)
+// Uses business's own Resend if configured, else platform RESEND_API_KEY
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +10,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const PLATFORM_RESEND_KEY = Deno.env.get("RESEND_API_KEY");
+const DEFAULT_FROM = "Bookly <bookly@logixcontact.site>";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -18,6 +20,7 @@ serve(async (req) => {
 
   try {
     const {
+      business_id: businessId,
       customerEmail,
       customerName,
       serviceName,
@@ -28,8 +31,27 @@ serve(async (req) => {
       hoursBefore,
     } = await req.json();
 
-    if (!RESEND_API_KEY) {
-      console.error("RESEND_API_KEY not configured");
+    let apiKey = PLATFORM_RESEND_KEY;
+    let from = DEFAULT_FROM;
+
+    if (businessId) {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      );
+      const { data: emailConfig } = await supabase
+        .from("business_email_config")
+        .select("from_email, from_name, resend_api_key")
+        .eq("business_id", businessId)
+        .maybeSingle();
+      if (emailConfig?.resend_api_key) {
+        apiKey = emailConfig.resend_api_key;
+        from = `${emailConfig.from_name || businessName || "Business"} <${emailConfig.from_email}>`;
+      }
+    }
+
+    if (!apiKey) {
+      console.error("No Resend API key (platform or business)");
       return new Response(
         JSON.stringify({ error: "Email service not configured" }),
         {
@@ -111,10 +133,10 @@ serve(async (req) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: `Bookly <bookly@logixcontact.site>`,
+        from,
         to: [customerEmail],
         subject: `Reminder: Your appointment ${reminderText} - ${serviceName}`,
         html: htmlContent,
