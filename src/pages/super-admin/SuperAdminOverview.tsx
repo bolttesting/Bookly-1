@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { formatCurrencySimple } from '@/lib/currency';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +17,9 @@ import {
 
 export default function SuperAdminOverview() {
   const { stats, loading } = useSuperAdmin();
-  const formatCurrency = (amount: number) => `$${amount.toLocaleString()}`;
+  const { settings } = useSiteSettings();
+  const currency = settings?.default_currency ?? 'USD';
+  const formatCurrency = (amount: number) => formatCurrencySimple(amount, currency);
 
   const statCards = [
     { label: 'Businesses', value: stats.totalBusinesses, icon: Building2 },

@@ -8,7 +8,8 @@ import { formatCurrencySimple } from '@/lib/currency';
 
 export default function SuperAdminPackages() {
   const { allPackages, loading } = useSuperAdmin();
-  const formatCurrency = (amount: number) => formatCurrencySimple(amount, 'USD');
+  const formatCurrency = (amount: number, currencyCode?: string) =>
+    formatCurrencySimple(amount, currencyCode ?? 'USD');
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full max-w-full min-w-0">
@@ -45,7 +46,7 @@ export default function SuperAdminPackages() {
                   {allPackages.map((pkg) => (
                     <TableRow key={pkg.id}>
                       <TableCell className="font-medium truncate max-w-[150px]">{pkg.name}</TableCell>
-                      <TableCell className="text-xs sm:text-sm whitespace-nowrap">{formatCurrency(Number(pkg.price))}</TableCell>
+                      <TableCell className="text-xs sm:text-sm whitespace-nowrap">{formatCurrency(Number(pkg.price), pkg.currency)}</TableCell>
                       <TableCell className="hidden sm:table-cell">{pkg.total_credits}</TableCell>
                       <TableCell className="hidden sm:table-cell">{pkg.used_credits}</TableCell>
                       <TableCell>

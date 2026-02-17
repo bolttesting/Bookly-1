@@ -9,7 +9,7 @@ import {
   Star,
   FileText,
 } from "lucide-react";
-import { NavLink, Link } from "react-router-dom";
+import { NavLink, Link, useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -40,6 +40,7 @@ const navItems = [
 
 export function SuperAdminSidebar() {
   const { state } = useSidebar();
+  const location = useLocation();
   const collapsed = state === "collapsed";
 
   return (
@@ -49,16 +50,16 @@ export function SuperAdminSidebar() {
     >
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary glow">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary glow shrink-0">
             <ShieldAlert className="h-5 w-5 text-primary-foreground" />
           </div>
           {!collapsed && (
-            <div className="flex flex-col">
-              <span className="font-display text-lg font-bold text-foreground">
-                Super Admin
+            <div className="flex flex-col min-w-0">
+              <span className="font-display text-lg font-bold text-foreground truncate">
+                Bookly
               </span>
               <span className="text-xs text-muted-foreground">
-                Platform Control
+                Super Admin
               </span>
             </div>
           )}
@@ -69,31 +70,32 @@ export function SuperAdminSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.title} className="min-w-0">
-                  <SidebarMenuButton
-                    asChild
-                    isActive={false}
-                    tooltip={item.title}
-                  >
-                    <NavLink
-                      to={item.url}
-                      end={item.end}
-                      className={({ isActive }) =>
-                        cn(
+              {navItems.map((item) => {
+                const isActive = item.end ? location.pathname === item.url : location.pathname.startsWith(item.url);
+                return (
+                  <SidebarMenuItem key={item.title} className="min-w-0">
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.title}
+                    >
+                      <NavLink
+                        to={item.url}
+                        end={item.end}
+                        className={cn(
                           "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200 min-w-0",
                           isActive
                             ? "bg-primary/10 text-primary font-medium"
                             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        )
-                      }
-                    >
-                      <item.icon className="h-5 w-5 shrink-0" />
-                      {!collapsed && <span className="truncate">{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+                        )}
+                      >
+                        <item.icon className={cn("h-5 w-5 shrink-0", isActive && "text-primary")} />
+                        {!collapsed && <span className="truncate">{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

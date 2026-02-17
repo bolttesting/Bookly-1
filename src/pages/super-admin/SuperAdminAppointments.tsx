@@ -1,4 +1,5 @@
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +9,9 @@ import { formatCurrencySimple } from '@/lib/currency';
 
 export default function SuperAdminAppointments() {
   const { allAppointments, loading } = useSuperAdmin();
-  const formatCurrency = (amount: number) => formatCurrencySimple(amount, 'USD');
+  const { settings } = useSiteSettings();
+  const currency = settings?.default_currency ?? 'USD';
+  const formatCurrency = (amount: number) => formatCurrencySimple(amount, currency);
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full max-w-full min-w-0">

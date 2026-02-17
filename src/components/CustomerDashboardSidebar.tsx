@@ -52,13 +52,13 @@ export function CustomerDashboardSidebar({ activeTab, onTabChange }: CustomerDas
     >
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shrink-0">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary glow shrink-0">
             <Calendar className="h-5 w-5 text-primary-foreground" />
           </div>
           {!collapsed && (
             <div className="flex flex-col min-w-0">
               <span className="font-display text-lg font-bold text-foreground truncate">
-                My Dashboard
+                Bookly
               </span>
               <span className="text-xs text-muted-foreground">
                 Appointments & bookings

@@ -24,6 +24,7 @@ interface Package {
   created_at: string;
   customer_id: string;
   business_id: string;
+  currency?: string;
 }
 
 interface Customer {
@@ -90,12 +91,41 @@ export function useSuperAdmin() {
     queryKey: ['superadmin-packages'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('packages')
-        .select('*')
+        .from('customer_packages')
+        .select(`
+          id,
+          customer_id,
+          business_id,
+          purchased_at,
+          expires_at,
+          bookings_used,
+          bookings_remaining,
+          status,
+          created_at,
+          package_templates (name, price, booking_limit),
+          businesses (currency)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Package[];
+      const rows = (data ?? []) as any[];
+      return rows.map((row) => {
+        const template = row.package_templates;
+        const totalCredits = (row.bookings_remaining ?? 0) + (row.bookings_used ?? 0);
+        return {
+          id: row.id,
+          name: template?.name ?? 'Package',
+          price: template?.price ?? 0,
+          total_credits: totalCredits || template?.booking_limit ?? 0,
+          used_credits: row.bookings_used ?? 0,
+          status: row.status ?? 'active',
+          expires_at: row.expires_at ?? null,
+          created_at: row.purchased_at ?? row.created_at,
+          customer_id: row.customer_id,
+          business_id: row.business_id,
+          currency: row.businesses?.currency ?? 'USD',
+        } as Package;
+      });
     },
     enabled: !!isSuperAdmin,
   });

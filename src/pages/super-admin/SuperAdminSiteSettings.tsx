@@ -14,7 +14,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
+import { CURRENCIES } from '@/lib/currency';
 import { toast } from 'sonner';
 import type { FooterLink } from '@/hooks/useFooterLinks';
 
@@ -25,6 +27,7 @@ export default function SuperAdminSiteSettings() {
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactAddress, setContactAddress] = useState('');
+  const [defaultCurrency, setDefaultCurrency] = useState('USD');
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<FooterLink | null>(null);
   const [linkLabel, setLinkLabel] = useState('');
@@ -37,6 +40,7 @@ export default function SuperAdminSiteSettings() {
       setContactEmail(settings.contact_email ?? '');
       setContactPhone(settings.contact_phone ?? '');
       setContactAddress(settings.contact_address ?? '');
+      setDefaultCurrency(settings.default_currency ?? 'USD');
     }
   }, [settings]);
 
@@ -48,6 +52,7 @@ export default function SuperAdminSiteSettings() {
         contact_email: contactEmail || null,
         contact_phone: contactPhone || null,
         contact_address: contactAddress || null,
+        default_currency: defaultCurrency || 'USD',
       });
       toast.success('Site settings saved');
     } catch (err: any) {
@@ -117,6 +122,22 @@ export default function SuperAdminSiteSettings() {
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 rows={3}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="default_currency">Default currency (super admin)</Label>
+              <Select value={defaultCurrency} onValueChange={setDefaultCurrency}>
+                <SelectTrigger id="default_currency">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.code} – {c.symbol} {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Used for Overview, Appointments, and Customers totals when no per-business currency applies.</p>
             </div>
             <Button type="submit" disabled={isUpdating}>
               {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
