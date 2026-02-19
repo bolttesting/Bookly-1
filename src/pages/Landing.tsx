@@ -11,6 +11,7 @@ import { useReviews } from "@/hooks/useReviews";
 import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { useFooterLinks } from "@/hooks/useFooterLinks";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatCurrencySimple, getCurrencyByCode } from "@/lib/currency";
 import { Loader2 } from "lucide-react";
 import { 
@@ -1005,8 +1006,8 @@ const Landing = () => {
         </div>
       </footer>
 
-      {/* Back to top button - sticky bottom-right */}
-      {showBackToTop && (
+      {/* Back to top - portal to body so it floats above all content, not stuck in footer */}
+      {showBackToTop && createPortal(
         <button
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
@@ -1014,7 +1015,8 @@ const Landing = () => {
           aria-label="Back to top"
         >
           <ChevronUp className="h-5 w-5" />
-        </button>
+        </button>,
+        document.body
       )}
     </div>
   );
