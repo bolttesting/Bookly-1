@@ -1035,6 +1035,31 @@ export default function MyAppointments() {
     navigate('/customer-login');
   };
 
+  // Must run before any early return (Rules of Hooks)
+  const applicablePackagesForBooking = useMemo(() => {
+    if (!selectedBusiness?.id || !selectedService?.id || !myPackages.length || !Array.isArray(packages)) return [];
+    const now = new Date();
+    return myPackages.filter((cp: any) => {
+      if (cp.business_id !== selectedBusiness.id) return false;
+      if (cp.status !== 'active') return false;
+      const remaining = cp.bookings_remaining ?? 0;
+      if (remaining <= 0) return false;
+      try {
+        if (cp.expires_at && new Date(cp.expires_at) < now) return false;
+      } catch {
+        return false;
+      }
+      const templateId = cp.package_template_id ?? cp.package_templates?.id;
+      if (!templateId) return false;
+      const template = packages.find((p: any) => p.id === templateId);
+      const psList = template?.package_services;
+      const serviceIds = Array.isArray(psList)
+        ? psList.map((ps: any) => ps?.service_id).filter(Boolean)
+        : [];
+      return serviceIds.includes(selectedService.id);
+    });
+  }, [myPackages, packages, selectedBusiness?.id, selectedService?.id]);
+
   // Redirect unauthenticated users to customer login (they reach this page via a business's link)
   if (!authLoading && !user) {
     return <Navigate to="/customer-login" replace />;
@@ -1106,32 +1131,6 @@ export default function MyAppointments() {
     acc[business.id].packages.push(pkg);
     return acc;
   }, {} as Record<string, { business: Business; packages: PackageTemplate[] }>);
-
-  // Packages the customer can use for the current service booking (same business, has credits, includes this service)
-  // Use "packages" (package_templates with package_services) to know which services each template includes
-  const applicablePackagesForBooking = useMemo(() => {
-    if (!selectedBusiness?.id || !selectedService?.id || !myPackages.length || !Array.isArray(packages)) return [];
-    const now = new Date();
-    return myPackages.filter((cp: any) => {
-      if (cp.business_id !== selectedBusiness.id) return false;
-      if (cp.status !== 'active') return false;
-      const remaining = cp.bookings_remaining ?? 0;
-      if (remaining <= 0) return false;
-      try {
-        if (cp.expires_at && new Date(cp.expires_at) < now) return false;
-      } catch {
-        return false;
-      }
-      const templateId = cp.package_template_id ?? cp.package_templates?.id;
-      if (!templateId) return false;
-      const template = packages.find((p: any) => p.id === templateId);
-      const psList = template?.package_services;
-      const serviceIds = Array.isArray(psList)
-        ? psList.map((ps: any) => ps?.service_id).filter(Boolean)
-        : [];
-      return serviceIds.includes(selectedService.id);
-    });
-  }, [myPackages, packages, selectedBusiness?.id, selectedService?.id]);
 
   return (
     <SidebarProvider>
