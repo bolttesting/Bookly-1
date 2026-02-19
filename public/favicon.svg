@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <!-- Rounded square background with primary blue color -->
-  <rect width="64" height="64" rx="14" fill="#3b82f6"/>
+  <!-- Rounded square background - matches theme primary (violet) -->
+  <rect width="64" height="64" rx="14" fill="#8b5cf6"/>
   
   <!-- Calendar icon - simplified and centered -->
   <g transform="translate(18, 18)">
@@ -15,8 +15,8 @@
     <circle cx="24" cy="3" r="2" fill="white"/>
     
     <!-- Calendar grid lines -->
-    <line x1="6" y1="16" x2="26" y2="16" stroke="#3b82f6" stroke-width="1.5" opacity="0.4"/>
-    <line x1="6" y1="20" x2="26" y2="20" stroke="#3b82f6" stroke-width="1.5" opacity="0.4"/>
-    <line x1="6" y1="24" x2="26" y2="24" stroke="#3b82f6" stroke-width="1.5" opacity="0.4"/>
+    <line x1="6" y1="16" x2="26" y2="16" stroke="#8b5cf6" stroke-width="1.5" opacity="0.4"/>
+    <line x1="6" y1="20" x2="26" y2="20" stroke="#8b5cf6" stroke-width="1.5" opacity="0.4"/>
+    <line x1="6" y1="24" x2="26" y2="24" stroke="#8b5cf6" stroke-width="1.5" opacity="0.4"/>
   </g>
 </svg>
