@@ -1005,12 +1005,12 @@ const Landing = () => {
         </div>
       </footer>
 
-      {/* Back to top button */}
+      {/* Back to top button - sticky bottom-right */}
       {showBackToTop && (
         <button
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-110 transition-transform duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          className="fixed bottom-6 right-6 z-[9999] p-3 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-110 transition-transform duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           aria-label="Back to top"
         >
           <ChevronUp className="h-5 w-5" />
