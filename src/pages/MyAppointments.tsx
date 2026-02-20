@@ -1587,7 +1587,7 @@ export default function MyAppointments() {
                                 </div>
                               </CardContent>
                             </Card>
-                          )))}
+                          ))}
                         </div>
                       </div>
                     ))}
