@@ -65,6 +65,8 @@ export function useScheduledClasses(businessId: string | null) {
   const create = useMutation({
     mutationFn: async (payload: ScheduledClassInsert) => {
       if (!businessId) throw new Error('No business');
+      const t = payload.start_time.trim();
+      const startTime = /^\d{1,2}:\d{2}$/.test(t) ? `${t}:00` : t;
       const { data, error } = await supabase
         .from('scheduled_classes')
         .insert({
@@ -72,21 +74,27 @@ export function useScheduledClasses(businessId: string | null) {
           location_id: payload.location_id,
           facility_id: payload.facility_id ?? null,
           day_of_week: payload.day_of_week,
-          start_time: payload.start_time,
+          start_time: startTime,
           service_id: payload.service_id,
           staff_id: payload.staff_id ?? null,
           display_order: payload.display_order ?? 0,
         })
         .select()
         .single();
-      if (error) throw error;
+      if (error) {
+        const msg = error.message + (error.details ? ` (${error.details})` : '') + (error.hint ? ` — ${error.hint}` : '');
+        throw new Error(msg);
+      }
       return data as ScheduledClassRow;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-classes', businessId] });
       toast.success('Class added to schedule');
     },
-    onError: (e: Error) => toast.error(e.message || 'Failed to add class'),
+    onError: (e: Error) => {
+      toast.error(e.message || 'Failed to add class');
+      console.error('[scheduled_classes insert]', e.message, e);
+    },
   });
 
   const update = useMutation({
