@@ -16,7 +16,7 @@ export interface ScheduledClassRow {
   display_order: number;
   created_at: string;
   updated_at: string;
-  service?: { id: string; name: string; duration: number };
+  service?: { id: string; name: string; duration: number; slot_capacity?: number };
   staff?: { id: string; name: string } | null;
   facility?: { id: string; name: string } | null;
   location?: { id: string; name: string };
@@ -44,7 +44,7 @@ export function useScheduledClasses(businessId: string | null) {
           .from('scheduled_classes')
           .select(`
             id, business_id, location_id, facility_id, day_of_week, start_time, service_id, staff_id, display_order, created_at, updated_at,
-            service:services(id, name, duration),
+            service:services(id, name, duration, slot_capacity),
             staff:staff_members(id, name),
             facility:facilities(id, name),
             location:business_locations(id, name)

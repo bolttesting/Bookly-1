@@ -2044,35 +2044,121 @@ export default function PublicBooking() {
                     <CardHeader>
                       <CardTitle className="text-lg flex items-center gap-2">
                         <User className="h-4 w-4" />
-                        Contact Information
+                        {loggedInUser ? 'Your Information' : 'Contact Information'}
                       </CardTitle>
+                      {!loggedInUser && (
+                        <CardDescription>
+                          <Tabs value={authMode} onValueChange={(v) => setAuthMode(v as 'guest' | 'login' | 'signup')}>
+                            <TabsList className="grid w-full grid-cols-3 text-xs sm:text-sm">
+                              <TabsTrigger value="guest">Guest</TabsTrigger>
+                              <TabsTrigger value="login">Login</TabsTrigger>
+                              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                            </TabsList>
+                          </Tabs>
+                        </CardDescription>
+                      )}
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="class-name">Full Name *</Label>
-                        <div className="relative">
-                          <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input id="class-name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="John Doe" className="pl-10" />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="class-email">Email *</Label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input id="class-email" type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="john@example.com" className="pl-10" />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="class-phone">Phone (Optional)</Label>
-                        <div className="relative">
-                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input id="class-phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+1 (555) 000-0000" className="pl-10" />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="class-notes">Notes (Optional)</Label>
-                        <Textarea id="class-notes" value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} placeholder="Any special requests or notes..." rows={3} />
-                      </div>
+                      {authMode === 'guest' && !loggedInUser && (
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="class-name">Full Name *</Label>
+                            <div className="relative">
+                              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input id="class-name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="John Doe" className="pl-10" />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="class-email">Email *</Label>
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input id="class-email" type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="john@example.com" className="pl-10" />
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      {authMode === 'login' && !loggedInUser && (
+                        <>
+                          <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignInBooking} disabled={isGoogleLoading || isAuthLoading}>
+                            {isGoogleLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : (
+                              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
+                            )}
+                            Continue with Google
+                          </Button>
+                          <div className="relative"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or continue with email</span></div></div>
+                          <div className="space-y-2">
+                            <Label htmlFor="class-login-email">Email</Label>
+                            <Input id="class-login-email" type="email" placeholder="john@example.com" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="pl-10" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="class-login-password">Password</Label>
+                            <Input id="class-login-password" type="password" placeholder="••••••••" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
+                          </div>
+                          <Button type="button" className="w-full" onClick={handleLogin} disabled={isAuthLoading}>
+                            {isAuthLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <LogIn className="h-4 w-4 mr-2" />}
+                            Sign In
+                          </Button>
+                          <div className="text-center">
+                            <Link to="/customer-login?open=forgot" className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline">Forgot password?</Link>
+                          </div>
+                        </>
+                      )}
+                      {authMode === 'signup' && !loggedInUser && (
+                        <>
+                          <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignInBooking} disabled={isGoogleLoading || isAuthLoading}>
+                            {isGoogleLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : (
+                              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
+                            )}
+                            Continue with Google
+                          </Button>
+                          <div className="relative"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or sign up with email</span></div></div>
+                          <div className="space-y-2">
+                            <Label htmlFor="class-signup-name">Full Name *</Label>
+                            <Input id="class-signup-name" placeholder="John Doe" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="class-signup-email">Email *</Label>
+                            <Input id="class-signup-email" type="email" placeholder="john@example.com" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="class-signup-password">Password *</Label>
+                            <Input id="class-signup-password" type="password" placeholder="••••••••" value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} />
+                          </div>
+                          <Button type="button" className="w-full" onClick={() => handleSignup(false)} disabled={isAuthLoading}>
+                            {isAuthLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <User className="h-4 w-4 mr-2" />}
+                            Create Account
+                          </Button>
+                        </>
+                      )}
+                      {(authMode === 'guest' || loggedInUser) && (
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="class-name">Full Name *</Label>
+                            <div className="relative">
+                              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input id="class-name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="John Doe" className="pl-10" />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="class-email">Email *</Label>
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input id="class-email" type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="john@example.com" className="pl-10" />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="class-phone">Phone (Optional)</Label>
+                            <div className="relative">
+                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input id="class-phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+1 (555) 000-0000" className="pl-10" />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="class-notes">Notes (Optional)</Label>
+                            <Textarea id="class-notes" value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} placeholder="Any special requests or notes..." rows={3} />
+                          </div>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
                   <Card className="glass-card">
@@ -2122,12 +2208,91 @@ export default function PublicBooking() {
                             </Select>
                           </div>
                         )}
+                        {!classSelectedPackageId && (
+                          <div className="space-y-2 pt-2 border-t border-border">
+                            <Label className="text-sm">Have a coupon code?</Label>
+                            {appliedCoupon ? (
+                              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle className="h-4 w-4 text-green-600" />
+                                  <span className="text-sm font-medium text-green-700 dark:text-green-400">Coupon {appliedCoupon.code} applied</span>
+                                </div>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => { setAppliedCoupon(null); setCouponCode(''); setCouponError(''); }}>
+                                  Remove
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Input
+                                  placeholder="Enter coupon code"
+                                  value={couponCode}
+                                  onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(''); }}
+                                  className="flex-1"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  disabled={isApplyingCoupon || !couponCode.trim()}
+                                  onClick={async () => {
+                                    if (!couponCode.trim() || !business || !classSelectedSlot) return;
+                                    const servicePrice = Number(services.find(s => s.id === classSelectedSlot.service_id)?.price ?? 0);
+                                    setIsApplyingCoupon(true); setCouponError('');
+                                    try {
+                                      const { data, error } = await supabase.rpc('validate_coupon', {
+                                        _coupon_code: couponCode.trim(),
+                                        _business_id: business.id,
+                                        _purchase_amount: servicePrice,
+                                        _service_id: classSelectedSlot.service_id,
+                                        _package_template_id: null,
+                                      });
+                                      if (error) throw error;
+                                      if (data && data.length > 0 && data[0].is_valid) {
+                                        const result = data[0];
+                                        setAppliedCoupon({
+                                          code: couponCode.trim(),
+                                          couponId: result.coupon_data?.id || '',
+                                          discount: Number(result.discount_amount),
+                                          discountType: result.coupon_data?.discount_type === 'percentage' ? 'percentage' : 'fixed',
+                                        });
+                                        toast.success('Coupon applied successfully!');
+                                      } else {
+                                        setCouponError(data?.[0]?.message || 'Invalid coupon code');
+                                      }
+                                    } catch (err: any) {
+                                      setCouponError(err.message || 'Failed to apply coupon');
+                                      toast.error(err.message || 'Failed to apply coupon');
+                                    } finally {
+                                      setIsApplyingCoupon(false);
+                                    }
+                                  }}
+                                >
+                                  {isApplyingCoupon ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                                </Button>
+                              </div>
+                            )}
+                            {couponError && <p className="text-sm text-red-600 dark:text-red-400">{couponError}</p>}
+                          </div>
+                        )}
+                        {appliedCoupon && !classSelectedPackageId && (
+                          <div className="flex justify-between py-2 border-b border-border text-green-600 dark:text-green-400">
+                            <span>Discount ({appliedCoupon.code})</span>
+                            <span>-{appliedCoupon.discountType === 'percentage' ? `${appliedCoupon.discount}%` : formatCurrencySimple(appliedCoupon.discount, business?.currency || 'USD')}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between py-2 text-lg">
                           <span className="font-semibold">Total</span>
                           <span className="font-bold text-primary">
                             {classSelectedPackageId
                               ? '1 credit from package'
-                              : formatCurrencySimple(Number(services.find(s => s.id === classSelectedSlot.service_id)?.price ?? 0), business?.currency || 'USD')}
+                              : (() => {
+                                  const basePrice = Number(services.find(s => s.id === classSelectedSlot.service_id)?.price ?? 0);
+                                  let finalPrice = basePrice;
+                                  if (appliedCoupon && !classSelectedPackageId) {
+                                    if (appliedCoupon.discountType === 'percentage') finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
+                                    else finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
+                                  }
+                                  return formatCurrencySimple(finalPrice, business?.currency || 'USD');
+                                })()}
                           </span>
                         </div>
                       </div>
@@ -2135,7 +2300,7 @@ export default function PublicBooking() {
                   </Card>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <Button variant="outline" className="flex-1 sm:flex-initial" onClick={() => { setClassStep(2); setClassSelectedSlot(null); setClassSelectedPackageId(null); }}>
+                  <Button variant="outline" className="flex-1 sm:flex-initial" onClick={() => { setClassStep(2); setClassSelectedSlot(null); setClassSelectedPackageId(null); setAppliedCoupon(null); setCouponCode(''); setCouponError(''); }}>
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back
                   </Button>
@@ -2182,12 +2347,24 @@ export default function PublicBooking() {
                                 .eq('id', classSelectedPackageId);
                               if (updateErr) throw new Error(updateErr.message ?? 'Failed to deduct package credit');
                             }
+                            let finalPrice: number;
+                            if (usePackage) {
+                              finalPrice = 0;
+                            } else {
+                              const basePrice = Number(services.find(s => s.id === classSelectedSlot.service_id)?.price ?? 0);
+                              if (appliedCoupon) {
+                                if (appliedCoupon.discountType === 'percentage') finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
+                                else finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
+                              } else {
+                                finalPrice = basePrice;
+                              }
+                            }
                             const startTime = new Date(classSelectedDate!);
                             const [h, m] = String(classSelectedSlot.start_time).slice(0, 5).split(':').map(Number);
                             startTime.setHours(h, m, 0, 0);
                             const duration = classSelectedSlot.service?.duration ?? 60;
                             const endTime = addMinutes(startTime, duration);
-                            await supabase.from('appointments').insert({
+                            const { data: newAppointment } = await supabase.from('appointments').insert({
                               business_id: business.id,
                               customer_id: customerId,
                               service_id: classSelectedSlot.service_id,
@@ -2198,8 +2375,23 @@ export default function PublicBooking() {
                               end_time: endTime.toISOString(),
                               status: 'confirmed',
                               notes: customerNotes || null,
-                              price: usePackage ? 0 : (services.find(s => s.id === classSelectedSlot.service_id)?.price ?? null),
-                            });
+                              price: finalPrice,
+                            }).select('id').single();
+                            if (appliedCoupon?.couponId && customerId && newAppointment?.id) {
+                              const basePrice = Number(services.find(s => s.id === classSelectedSlot.service_id)?.price ?? 0);
+                              const discountAmount = basePrice - finalPrice;
+                              try {
+                                await supabase.rpc('record_coupon_usage', {
+                                  _coupon_id: appliedCoupon.couponId,
+                                  _customer_id: customerId,
+                                  _user_id: loggedInUser?.id || null,
+                                  _order_id: newAppointment.id,
+                                  _discount_amount: discountAmount,
+                                });
+                              } catch (couponErr) {
+                                console.error('Failed to record coupon usage:', couponErr);
+                              }
+                            }
                             setBookingComplete(true);
                             setSelectedDate(classSelectedDate);
                             setSelectedTime(String(classSelectedSlot.start_time).slice(0, 5));
