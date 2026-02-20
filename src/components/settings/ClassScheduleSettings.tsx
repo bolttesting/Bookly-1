@@ -54,8 +54,6 @@ export function ClassScheduleSettings() {
   const { rows, isLoading: scheduleLoading, create, remove, dayNames } = useScheduledClasses(business?.id ?? null);
   const [savingToggle, setSavingToggle] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
-  const { facilities, isLoading: facilitiesLoading, create: createFacility, remove: removeFacility } = useFacilities(selectedLocationId ?? null);
-  const { facilities: facilitiesForNewClass } = useFacilities(addClassOpen ? (newClassLocation || null) : null);
   const [addClassOpen, setAddClassOpen] = useState(false);
   const [newClassLocation, setNewClassLocation] = useState('');
   const [newClassDay, setNewClassDay] = useState(1);
@@ -65,6 +63,8 @@ export function ClassScheduleSettings() {
   const [newClassFacility, setNewClassFacility] = useState<string | null>(null);
   const [newFacilityName, setNewFacilityName] = useState('');
   const [facilityDialogOpen, setFacilityDialogOpen] = useState(false);
+  const { facilities, isLoading: facilitiesLoading, create: createFacility, remove: removeFacility } = useFacilities(selectedLocationId ?? null);
+  const { facilities: facilitiesForNewClass } = useFacilities(addClassOpen ? (newClassLocation || null) : null);
 
   const useClassSchedule = business?.use_class_schedule ?? false;
 
