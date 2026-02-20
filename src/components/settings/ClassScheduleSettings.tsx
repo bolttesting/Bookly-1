@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CalendarDays, MapPin, Plus, Pencil, Trash2, Loader2, DoorOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,6 +67,13 @@ export function ClassScheduleSettings() {
   const { facilities: facilitiesForNewClass } = useFacilities(addClassOpen ? (newClassLocation || null) : null);
 
   const useClassSchedule = business?.use_class_schedule ?? false;
+
+  // Sync selected location with first location when locations load (so "Add facility" has a valid location)
+  useEffect(() => {
+    if (locations.length > 0 && selectedLocationId === null) {
+      setSelectedLocationId(locations[0].id);
+    }
+  }, [locations, selectedLocationId]);
 
   const handleToggleClassSchedule = async (checked: boolean) => {
     if (!business?.id) return;

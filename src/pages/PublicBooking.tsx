@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
-import { format, addMinutes, setHours, setMinutes, startOfDay, isBefore, isAfter, addDays } from 'date-fns';
+import { format, addMinutes, setHours, setMinutes, startOfDay, startOfWeek, isBefore, isAfter, addDays } from 'date-fns';
 import { Calendar, Clock, User, Mail, Phone, ArrowRight, ArrowLeft, CheckCircle, Loader2, Users, LogIn, MapPin, Eye, EyeOff, Tag, Repeat, CalendarIcon, Package, LayoutDashboard, Sun, Moon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -163,6 +163,9 @@ export default function PublicBooking() {
   const [classSelectedDate, setClassSelectedDate] = useState<Date | undefined>();
   const [classSelectedSlot, setClassSelectedSlot] = useState<ScheduledClassRow | null>(null);
   const [classStep, setClassStep] = useState<1 | 2 | 3>(1);
+  const [classFilterClass, setClassFilterClass] = useState<string>('');
+  const [classFilterInstructor, setClassFilterInstructor] = useState<string>('');
+  const [classFilterFacility, setClassFilterFacility] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -233,6 +236,14 @@ export default function PublicBooking() {
     else if (bt === 'dark') setEffectiveTheme('dark');
     else setEffectiveTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   }, [business?.id, business?.booking_theme]);
+
+  // Class schedule: default to today and show week view (no calendar step)
+  useEffect(() => {
+    if (business?.use_class_schedule && (classStep === 1 || !classSelectedDate)) {
+      setClassSelectedDate(startOfDay(new Date()));
+      setClassStep(2);
+    }
+  }, [business?.use_class_schedule]);
 
   // When booking a package, require login/signup (no guest)
   useEffect(() => {
@@ -1805,107 +1816,160 @@ export default function PublicBooking() {
           </DialogContent>
         </Dialog>
 
-        {/* Class schedule flow (fitness/yoga): pick date → today's classes → book */}
-        {business?.use_class_schedule && (
+        {/* Class schedule flow (fitness/yoga): week strip + filters + class list → book */}
+        {business?.use_class_schedule && (() => {
+          const today = startOfDay(new Date());
+          const selectedDate = classSelectedDate || today;
+          const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+          const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+          const hasFilters = !!(classFilterClass || classFilterInstructor || classFilterFacility);
+          const uniqueClasses = Array.from(new Map(scheduledClasses.map((r) => [r.service_id, { id: r.service_id, name: r.service?.name ?? '' }])).values()).filter((c) => c.name);
+          const uniqueInstructors = Array.from(new Map(scheduledClasses.filter((r) => r.staff_id).map((r) => [r.staff_id!, { id: r.staff_id!, name: r.staff?.name ?? '' }])).values()).filter((c) => c.name);
+          const uniqueFacilities = Array.from(new Map(scheduledClasses.filter((r) => r.facility_id).map((r) => [r.facility_id!, { id: r.facility_id!, name: r.facility?.name ?? '' }])).values()).filter((c) => c.name);
+          return (
           <div className="space-y-6">
-            {classStep === 1 && (
-              <div className="space-y-6">
-                <div className="text-center">
-                  <h2 className="text-xl sm:text-2xl font-display font-bold">Pick a date</h2>
-                  <p className="text-sm sm:text-base text-muted-foreground mt-1">Then see that day&apos;s classes and book</p>
-                </div>
-                <Card className="glass-card max-w-sm mx-auto">
-                  <CardContent className="pt-6">
-                    <CalendarComponent
-                      mode="single"
-                      selected={classSelectedDate}
-                      onSelect={(date) => { setClassSelectedDate(date); setClassSelectedSlot(null); setClassStep(2); }}
-                      disabled={(date) => isBefore(date, startOfDay(new Date())) || isAfter(date, addDays(new Date(), 60))}
-                      className="rounded-md"
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-            {classStep === 2 && classSelectedDate && (() => {
-              const dayOfWeek = classSelectedDate.getDay();
-              const dateStr = format(classSelectedDate, 'yyyy-MM-dd');
-              const forDay = scheduledClasses.filter((r) => r.day_of_week === dayOfWeek);
-              const byLocation = selectedLocation ? forDay.filter((r) => r.location_id === selectedLocation.id) : forDay;
-              const withSpots = byLocation.map((row) => {
-                const capacity = row.service?.slot_capacity ?? 1;
-                const timeStr = String(row.start_time).slice(0, 5);
-                const booked = appointments.filter((a) => {
-                  const aptDate = format(new Date(a.start_time), 'yyyy-MM-dd');
-                  const aptTime = format(new Date(a.start_time), 'HH:mm');
-                  return aptDate === dateStr && aptTime === timeStr && a.service_id === row.service_id && (a.location_id ?? null) === (row.location_id ?? null) && (a.staff_id ?? null) === (row.staff_id ?? null);
-                }).length;
-                return { row, capacity, booked, spotsLeft: Math.max(0, capacity - booked) };
-              }).filter((x) => x.spotsLeft > 0);
-              return (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="text-center sm:text-left">
-                      <h2 className="text-xl sm:text-2xl font-display font-bold">Classes on {format(classSelectedDate, 'EEEE, MMM d')}</h2>
-                      <p className="text-sm text-muted-foreground">Book a spot in a class</p>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => { setClassStep(1); setClassSelectedSlot(null); }}>
-                      <ArrowLeft className="h-4 w-4 mr-1" /> Change date
-                    </Button>
-                  </div>
-                  {locations.length > 1 && (
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <span className="text-sm text-muted-foreground">Location:</span>
-                      {locations.map((loc) => (
-                        <Button
-                          key={loc.id}
-                          variant={selectedLocation?.id === loc.id ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setSelectedLocation(loc)}
-                        >
-                          {loc.name}
-                        </Button>
+            {classStep === 2 && (
+            <>
+              {/* Filters */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <Select value={classFilterClass || '__all__'} onValueChange={(v) => setClassFilterClass(v === '__all__' ? '' : v)}>
+                    <SelectTrigger className="w-[140px]"><SelectValue placeholder="Class" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Class</SelectItem>
+                      {uniqueClasses.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                       ))}
-                    </div>
-                  )}
-                  {withSpots.length === 0 ? (
+                    </SelectContent>
+                  </Select>
+                  <Select value={classFilterInstructor || '__all__'} onValueChange={(v) => setClassFilterInstructor(v === '__all__' ? '' : v)}>
+                    <SelectTrigger className="w-[140px]"><SelectValue placeholder="Instructor" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Instructor</SelectItem>
+                      {uniqueInstructors.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={classFilterFacility || '__all__'} onValueChange={(v) => setClassFilterFacility(v === '__all__' ? '' : v)}>
+                    <SelectTrigger className="w-[140px]"><SelectValue placeholder="Facility" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Facility</SelectItem>
+                      {uniqueFacilities.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {hasFilters && (
+                  <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => { setClassFilterClass(''); setClassFilterInstructor(''); setClassFilterFacility(''); }}>
+                    Clear all filters
+                  </Button>
+                )}
+              </div>
+
+              {/* Date navigation: 7 days */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-2">
+                <Button variant="outline" size="icon" className="shrink-0" onClick={() => setClassSelectedDate(addDays(selectedDate, -7))} aria-label="Previous week">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex flex-1 gap-1 min-w-0 justify-between">
+                  {weekDays.map((d) => {
+                    const isSelected = format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+                    const isPast = isBefore(d, today);
+                    return (
+                      <button
+                        key={d.toISOString()}
+                        type="button"
+                        onClick={() => !isPast && setClassSelectedDate(d)}
+                        disabled={isPast}
+                        className={cn(
+                          'shrink-0 rounded-md border px-2 py-2 text-center text-sm transition-colors min-w-[52px]',
+                          isSelected && 'border-primary bg-primary/10 font-medium',
+                          !isSelected && !isPast && 'border-border hover:bg-muted',
+                          isPast && 'opacity-50 cursor-not-allowed'
+                        )}
+                      >
+                        <div className="font-medium">{format(d, 'EEE')}</div>
+                        <div className="text-muted-foreground">{format(d, 'd MMM')}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <Button variant="outline" size="icon" className="shrink-0" onClick={() => setClassSelectedDate(addDays(selectedDate, 7))} aria-label="Next week">
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {locations.length > 1 && (
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="text-sm text-muted-foreground">Location:</span>
+                  {locations.map((loc) => (
+                    <Button key={loc.id} variant={selectedLocation?.id === loc.id ? 'default' : 'outline'} size="sm" onClick={() => setSelectedLocation(loc)}>{loc.name}</Button>
+                  ))}
+                </div>
+              )}
+
+              {/* Class list for selected day */}
+              {(() => {
+                const dayOfWeek = selectedDate.getDay();
+                const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                const forDay = scheduledClasses.filter((r) => r.day_of_week === dayOfWeek);
+                const byLocation = selectedLocation ? forDay.filter((r) => r.location_id === selectedLocation.id) : forDay;
+                let withSpots = byLocation.map((row) => {
+                  const capacity = row.service?.slot_capacity ?? 1;
+                  const timeStr = String(row.start_time).slice(0, 5);
+                  const booked = appointments.filter((a) => {
+                    const aptDate = format(new Date(a.start_time), 'yyyy-MM-dd');
+                    const aptTime = format(new Date(a.start_time), 'HH:mm');
+                    return aptDate === dateStr && aptTime === timeStr && a.service_id === row.service_id && (a.location_id ?? null) === (row.location_id ?? null) && (a.staff_id ?? null) === (row.staff_id ?? null);
+                  }).length;
+                  return { row, capacity, booked, spotsLeft: Math.max(0, capacity - booked) };
+                }).filter((x) => x.spotsLeft > 0);
+                if (classFilterClass) withSpots = withSpots.filter((x) => x.row.service_id === classFilterClass);
+                if (classFilterInstructor) withSpots = withSpots.filter((x) => x.row.staff_id === classFilterInstructor);
+                if (classFilterFacility) withSpots = withSpots.filter((x) => (x.row.facility_id ?? null) === classFilterFacility);
+                if (withSpots.length === 0) {
+                  return (
                     <Card className="glass-card p-6 text-center">
                       <p className="text-muted-foreground">No classes with spots left on this day.</p>
-                      <Button variant="outline" className="mt-3" onClick={() => setClassStep(1)}>Pick another date</Button>
                     </Card>
-                  ) : (
-                    <div className="space-y-3">
-                      {withSpots.map(({ row, spotsLeft }) => (
-                        <Card key={row.id} className="glass-card overflow-hidden">
-                          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium">{row.service?.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {format(new Date(`2000-01-01T${row.start_time}`), 'h:mm a')}
-                                {' · '}
-                                {row.service?.duration ?? 0} min
-                                {row.staff?.name && ` · ${row.staff.name}`}
-                                {row.facility?.name && ` · ${row.facility.name}`}
-                                {row.location?.name && ` · ${row.location.name}`}
-                              </p>
+                  );
+                }
+                return (
+                  <div className="space-y-0 rounded-lg border divide-y divide-border overflow-hidden">
+                    {withSpots.map(({ row, spotsLeft }) => {
+                      const initials = (row.staff?.name ?? '?').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+                      return (
+                        <div key={row.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-card hover:bg-muted/30 transition-colors">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="shrink-0 space-y-0.5 text-sm">
+                              <div className="font-medium">{format(new Date(`2000-01-01T${row.start_time}`), 'h:mm a')}</div>
+                              <div className="text-muted-foreground">{row.service?.duration ?? 0} min</div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <Badge variant="secondary">{spotsLeft} left</Badge>
-                              <Button
-                                size="sm"
-                                onClick={() => { setClassSelectedSlot(row); setClassStep(3); }}
-                              >
-                                Book
-                              </Button>
+                            <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center text-xs font-medium shrink-0">
+                              {initials}
                             </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+                            <div className="min-w-0">
+                              <div className="font-medium">{row.service?.name}</div>
+                              <div className="text-sm text-muted-foreground">{row.staff?.name ?? '—'}</div>
+                              <div className="text-xs text-muted-foreground">{row.facility?.name ?? '—'}</div>
+                            </div>
+                            <div className="text-sm text-muted-foreground shrink-0">{row.location?.name ?? '—'}</div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 sm:pl-4">
+                            <Badge variant="secondary">{spotsLeft} left</Badge>
+                            <Button size="sm" onClick={() => { setClassSelectedSlot(row); setClassStep(3); }}>Book</Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </>
+            )}
+
             {classStep === 3 && classSelectedSlot && business && (
               <div className="space-y-6">
                 <div className="text-center sm:text-left">
@@ -2001,7 +2065,8 @@ export default function PublicBooking() {
               </div>
             )}
           </div>
-        )}
+        );
+        })()}
 
         {/* Progress Steps and regular booking steps (hidden when using class schedule) */}
         {!business?.use_class_schedule && (
