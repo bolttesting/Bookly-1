@@ -18,14 +18,18 @@ export function useFacilities(locationId: string | null) {
     queryKey: ['facilities', locationId],
     queryFn: async (): Promise<Facility[]> => {
       if (!locationId) return [];
-      const { data, error } = await supabase
-        .from('facilities')
-        .select('*')
-        .eq('location_id', locationId)
-        .order('display_order')
-        .order('name');
-      if (error) throw error;
-      return (data ?? []) as Facility[];
+      try {
+        const { data, error } = await supabase
+          .from('facilities')
+          .select('*')
+          .eq('location_id', locationId)
+          .order('display_order')
+          .order('name');
+        if (error) throw error;
+        return (data ?? []) as Facility[];
+      } catch {
+        return [];
+      }
     },
     enabled: !!locationId,
   });

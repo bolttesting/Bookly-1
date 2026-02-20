@@ -271,7 +271,10 @@ export function ClassScheduleSettings() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <h3 className="text-sm font-semibold">Weekly class schedule</h3>
-                  <Dialog open={addClassOpen} onOpenChange={setAddClassOpen}>
+                  <Dialog open={addClassOpen} onOpenChange={(open) => {
+                    setAddClassOpen(open);
+                    if (open && !newClassLocation && locations.length > 0) setNewClassLocation(locations[0].id);
+                  }}>
                     <DialogTrigger asChild>
                       <Button size="sm">
                         <Plus className="h-4 w-4 mr-1" />
@@ -286,10 +289,10 @@ export function ClassScheduleSettings() {
                       <div className="grid gap-3">
                         <div>
                           <Label>Location</Label>
-                          <Select value={newClassLocation} onValueChange={setNewClassLocation}>
+                          <Select value={newClassLocation || (locations[0]?.id ?? '')} onValueChange={setNewClassLocation}>
                             <SelectTrigger><SelectValue placeholder="Location" /></SelectTrigger>
                             <SelectContent>
-                              {locations.map((loc) => (
+                              {(locations || []).map((loc) => (
                                 <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
                               ))}
                             </SelectContent>
@@ -322,7 +325,7 @@ export function ClassScheduleSettings() {
                           <Select value={newClassService} onValueChange={setNewClassService}>
                             <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
                             <SelectContent>
-                              {services.map((s) => (
+                              {(services || []).map((s) => (
                                 <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                               ))}
                             </SelectContent>
@@ -334,7 +337,7 @@ export function ClassScheduleSettings() {
                             <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="">—</SelectItem>
-                              {staff.map((s) => (
+                              {(staff || []).map((s) => (
                                 <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                               ))}
                             </SelectContent>
@@ -347,7 +350,7 @@ export function ClassScheduleSettings() {
                               <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="">—</SelectItem>
-                                {(addClassOpen && newClassLocation ? facilitiesForNewClass : facilities).map((f) => (
+                                {((addClassOpen && newClassLocation ? facilitiesForNewClass : facilities) || []).map((f) => (
                                   <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                                 ))}
                               </SelectContent>

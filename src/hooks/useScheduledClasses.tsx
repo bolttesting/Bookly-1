@@ -39,21 +39,25 @@ export function useScheduledClasses(businessId: string | null) {
     queryKey: ['scheduled-classes', businessId],
     queryFn: async (): Promise<ScheduledClassRow[]> => {
       if (!businessId) return [];
-      const { data, error } = await supabase
-        .from('scheduled_classes')
-        .select(`
-          id, business_id, location_id, facility_id, day_of_week, start_time, service_id, staff_id, display_order, created_at, updated_at,
-          service:services(id, name, duration),
-          staff:staff_members(id, name),
-          facility:facilities(id, name),
-          location:business_locations(id, name)
-        `)
-        .eq('business_id', businessId)
-        .order('location_id')
-        .order('day_of_week')
-        .order('start_time');
-      if (error) throw error;
-      return (data ?? []) as ScheduledClassRow[];
+      try {
+        const { data, error } = await supabase
+          .from('scheduled_classes')
+          .select(`
+            id, business_id, location_id, facility_id, day_of_week, start_time, service_id, staff_id, display_order, created_at, updated_at,
+            service:services(id, name, duration),
+            staff:staff_members(id, name),
+            facility:facilities(id, name),
+            location:business_locations(id, name)
+          `)
+          .eq('business_id', businessId)
+          .order('location_id')
+          .order('day_of_week')
+          .order('start_time');
+        if (error) throw error;
+        return (data ?? []) as ScheduledClassRow[];
+      } catch {
+        return [];
+      }
     },
     enabled: !!businessId,
   });
