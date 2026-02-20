@@ -38,7 +38,7 @@ import {
   Repeat,
   CalendarIcon
 } from 'lucide-react';
-import { format, isPast, isFuture, isToday, addMinutes, setHours, setMinutes, startOfDay, isBefore, isAfter, addDays, differenceInHours } from 'date-fns';
+import { format, isPast, isFuture, isToday, addMinutes, setHours, setMinutes, startOfDay, isBefore, isAfter, addDays, differenceInHours, startOfWeek } from 'date-fns';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -53,12 +53,14 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/s
 import { CustomerDashboardSidebar, type CustomerDashboardTab } from '@/components/CustomerDashboardSidebar';
 import { RescheduleRequestDialog } from '@/components/appointments/RescheduleRequestDialog';
 import { ImageSlideshow } from '@/components/ImageSlideshow';
+import { useScheduledClasses, type ScheduledClassRow } from '@/hooks/useScheduledClasses';
 
 interface Business {
   id: string;
   name: string;
   slug: string;
   currency: string | null;
+  use_class_schedule?: boolean | null;
 }
 
 interface Service {
@@ -167,6 +169,14 @@ export default function MyAppointments() {
   const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'date' | 'occurrences'>('never');
   const [selectedCustomerPackageId, setSelectedCustomerPackageId] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
+  // Class schedule flow (when business has use_class_schedule)
+  const [classScheduleMode, setClassScheduleMode] = useState(false);
+  const [classStep, setClassStep] = useState<1 | 2 | 3>(2);
+  const [classSelectedDate, setClassSelectedDate] = useState<Date | undefined>();
+  const [classSelectedSlot, setClassSelectedSlot] = useState<ScheduledClassRow | null>(null);
+  const [classFilterClass, setClassFilterClass] = useState<string>('');
+  const [classFilterInstructor, setClassFilterInstructor] = useState<string>('');
+  const [classFilterFacility, setClassFilterFacility] = useState<string>('');
 
   useEffect(() => {
     const t = setTimeout(() => setHasMounted(true), 0);
@@ -192,7 +202,7 @@ export default function MyAppointments() {
 
       const { data: businessesData, error: businessError } = await supabase
         .from('businesses')
-        .select('id, name, slug, currency')
+        .select('id, name, slug, currency, use_class_schedule')
         .in('id', businessIds);
 
       if (businessError) throw businessError;
@@ -209,7 +219,7 @@ export default function MyAppointments() {
 
       const { data, error } = await supabase
         .from('businesses')
-        .select('id, name, slug, currency')
+        .select('id, name, slug, currency, use_class_schedule')
         .or(`name.ilike.%${businessSearchQuery}%,slug.ilike.%${businessSearchQuery}%`)
         .limit(10);
 
@@ -658,6 +668,30 @@ export default function MyAppointments() {
     enabled: !!selectedBusiness?.id && !!selectedDate,
   });
 
+  // Class schedule: scheduled classes and appointments for spots (when business uses class schedule)
+  const { data: scheduledClasses = [], isLoading: scheduledClassesLoading } = useScheduledClasses(
+    classScheduleMode && selectedBusiness?.id ? selectedBusiness.id : null
+  );
+
+  const { data: classModeAppointments = [] } = useQuery({
+    queryKey: ['class-mode-appointments', selectedBusiness?.id, classScheduleMode],
+    queryFn: async () => {
+      if (!selectedBusiness?.id || !classScheduleMode) return [];
+      const rangeStart = new Date();
+      const rangeEnd = addDays(new Date(), 30);
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('start_time, service_id, location_id, staff_id')
+        .eq('business_id', selectedBusiness.id)
+        .gte('start_time', rangeStart.toISOString())
+        .lte('start_time', rangeEnd.toISOString())
+        .in('status', ['confirmed', 'pending']);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedBusiness?.id && classScheduleMode,
+  });
+
   // Generate time slots with availability
   interface SlotAvailability {
     time: string;
@@ -947,6 +981,99 @@ export default function MyAppointments() {
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to book appointment');
+    },
+  });
+
+  // Handle class schedule booking (when business has use_class_schedule)
+  const handleClassBooking = useMutation({
+    mutationFn: async () => {
+      if (!selectedBusiness || !classSelectedSlot || !classSelectedDate || !user) {
+        throw new Error('Missing booking details');
+      }
+      let { data: customer } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('business_id', selectedBusiness.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!customer) {
+        const { data: profile } = await supabase.from('profiles').select('first_name, last_name, email').eq('id', user.id).single();
+        const { data: newCustomer, error: customerError } = await supabase
+          .from('customers')
+          .insert({
+            business_id: selectedBusiness.id,
+            user_id: user.id,
+            name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || user.email?.split('@')[0] || 'Customer' : user.email?.split('@')[0] || 'Customer',
+            email: profile?.email || user.email || null,
+            status: 'active',
+          })
+          .select('id')
+          .single();
+        if (customerError) throw customerError;
+        customer = newCustomer;
+      }
+      const usingPackage = !!selectedCustomerPackageId;
+      if (usingPackage) {
+        const { data: pkgRow, error: pkgErr } = await supabase
+          .from('customer_packages')
+          .select('id, bookings_remaining, bookings_used')
+          .eq('id', selectedCustomerPackageId)
+          .single();
+        if (pkgErr || !pkgRow || (pkgRow.bookings_remaining ?? 0) <= 0) {
+          throw new Error('This package has no credits left.');
+        }
+        await supabase
+          .from('customer_packages')
+          .update({
+            bookings_remaining: Math.max(0, (pkgRow.bookings_remaining ?? 0) - 1),
+            bookings_used: (pkgRow.bookings_used ?? 0) + 1,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', selectedCustomerPackageId);
+      }
+      const [h, m] = String(classSelectedSlot.start_time).slice(0, 5).split(':').map(Number);
+      const startTime = setMinutes(setHours(new Date(classSelectedDate), h), m);
+      const duration = classSelectedSlot.service?.duration ?? 60;
+      const endTime = addMinutes(startTime, duration);
+      const servicePrice = safeServices.find((s) => s.id === classSelectedSlot.service_id)?.price ?? 0;
+      const { data: appointment, error } = await supabase
+        .from('appointments')
+        .insert({
+          business_id: selectedBusiness.id,
+          customer_id: customer.id,
+          service_id: classSelectedSlot.service_id,
+          staff_id: classSelectedSlot.staff_id || null,
+          location_id: classSelectedSlot.location_id || null,
+          facility_id: classSelectedSlot.facility_id || null,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          price: usingPackage ? 0 : Number(servicePrice),
+          status: 'confirmed',
+          notes: null,
+        })
+        .select('id')
+        .single();
+      if (error) throw error;
+      return appointment;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['class-mode-appointments'] });
+      if (selectedCustomerPackageId) {
+        queryClient.invalidateQueries({ queryKey: ['customer-packages'] });
+      }
+      toast.success('Class booked successfully!');
+      setClassScheduleMode(false);
+      setClassStep(2);
+      setClassSelectedSlot(null);
+      setClassSelectedDate(undefined);
+      setSelectedService(null);
+      setSelectedCustomerPackageId(null);
+      setIsBooking(false);
+      setActiveTab('appointments');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to book class');
     },
   });
 
@@ -1391,7 +1518,31 @@ export default function MyAppointments() {
                       <div key={business.id} className="space-y-3 sm:space-y-4">
                         <h3 className="text-base sm:text-lg font-semibold">{business.name}</h3>
                         <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                          {businessServices.map((service) => (
+                          {business.use_class_schedule ? (
+                            <Card
+                              className="glass-card cursor-pointer hover:border-primary/50 transition-all overflow-hidden"
+                              onClick={() => {
+                                setSelectedBusiness(business);
+                                setClassScheduleMode(true);
+                                setClassSelectedDate(startOfDay(new Date()));
+                                setClassStep(2);
+                                setClassSelectedSlot(null);
+                                setClassFilterClass('');
+                                setClassFilterInstructor('');
+                                setClassFilterFacility('');
+                                setSelectedCustomerPackageId(null);
+                                setIsBooking(true);
+                              }}
+                            >
+                              <CardHeader>
+                                <div className="flex items-center gap-2">
+                                  <CalendarClock className="h-5 w-5 text-primary" />
+                                  <CardTitle className="text-base">View class schedule</CardTitle>
+                                </div>
+                                <CardDescription>Book a class from the weekly schedule</CardDescription>
+                              </CardHeader>
+                            </Card>
+                          ) : businessServices.map((service) => (
                             <Card
                               key={service.id}
                               className="glass-card cursor-pointer hover:border-primary/50 transition-all overflow-hidden"
@@ -1433,12 +1584,12 @@ export default function MyAppointments() {
                                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                   <Clock className="h-4 w-4" />
                                   <span>{service.duration} min</span>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          )))}
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
+                      </div>
                     ))}
 
                     {filteredServices.length === 0 && (
@@ -1449,6 +1600,271 @@ export default function MyAppointments() {
                       </Card>
                     )}
                   </>
+                ) : classScheduleMode && selectedBusiness ? (
+                  /* Class schedule flow: filters + 7-day strip + class list, or confirm step */
+                  (() => {
+                    const today = startOfDay(new Date());
+                    const selectedDate = classSelectedDate || today;
+                    const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+                    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+                    const hasFilters = !!(classFilterClass || classFilterInstructor || classFilterFacility);
+                    const uniqueClasses = Array.from(new Map(scheduledClasses.map((r) => [r.service_id, { id: r.service_id, name: r.service?.name ?? '' }])).values()).filter((c) => c.name);
+                    const uniqueInstructors = Array.from(new Map(scheduledClasses.filter((r) => r.staff_id).map((r) => [r.staff_id!, { id: r.staff_id!, name: r.staff?.name ?? '' }])).values()).filter((c) => c.name);
+                    const uniqueFacilities = Array.from(new Map(scheduledClasses.filter((r) => r.facility_id).map((r) => [r.facility_id!, { id: r.facility_id!, name: r.facility?.name ?? '' }])).values()).filter((c) => c.name);
+                    const classModeLocations = locations;
+
+                    return (
+                      <div className="space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                          <Button variant="ghost" onClick={() => {
+                            setClassScheduleMode(false);
+                            setClassStep(2);
+                            setClassSelectedSlot(null);
+                            setClassSelectedDate(undefined);
+                            setSelectedBusiness(null);
+                            setSelectedCustomerPackageId(null);
+                            setIsBooking(false);
+                          }} className="w-full sm:w-auto">
+                            <ArrowRight className="h-4 w-4 mr-2 rotate-180" />
+                            Back
+                          </Button>
+                          <h2 className="text-lg sm:text-xl font-semibold truncate">{selectedBusiness.name} – Class schedule</h2>
+                        </div>
+
+                        {classStep === 2 && (
+                          <>
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap gap-2 items-center">
+                                <Select value={classFilterClass || '__all__'} onValueChange={(v) => setClassFilterClass(v === '__all__' ? '' : v)}>
+                                  <SelectTrigger className="w-[140px]"><SelectValue placeholder="Class" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__all__">Class</SelectItem>
+                                    {uniqueClasses.map((c) => (
+                                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Select value={classFilterInstructor || '__all__'} onValueChange={(v) => setClassFilterInstructor(v === '__all__' ? '' : v)}>
+                                  <SelectTrigger className="w-[140px]"><SelectValue placeholder="Instructor" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__all__">Instructor</SelectItem>
+                                    {uniqueInstructors.map((c) => (
+                                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Select value={classFilterFacility || '__all__'} onValueChange={(v) => setClassFilterFacility(v === '__all__' ? '' : v)}>
+                                  <SelectTrigger className="w-[140px]"><SelectValue placeholder="Facility" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__all__">Facility</SelectItem>
+                                    {uniqueFacilities.map((c) => (
+                                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {hasFilters && (
+                                <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => { setClassFilterClass(''); setClassFilterInstructor(''); setClassFilterFacility(''); }}>
+                                  Clear all filters
+                                </Button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1 overflow-x-auto pb-2">
+                              <Button variant="outline" size="icon" className="shrink-0" onClick={() => setClassSelectedDate(addDays(selectedDate, -7))} aria-label="Previous week">
+                                <ArrowRight className="h-4 w-4 rotate-180" />
+                              </Button>
+                              <div className="flex flex-1 gap-1 min-w-0 justify-between">
+                                {weekDays.map((d) => {
+                                  const isSelected = format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+                                  const isPast = isBefore(d, today);
+                                  return (
+                                    <button
+                                      key={d.toISOString()}
+                                      type="button"
+                                      onClick={() => !isPast && setClassSelectedDate(d)}
+                                      disabled={isPast}
+                                      className={cn(
+                                        'shrink-0 rounded-md border px-2 py-2 text-center text-sm transition-colors min-w-[52px]',
+                                        isSelected && 'border-primary bg-primary/10 font-medium',
+                                        !isSelected && !isPast && 'border-border hover:bg-muted',
+                                        isPast && 'opacity-50 cursor-not-allowed'
+                                      )}
+                                    >
+                                      <div className="font-medium">{format(d, 'EEE')}</div>
+                                      <div className="text-muted-foreground">{format(d, 'd MMM')}</div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <Button variant="outline" size="icon" className="shrink-0" onClick={() => setClassSelectedDate(addDays(selectedDate, 7))} aria-label="Next week">
+                                <ArrowRight className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            {classModeLocations.length > 1 && (
+                              <div className="flex flex-wrap gap-2 items-center">
+                                <span className="text-sm text-muted-foreground">Location:</span>
+                                {classModeLocations.map((loc: { id: string; name: string }) => (
+                                  <Button key={loc.id} variant={selectedLocation?.id === loc.id ? 'default' : 'outline'} size="sm" onClick={() => setSelectedLocation(loc)}>{loc.name}</Button>
+                                ))}
+                              </div>
+                            )}
+
+                            {(() => {
+                              const dayOfWeek = selectedDate.getDay();
+                              const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                              const forDay = scheduledClasses.filter((r) => r.day_of_week === dayOfWeek);
+                              const byLocation = selectedLocation ? forDay.filter((r) => r.location_id === selectedLocation.id) : forDay;
+                              const appointmentsList = classModeAppointments as { start_time: string; service_id: string; location_id?: string | null; staff_id?: string | null }[];
+                              let withSpots = byLocation.map((row) => {
+                                const capacity = (row.service as { slot_capacity?: number })?.slot_capacity ?? 1;
+                                const timeStr = String(row.start_time).slice(0, 5);
+                                const booked = appointmentsList.filter((a) => {
+                                  const aptDate = format(new Date(a.start_time), 'yyyy-MM-dd');
+                                  const aptTime = format(new Date(a.start_time), 'HH:mm');
+                                  return aptDate === dateStr && aptTime === timeStr && a.service_id === row.service_id && (a.location_id ?? null) === (row.location_id ?? null) && (a.staff_id ?? null) === (row.staff_id ?? null);
+                                }).length;
+                                return { row, capacity, booked, spotsLeft: Math.max(0, capacity - booked) };
+                              }).filter((x) => x.spotsLeft > 0);
+                              if (classFilterClass) withSpots = withSpots.filter((x) => x.row.service_id === classFilterClass);
+                              if (classFilterInstructor) withSpots = withSpots.filter((x) => x.row.staff_id === classFilterInstructor);
+                              if (classFilterFacility) withSpots = withSpots.filter((x) => (x.row.facility_id ?? null) === classFilterFacility);
+                              if (scheduledClassesLoading) {
+                                return (
+                                  <Card className="glass-card p-6 text-center">
+                                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                                  </Card>
+                                );
+                              }
+                              if (withSpots.length === 0) {
+                                return (
+                                  <Card className="glass-card p-6 text-center">
+                                    <p className="text-muted-foreground">No classes with spots left on this day.</p>
+                                  </Card>
+                                );
+                              }
+                              return (
+                                <div className="space-y-0 rounded-lg border divide-y divide-border overflow-hidden">
+                                  {withSpots.map(({ row, spotsLeft }) => {
+                                    const initials = (row.staff?.name ?? '?').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+                                    const serviceForPackage = safeServices.find((s) => s.id === row.service_id);
+                                    return (
+                                      <div key={row.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-card hover:bg-muted/30 transition-colors">
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                          <div className="shrink-0 space-y-0.5 text-sm">
+                                            <div className="font-medium">{format(new Date(`2000-01-01T${row.start_time}`), 'h:mm a')}</div>
+                                            <div className="text-muted-foreground">{row.service?.duration ?? 0} min</div>
+                                          </div>
+                                          <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center text-xs font-medium shrink-0">
+                                            {initials}
+                                          </div>
+                                          <div className="min-w-0">
+                                            <div className="font-medium">{row.service?.name}</div>
+                                            <div className="text-sm text-muted-foreground">{row.staff?.name ?? '—'}</div>
+                                            <div className="text-xs text-muted-foreground">{row.facility?.name ?? '—'}</div>
+                                          </div>
+                                          <div className="text-sm text-muted-foreground shrink-0">{row.location?.name ?? '—'}</div>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0 sm:pl-4">
+                                          <Badge variant="secondary">{spotsLeft} left</Badge>
+                                          <Button size="sm" onClick={() => {
+                                            setClassSelectedSlot(row);
+                                            setSelectedService(serviceForPackage ?? null);
+                                            setClassStep(3);
+                                          }}>Book</Button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
+                          </>
+                        )}
+
+                        {classStep === 3 && classSelectedSlot && selectedBusiness && (
+                          <div className="space-y-6">
+                            <h2 className="text-xl font-semibold">Confirm booking</h2>
+                            <p className="text-sm text-muted-foreground">
+                              {classSelectedSlot.service?.name} · {classSelectedDate && format(classSelectedDate, 'EEEE, MMM d')} at {format(new Date(`2000-01-01T${classSelectedSlot.start_time}`), 'h:mm a')}
+                            </p>
+                            <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+                              <Card className="glass-card">
+                                <CardHeader>
+                                  <CardTitle className="text-lg flex items-center gap-2">
+                                    <User className="h-4 w-4" />
+                                    Contact Information
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                  <p className="text-sm text-muted-foreground">Booking as {profile?.first_name} {profile?.last_name} ({user?.email})</p>
+                                </CardContent>
+                              </Card>
+                              <Card className="glass-card">
+                                <CardHeader>
+                                  <CardTitle className="text-lg">Booking Summary</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-muted-foreground">Service</span>
+                                      <span className="font-medium">{classSelectedSlot.service?.name}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-muted-foreground">Date & Time</span>
+                                      <span className="font-medium">
+                                        {classSelectedDate && format(classSelectedDate, 'MMM d, yyyy')} at {format(new Date(`2000-01-01T${classSelectedSlot.start_time}`), 'h:mm a')}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-muted-foreground">Price</span>
+                                      <span className="font-medium">
+                                        {selectedCustomerPackageId
+                                          ? (() => {
+                                              const pkg = applicablePackagesForBooking.find((cp: any) => cp.id === selectedCustomerPackageId);
+                                              return pkg ? <span className="text-primary">Using package: {pkg.package_templates?.name} (1 credit)</span> : formatCurrencySimple(0, selectedBusiness?.currency || 'USD');
+                                            })()
+                                          : formatCurrencySimple(Number(selectedService?.price ?? 0), selectedBusiness?.currency || 'USD')}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {Array.isArray(applicablePackagesForBooking) && applicablePackagesForBooking.length > 0 && (
+                                    <div className="space-y-2 pt-2 border-t">
+                                      <Label className="text-sm">Use a package?</Label>
+                                      <div className="flex flex-col gap-2">
+                                        <Button type="button" variant={selectedCustomerPackageId === null ? 'default' : 'outline'} size="sm" className="justify-start" onClick={() => setSelectedCustomerPackageId(null)}>
+                                          Pay full price
+                                        </Button>
+                                        {applicablePackagesForBooking.map((cp: any) => (
+                                          <Button key={cp.id} type="button" variant={selectedCustomerPackageId === cp.id ? 'default' : 'outline'} size="sm" className="justify-start" onClick={() => setSelectedCustomerPackageId(cp.id)}>
+                                            <Package className="h-4 w-4 mr-2 shrink-0" />
+                                            {cp.package_templates?.name ?? 'Package'} ({(cp.bookings_remaining ?? 0)} credit{(cp.bookings_remaining ?? 0) !== 1 ? 's' : ''} left)
+                                          </Button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            </div>
+                            <div className="flex justify-between gap-3">
+                              <Button variant="outline" onClick={() => { setClassStep(2); setClassSelectedSlot(null); setSelectedService(null); }}>
+                                Back
+                              </Button>
+                              <Button
+                                disabled={handleClassBooking.isPending}
+                                onClick={() => handleClassBooking.mutate()}
+                              >
+                                {handleClassBooking.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                                Confirm booking
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
                 ) : (
                   <div className="space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">

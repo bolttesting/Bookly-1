@@ -29,7 +29,7 @@ import {
 import { useBusiness } from '@/hooks/useBusiness';
 import { useLocations } from '@/hooks/useLocations';
 import { useFacilities } from '@/hooks/useFacilities';
-import { useScheduledClasses, type ScheduledClassInsert } from '@/hooks/useScheduledClasses';
+import { useScheduledClasses, type ScheduledClassInsert, type ScheduledClassRow } from '@/hooks/useScheduledClasses';
 import { useServices } from '@/hooks/useServices';
 import { useStaff } from '@/hooks/useStaff';
 import { toast } from 'sonner';
@@ -50,8 +50,8 @@ export function ClassScheduleSettings() {
   const { business, updateBusiness } = useBusiness();
   const { locations, isLoading: locationsLoading } = useLocations();
   const { services } = useServices();
-  const { data: staff = [] } = useStaff();
-  const { rows, isLoading: scheduleLoading, create, remove, dayNames } = useScheduledClasses(business?.id ?? null);
+  const { staff = [] } = useStaff();
+  const { rows, isLoading: scheduleLoading, create, update, remove, dayNames } = useScheduledClasses(business?.id ?? null);
   const [savingToggle, setSavingToggle] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [addClassOpen, setAddClassOpen] = useState(false);
@@ -63,8 +63,16 @@ export function ClassScheduleSettings() {
   const [newClassFacility, setNewClassFacility] = useState<string | null>(null);
   const [newFacilityName, setNewFacilityName] = useState('');
   const [facilityDialogOpen, setFacilityDialogOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<ScheduledClassRow | null>(null);
+  const [editLocationId, setEditLocationId] = useState('');
+  const [editDay, setEditDay] = useState(1);
+  const [editTime, setEditTime] = useState('09:00');
+  const [editServiceId, setEditServiceId] = useState('');
+  const [editStaffId, setEditStaffId] = useState<string | null>(null);
+  const [editFacilityId, setEditFacilityId] = useState<string | null>(null);
   const { facilities, isLoading: facilitiesLoading, create: createFacility, remove: removeFacility } = useFacilities(selectedLocationId ?? null);
   const { facilities: facilitiesForNewClass } = useFacilities(addClassOpen ? (newClassLocation || null) : null);
+  const { facilities: facilitiesForEdit } = useFacilities(editingRow ? editLocationId || null : null);
 
   const useClassSchedule = business?.use_class_schedule ?? false;
 
@@ -121,6 +129,35 @@ export function ClassScheduleSettings() {
       await createFacility.mutateAsync({ name: newFacilityName.trim() });
       setNewFacilityName('');
       setFacilityDialogOpen(false);
+    } catch (_) {}
+  };
+
+  const openEdit = (row: ScheduledClassRow) => {
+    setEditingRow(row);
+    setEditLocationId(row.location_id);
+    setEditDay(row.day_of_week);
+    setEditTime(String(row.start_time).slice(0, 5));
+    setEditServiceId(row.service_id);
+    setEditStaffId(row.staff_id || null);
+    setEditFacilityId(row.facility_id || null);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingRow || !editLocationId || !editServiceId) {
+      toast.error('Select location and service');
+      return;
+    }
+    try {
+      await update.mutateAsync({
+        id: editingRow.id,
+        location_id: editLocationId,
+        day_of_week: editDay,
+        start_time: editTime,
+        service_id: editServiceId,
+        staff_id: editStaffId || null,
+        facility_id: editFacilityId || null,
+      });
+      setEditingRow(null);
     } catch (_) {}
   };
 
@@ -374,6 +411,95 @@ export function ClassScheduleSettings() {
                     </DialogContent>
                   </Dialog>
                 </div>
+
+                {/* Edit class dialog */}
+                <Dialog open={!!editingRow} onOpenChange={(open) => !open && setEditingRow(null)}>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Edit class</DialogTitle>
+                      <DialogDescription>Change day, time, service, instructor, or room.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-3">
+                      <div>
+                        <Label>Location</Label>
+                        <Select value={editLocationId} onValueChange={(v) => { setEditLocationId(v); setEditFacilityId(null); }}>
+                          <SelectTrigger><SelectValue placeholder="Location" /></SelectTrigger>
+                          <SelectContent>
+                            {(locations || []).map((loc) => (
+                              <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Day</Label>
+                        <Select value={String(editDay)} onValueChange={(v) => setEditDay(Number(v))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {dayNames.map((name, i) => (
+                              <SelectItem key={i} value={String(i)}>{name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Time</Label>
+                        <Select value={editTime} onValueChange={setEditTime}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {TIME_OPTIONS.map(({ value, label }) => (
+                              <SelectItem key={value} value={value}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Service (class)</Label>
+                        <Select value={editServiceId} onValueChange={setEditServiceId}>
+                          <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
+                          <SelectContent>
+                            {(services || []).map((s) => (
+                              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Instructor (optional)</Label>
+                        <Select value={editStaffId ?? '__none__'} onValueChange={(v) => setEditStaffId(v === '__none__' ? null : v)}>
+                          <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">—</SelectItem>
+                            {(staff || []).map((s) => (
+                              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {editLocationId && (
+                        <div>
+                          <Label>Room (optional)</Label>
+                          <Select value={editFacilityId ?? '__none__'} onValueChange={(v) => setEditFacilityId(v === '__none__' ? null : v)}>
+                            <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">—</SelectItem>
+                              {(facilitiesForEdit || []).map((f) => (
+                                <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setEditingRow(null)}>Cancel</Button>
+                      <Button onClick={handleEditSave} disabled={!editLocationId || !editServiceId || update.isPending}>
+                        {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
                 {scheduleLoading ? (
                   <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading schedule…
@@ -390,7 +516,7 @@ export function ClassScheduleSettings() {
                           <th className="text-left p-2">Class</th>
                           <th className="text-left p-2">Instructor</th>
                           <th className="text-left p-2">Room</th>
-                          <th className="w-10 p-2"></th>
+                          <th className="w-20 p-2"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -402,7 +528,11 @@ export function ClassScheduleSettings() {
                             <td className="p-2">{r.staff?.name ?? '—'}</td>
                             <td className="p-2">{r.facility?.name ?? '—'}</td>
                             <td className="p-2">
-                              <AlertDialog>
+                              <div className="flex items-center gap-1">
+                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => openEdit(r)} aria-label="Edit">
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
                                     <Trash2 className="h-4 w-4" />
@@ -421,6 +551,7 @@ export function ClassScheduleSettings() {
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
+                              </div>
                             </td>
                           </tr>
                         ))}

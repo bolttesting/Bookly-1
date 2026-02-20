@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { format, addMinutes, setHours, setMinutes, startOfDay, startOfWeek, isBefore, isAfter, addDays } from 'date-fns';
@@ -166,6 +166,9 @@ export default function PublicBooking() {
   const [classFilterClass, setClassFilterClass] = useState<string>('');
   const [classFilterInstructor, setClassFilterInstructor] = useState<string>('');
   const [classFilterFacility, setClassFilterFacility] = useState<string>('');
+  const [classSelectedPackageId, setClassSelectedPackageId] = useState<string | null>(null);
+  const [classBookingCustomerId, setClassBookingCustomerId] = useState<string | null>(null);
+  const [classCustomerPackages, setClassCustomerPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -270,6 +273,64 @@ export default function PublicBooking() {
     };
     checkAuth();
   }, []);
+
+  // Class confirm: resolve customer id for logged-in user (for package list)
+  useEffect(() => {
+    if (!business?.id || !loggedInUser?.id || classStep !== 3) {
+      setClassBookingCustomerId(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('business_id', business.id)
+        .eq('user_id', loggedInUser.id)
+        .maybeSingle();
+      if (!cancelled && data?.id) setClassBookingCustomerId(data.id);
+      if (!cancelled && !data?.id) setClassBookingCustomerId(null);
+    })();
+    return () => { cancelled = true; };
+  }, [business?.id, loggedInUser?.id, classStep]);
+
+  // Class confirm: fetch customer packages when we have customer id
+  useEffect(() => {
+    if (!classBookingCustomerId || !business?.id || classStep !== 3) {
+      setClassCustomerPackages([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('customer_packages')
+        .select('id, package_template_id, bookings_remaining, status, expires_at, package_templates(id, name)')
+        .eq('customer_id', classBookingCustomerId)
+        .eq('business_id', business.id)
+        .eq('status', 'active')
+        .gt('bookings_remaining', 0);
+      if (!cancelled) setClassCustomerPackages(data || []);
+    })();
+    return () => { cancelled = true; };
+  }, [classBookingCustomerId, business?.id, classStep]);
+
+  // Applicable packages for the selected class (service) when on class confirm
+  const classApplicablePackages = useMemo(() => {
+    if (!classSelectedSlot?.service_id || !packages.length || !classCustomerPackages.length) return [];
+    const now = new Date();
+    return classCustomerPackages.filter((cp: any) => {
+      try {
+        if (cp.expires_at && new Date(cp.expires_at) < now) return false;
+      } catch {
+        return false;
+      }
+      const templateId = cp.package_template_id ?? cp.package_templates?.id;
+      if (!templateId) return false;
+      const template = packages.find((p: any) => p.id === templateId);
+      const serviceIds = (template?.services || []).map((s: any) => s?.id).filter(Boolean);
+      return serviceIds.includes(classSelectedSlot.service_id);
+    });
+  }, [classSelectedSlot?.service_id, packages, classCustomerPackages]);
 
   useEffect(() => {
     const fetchBusinessData = async () => {
@@ -1978,28 +2039,106 @@ export default function PublicBooking() {
                     {classSelectedSlot.service?.name} · {classSelectedDate && format(classSelectedDate, 'EEEE, MMM d')} at {format(new Date(`2000-01-01T${classSelectedSlot.start_time}`), 'h:mm a')}
                   </p>
                 </div>
-                <Card className="glass-card max-w-md">
-                  <CardContent className="pt-6 space-y-4">
-                    <div>
-                      <Label htmlFor="class-name">Name *</Label>
-                      <Input id="class-name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Your name" />
-                    </div>
-                    <div>
-                      <Label htmlFor="class-email">Email *</Label>
-                      <Input id="class-email" type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="you@example.com" />
-                    </div>
-                    <div>
-                      <Label htmlFor="class-phone">Phone</Label>
-                      <Input id="class-phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="Optional" />
-                    </div>
-                    <div>
-                      <Label htmlFor="class-notes">Notes</Label>
-                      <Textarea id="class-notes" value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} placeholder="Optional" rows={2} />
-                    </div>
-                    <div className="flex gap-3 pt-2">
-                      <Button variant="outline" className="flex-1" onClick={() => { setClassStep(2); setClassSelectedSlot(null); }}>
-                        Back
-                      </Button>
+                <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Contact Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="class-name">Full Name *</Label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input id="class-name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="John Doe" className="pl-10" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="class-email">Email *</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input id="class-email" type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="john@example.com" className="pl-10" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="class-phone">Phone (Optional)</Label>
+                        <div className="relative">
+                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input id="class-phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+1 (555) 000-0000" className="pl-10" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="class-notes">Notes (Optional)</Label>
+                        <Textarea id="class-notes" value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} placeholder="Any special requests or notes..." rows={3} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Booking Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span className="text-muted-foreground">Service</span>
+                          <span className="font-medium">{classSelectedSlot.service?.name}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span className="text-muted-foreground">Duration</span>
+                          <span className="font-medium">{classSelectedSlot.service?.duration ?? 60} min</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span className="text-muted-foreground">Staff</span>
+                          <span className="font-medium">{classSelectedSlot.staff?.name || '—'}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span className="text-muted-foreground">Date</span>
+                          <span className="font-medium">{classSelectedDate && format(classSelectedDate, 'MMM d, yyyy')}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span className="text-muted-foreground">Time</span>
+                          <span className="font-medium">{format(new Date(`2000-01-01T${classSelectedSlot.start_time}`), 'h:mm a')}</span>
+                        </div>
+                        {classApplicablePackages.length > 0 && (
+                          <div className="space-y-2 pt-2 border-b border-border">
+                            <Label className="text-sm">Use package</Label>
+                            <Select
+                              value={classSelectedPackageId ?? '__none__'}
+                              onValueChange={(v) => setClassSelectedPackageId(v === '__none__' ? null : v)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Pay with card" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">Pay with card</SelectItem>
+                                {classApplicablePackages.map((cp: any) => (
+                                  <SelectItem key={cp.id} value={cp.id}>
+                                    {cp.package_templates?.name ?? 'Package'} ({(cp.bookings_remaining ?? 0)} credit{(cp.bookings_remaining ?? 0) !== 1 ? 's' : ''} left)
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        <div className="flex justify-between py-2 text-lg">
+                          <span className="font-semibold">Total</span>
+                          <span className="font-bold text-primary">
+                            {classSelectedPackageId
+                              ? '1 credit from package'
+                              : formatCurrencySimple(Number(services.find(s => s.id === classSelectedSlot.service_id)?.price ?? 0), business?.currency || 'USD')}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <Button variant="outline" className="flex-1 sm:flex-initial" onClick={() => { setClassStep(2); setClassSelectedSlot(null); setClassSelectedPackageId(null); }}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                  </Button>
                       <Button
                         className="flex-1"
                         disabled={submitting || !customerName.trim() || !customerEmail.trim()}
@@ -2027,6 +2166,22 @@ export default function PublicBooking() {
                               if (insertErr || !newC?.id) throw new Error(insertErr?.message ?? 'Failed to create customer');
                               customerId = newC.id;
                             }
+                            const usePackage = !!classSelectedPackageId;
+                            if (usePackage) {
+                              const { data: cp, error: cpErr } = await supabase
+                                .from('customer_packages')
+                                .select('bookings_remaining, bookings_used')
+                                .eq('id', classSelectedPackageId)
+                                .single();
+                              if (cpErr || !cp) throw new Error(cpErr?.message ?? 'Package not found');
+                              const remaining = (cp.bookings_remaining ?? 0) - 1;
+                              const used = (cp.bookings_used ?? 0) + 1;
+                              const { error: updateErr } = await supabase
+                                .from('customer_packages')
+                                .update({ bookings_remaining: remaining, bookings_used: used })
+                                .eq('id', classSelectedPackageId);
+                              if (updateErr) throw new Error(updateErr.message ?? 'Failed to deduct package credit');
+                            }
                             const startTime = new Date(classSelectedDate!);
                             const [h, m] = String(classSelectedSlot.start_time).slice(0, 5).split(':').map(Number);
                             startTime.setHours(h, m, 0, 0);
@@ -2043,12 +2198,13 @@ export default function PublicBooking() {
                               end_time: endTime.toISOString(),
                               status: 'confirmed',
                               notes: customerNotes || null,
-                              price: services.find(s => s.id === classSelectedSlot.service_id)?.price ?? null,
+                              price: usePackage ? 0 : (services.find(s => s.id === classSelectedSlot.service_id)?.price ?? null),
                             });
                             setBookingComplete(true);
                             setSelectedDate(classSelectedDate);
                             setSelectedTime(String(classSelectedSlot.start_time).slice(0, 5));
                             setSelectedService(services.find(s => s.id === classSelectedSlot.service_id) ?? null);
+                            setClassSelectedPackageId(null);
                             toast.success('You’re booked!');
                           } catch (e: any) {
                             toast.error(e?.message ?? 'Booking failed');
@@ -2057,11 +2213,10 @@ export default function PublicBooking() {
                           }
                         }}
                       >
-                        {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm booking'}
+                        {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                        Confirm booking
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                </div>
               </div>
             )}
           </div>

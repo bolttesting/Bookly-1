@@ -100,22 +100,31 @@ export function useScheduledClasses(businessId: string | null) {
   const update = useMutation({
     mutationFn: async ({
       id,
-      facility_id,
+      location_id,
+      day_of_week,
       start_time,
+      facility_id,
       service_id,
       staff_id,
       display_order,
     }: {
       id: string;
-      facility_id?: string | null;
+      location_id?: string;
+      day_of_week?: number;
       start_time?: string;
+      facility_id?: string | null;
       service_id?: string;
       staff_id?: string | null;
       display_order?: number;
     }) => {
       const updates: Record<string, unknown> = {};
+      if (location_id !== undefined) updates.location_id = location_id;
+      if (day_of_week !== undefined) updates.day_of_week = day_of_week;
       if (facility_id !== undefined) updates.facility_id = facility_id;
-      if (start_time !== undefined) updates.start_time = start_time;
+      if (start_time !== undefined) {
+        const t = start_time.trim();
+        updates.start_time = /^\d{1,2}:\d{2}$/.test(t) ? `${t}:00` : t;
+      }
       if (service_id !== undefined) updates.service_id = service_id;
       if (staff_id !== undefined) updates.staff_id = staff_id;
       if (display_order !== undefined) updates.display_order = display_order;
