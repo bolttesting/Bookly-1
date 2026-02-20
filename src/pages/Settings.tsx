@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { User, Building2, CreditCard, Bell, Link2, Copy, Check, ExternalLink, Clock, Download, QrCode, Code2, MapPin, DollarSign, CheckCircle, Package, Loader2, Upload, X, Mail, MessageSquare } from "lucide-react";
+import { User, Building2, CreditCard, Bell, Link2, Copy, Check, ExternalLink, Clock, Download, QrCode, Code2, MapPin, DollarSign, CheckCircle, Package, Loader2, Upload, X, Mail, MessageSquare, CalendarDays } from "lucide-react";
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { LocationHoursSettings } from '@/components/settings/LocationHoursSettings';
 import { LocationsSettings } from '@/components/settings/LocationsSettings';
+import { ClassScheduleSettings } from '@/components/settings/ClassScheduleSettings';
 import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
 import { TIMEZONES } from '@/lib/timezones';
 import { cn } from '@/lib/utils';
@@ -194,7 +195,7 @@ const Settings = () => {
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6 w-full max-w-full min-w-0 overflow-hidden">
         <div className="glass-card p-2 w-full max-w-full min-w-0 -mx-2 px-2 sm:mx-0 sm:px-0 overflow-x-auto overflow-y-hidden scrollbar-thin touch-pan-x overscroll-x-contain">
-          <TabsList className="inline-flex w-max min-w-full sm:w-full sm:inline-grid sm:grid-cols-7 h-auto bg-transparent gap-1 flex-nowrap border-0 p-0">
+          <TabsList className="inline-flex w-max min-w-full sm:w-full sm:inline-grid sm:grid-cols-8 h-auto bg-transparent gap-1 flex-nowrap border-0 p-0">
             <TabsTrigger value="booking" className="flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 px-3 sm:px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap shrink-0 sm:shrink">
               <Link2 className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
               <span className="hidden sm:inline">Booking</span>
@@ -208,6 +209,11 @@ const Settings = () => {
               <MapPin className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
               <span className="hidden sm:inline">Locations</span>
               <span className="sm:hidden">Loc</span>
+            </TabsTrigger>
+            <TabsTrigger value="class-schedule" className="flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 px-3 sm:px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap shrink-0 sm:shrink">
+              <CalendarDays className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+              <span className="hidden sm:inline">Class schedule</span>
+              <span className="sm:hidden">Classes</span>
             </TabsTrigger>
             <TabsTrigger value="profile" className="flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 px-3 sm:px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm whitespace-nowrap shrink-0 sm:shrink">
               <User className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
@@ -483,6 +489,10 @@ const Settings = () => {
 
         <TabsContent value="locations">
           <LocationsSettings />
+        </TabsContent>
+
+        <TabsContent value="class-schedule" className="w-full min-w-0 mt-4 sm:mt-6">
+          <ClassScheduleSettings />
         </TabsContent>
 
         <TabsContent value="profile" className="space-y-6">

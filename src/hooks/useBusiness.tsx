@@ -25,6 +25,7 @@ interface Business {
   partial_payment_percentage?: number | null;
   reschedule_deadline_hours?: number | null;
   booking_theme?: 'light' | 'dark' | 'system' | null;
+  use_class_schedule?: boolean | null;
 }
 
 type AppRole = 'owner' | 'admin' | 'staff';

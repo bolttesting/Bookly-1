@@ -47,6 +47,7 @@ interface Business {
   booking_theme?: 'light' | 'dark' | 'system' | null;
   require_payment?: boolean;
   stripe_connected?: boolean;
+  use_class_schedule?: boolean | null;
 }
 
 interface Service {
@@ -98,6 +99,22 @@ interface SlotAvailability {
   available: number;
 }
 
+interface ScheduledClassRow {
+  id: string;
+  business_id: string;
+  location_id: string;
+  facility_id: string | null;
+  day_of_week: number;
+  start_time: string;
+  service_id: string;
+  staff_id: string | null;
+  display_order: number;
+  service?: { id: string; name: string; duration: number; slot_capacity?: number };
+  staff?: { id: string; name: string } | null;
+  facility?: { id: string; name: string } | null;
+  location?: { id: string; name: string };
+}
+
 interface PackageTemplate {
   id: string;
   name: string;
@@ -141,7 +158,11 @@ export default function PublicBooking() {
   const [hourRangesByBhId, setHourRangesByBhId] = useState<Record<string, TimeRange[]>>({});
   const [slotBlocks, setSlotBlocks] = useState<{ service_id: string; blocked_date: string; start_time: string }[]>([]);
   const [serviceSchedules, setServiceSchedules] = useState<Record<string, Record<number, TimeRange[]>>>({});
-  const [appointments, setAppointments] = useState<{ start_time: string; service_id: string }[]>([]);
+  const [appointments, setAppointments] = useState<{ start_time: string; service_id: string; location_id?: string | null; staff_id?: string | null }[]>([]);
+  const [scheduledClasses, setScheduledClasses] = useState<ScheduledClassRow[]>([]);
+  const [classSelectedDate, setClassSelectedDate] = useState<Date | undefined>();
+  const [classSelectedSlot, setClassSelectedSlot] = useState<ScheduledClassRow | null>(null);
+  const [classStep, setClassStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -413,6 +434,33 @@ export default function PublicBooking() {
           }
         }
         setServiceSchedules(scheduleMap);
+
+        // Class schedule (fitness/yoga): scheduled classes and appointments with location/staff for spots left
+        if (businessData.use_class_schedule) {
+          const { data: scheduledData } = await supabase
+            .from('scheduled_classes')
+            .select(`
+              id, business_id, location_id, facility_id, day_of_week, start_time, service_id, staff_id, display_order,
+              service:services(id, name, duration, slot_capacity),
+              staff:staff_members(id, name),
+              facility:facilities(id, name),
+              location:business_locations(id, name)
+            `)
+            .eq('business_id', businessData.id)
+            .order('location_id')
+            .order('day_of_week')
+            .order('start_time');
+          setScheduledClasses((scheduledData ?? []) as ScheduledClassRow[]);
+
+          const { data: aptsData } = await supabase
+            .from('appointments')
+            .select('start_time, service_id, location_id, staff_id')
+            .eq('business_id', businessData.id)
+            .gte('start_time', new Date().toISOString())
+            .lte('start_time', addDays(new Date(), 30).toISOString())
+            .in('status', ['confirmed', 'pending']);
+          setAppointments(aptsData || []);
+        }
       } catch (error) {
         logger.error('Error fetching business:', error);
         toast.error('Failed to load booking page');
@@ -1757,7 +1805,207 @@ export default function PublicBooking() {
           </DialogContent>
         </Dialog>
 
-        {/* Progress Steps - Dynamic based on whether locations exist */}
+        {/* Class schedule flow (fitness/yoga): pick date → today's classes → book */}
+        {business?.use_class_schedule && (
+          <div className="space-y-6">
+            {classStep === 1 && (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <h2 className="text-xl sm:text-2xl font-display font-bold">Pick a date</h2>
+                  <p className="text-sm sm:text-base text-muted-foreground mt-1">Then see that day&apos;s classes and book</p>
+                </div>
+                <Card className="glass-card max-w-sm mx-auto">
+                  <CardContent className="pt-6">
+                    <CalendarComponent
+                      mode="single"
+                      selected={classSelectedDate}
+                      onSelect={(date) => { setClassSelectedDate(date); setClassSelectedSlot(null); setClassStep(2); }}
+                      disabled={(date) => isBefore(date, startOfDay(new Date())) || isAfter(date, addDays(new Date(), 60))}
+                      className="rounded-md"
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+            {classStep === 2 && classSelectedDate && (() => {
+              const dayOfWeek = classSelectedDate.getDay();
+              const dateStr = format(classSelectedDate, 'yyyy-MM-dd');
+              const forDay = scheduledClasses.filter((r) => r.day_of_week === dayOfWeek);
+              const byLocation = selectedLocation ? forDay.filter((r) => r.location_id === selectedLocation.id) : forDay;
+              const withSpots = byLocation.map((row) => {
+                const capacity = row.service?.slot_capacity ?? 1;
+                const timeStr = String(row.start_time).slice(0, 5);
+                const booked = appointments.filter((a) => {
+                  const aptDate = format(new Date(a.start_time), 'yyyy-MM-dd');
+                  const aptTime = format(new Date(a.start_time), 'HH:mm');
+                  return aptDate === dateStr && aptTime === timeStr && a.service_id === row.service_id && (a.location_id ?? null) === (row.location_id ?? null) && (a.staff_id ?? null) === (row.staff_id ?? null);
+                }).length;
+                return { row, capacity, booked, spotsLeft: Math.max(0, capacity - booked) };
+              }).filter((x) => x.spotsLeft > 0);
+              return (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="text-center sm:text-left">
+                      <h2 className="text-xl sm:text-2xl font-display font-bold">Classes on {format(classSelectedDate, 'EEEE, MMM d')}</h2>
+                      <p className="text-sm text-muted-foreground">Book a spot in a class</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => { setClassStep(1); setClassSelectedSlot(null); }}>
+                      <ArrowLeft className="h-4 w-4 mr-1" /> Change date
+                    </Button>
+                  </div>
+                  {locations.length > 1 && (
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className="text-sm text-muted-foreground">Location:</span>
+                      {locations.map((loc) => (
+                        <Button
+                          key={loc.id}
+                          variant={selectedLocation?.id === loc.id ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setSelectedLocation(loc)}
+                        >
+                          {loc.name}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  {withSpots.length === 0 ? (
+                    <Card className="glass-card p-6 text-center">
+                      <p className="text-muted-foreground">No classes with spots left on this day.</p>
+                      <Button variant="outline" className="mt-3" onClick={() => setClassStep(1)}>Pick another date</Button>
+                    </Card>
+                  ) : (
+                    <div className="space-y-3">
+                      {withSpots.map(({ row, spotsLeft }) => (
+                        <Card key={row.id} className="glass-card overflow-hidden">
+                          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium">{row.service?.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {format(new Date(`2000-01-01T${row.start_time}`), 'h:mm a')}
+                                {' · '}
+                                {row.service?.duration ?? 0} min
+                                {row.staff?.name && ` · ${row.staff.name}`}
+                                {row.facility?.name && ` · ${row.facility.name}`}
+                                {row.location?.name && ` · ${row.location.name}`}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Badge variant="secondary">{spotsLeft} left</Badge>
+                              <Button
+                                size="sm"
+                                onClick={() => { setClassSelectedSlot(row); setClassStep(3); }}
+                              >
+                                Book
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            {classStep === 3 && classSelectedSlot && business && (
+              <div className="space-y-6">
+                <div className="text-center sm:text-left">
+                  <h2 className="text-xl sm:text-2xl font-display font-bold">Confirm booking</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {classSelectedSlot.service?.name} · {classSelectedDate && format(classSelectedDate, 'EEEE, MMM d')} at {format(new Date(`2000-01-01T${classSelectedSlot.start_time}`), 'h:mm a')}
+                  </p>
+                </div>
+                <Card className="glass-card max-w-md">
+                  <CardContent className="pt-6 space-y-4">
+                    <div>
+                      <Label htmlFor="class-name">Name *</Label>
+                      <Input id="class-name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Your name" />
+                    </div>
+                    <div>
+                      <Label htmlFor="class-email">Email *</Label>
+                      <Input id="class-email" type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="you@example.com" />
+                    </div>
+                    <div>
+                      <Label htmlFor="class-phone">Phone</Label>
+                      <Input id="class-phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="Optional" />
+                    </div>
+                    <div>
+                      <Label htmlFor="class-notes">Notes</Label>
+                      <Textarea id="class-notes" value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} placeholder="Optional" rows={2} />
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                      <Button variant="outline" className="flex-1" onClick={() => { setClassStep(2); setClassSelectedSlot(null); }}>
+                        Back
+                      </Button>
+                      <Button
+                        className="flex-1"
+                        disabled={submitting || !customerName.trim() || !customerEmail.trim()}
+                        onClick={async () => {
+                          const validation = customerSchema.safeParse({ name: customerName, email: customerEmail, phone: customerPhone || undefined, notes: customerNotes || undefined });
+                          if (!validation.success) { toast.error(validation.error.errors[0].message); return; }
+                          setSubmitting(true);
+                          try {
+                            let customerId: string;
+                            const { data: existingCustomer } = await supabase.from('customers').select('id').eq('business_id', business.id).eq('email', customerEmail).maybeSingle();
+                            if (existingCustomer) {
+                              customerId = existingCustomer.id;
+                              if (loggedInUser) {
+                                await supabase.from('customers').update({ user_id: loggedInUser.id, name: customerName }).eq('id', existingCustomer.id);
+                              }
+                            } else {
+                              const { data: newC, error: insertErr } = await supabase.from('customers').insert({
+                                business_id: business.id,
+                                name: customerName,
+                                email: customerEmail,
+                                phone: customerPhone || null,
+                                notes: customerNotes || null,
+                                user_id: loggedInUser?.id || null,
+                              }).select('id').single();
+                              if (insertErr || !newC?.id) throw new Error(insertErr?.message ?? 'Failed to create customer');
+                              customerId = newC.id;
+                            }
+                            const startTime = new Date(classSelectedDate!);
+                            const [h, m] = String(classSelectedSlot.start_time).slice(0, 5).split(':').map(Number);
+                            startTime.setHours(h, m, 0, 0);
+                            const duration = classSelectedSlot.service?.duration ?? 60;
+                            const endTime = addMinutes(startTime, duration);
+                            await supabase.from('appointments').insert({
+                              business_id: business.id,
+                              customer_id: customerId,
+                              service_id: classSelectedSlot.service_id,
+                              staff_id: classSelectedSlot.staff_id || null,
+                              location_id: classSelectedSlot.location_id || null,
+                              facility_id: classSelectedSlot.facility_id || null,
+                              start_time: startTime.toISOString(),
+                              end_time: endTime.toISOString(),
+                              status: 'confirmed',
+                              notes: customerNotes || null,
+                              price: services.find(s => s.id === classSelectedSlot.service_id)?.price ?? null,
+                            });
+                            setBookingComplete(true);
+                            setSelectedDate(classSelectedDate);
+                            setSelectedTime(String(classSelectedSlot.start_time).slice(0, 5));
+                            setSelectedService(services.find(s => s.id === classSelectedSlot.service_id) ?? null);
+                            toast.success('You’re booked!');
+                          } catch (e: any) {
+                            toast.error(e?.message ?? 'Booking failed');
+                          } finally {
+                            setSubmitting(false);
+                          }
+                        }}
+                      >
+                        {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm booking'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Progress Steps and regular booking steps (hidden when using class schedule) */}
+        {!business?.use_class_schedule && (
+        <>
         {(() => {
           const hasMultipleLocations = locations.length > 1;
           const totalSteps = hasMultipleLocations ? 5 : 4;
@@ -2721,6 +2969,8 @@ export default function PublicBooking() {
               )}
             </div>
           </div>
+        )}
+        </>
         )}
       </main>
 
