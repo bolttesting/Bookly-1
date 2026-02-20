@@ -333,10 +333,10 @@ export function ClassScheduleSettings() {
                         </div>
                         <div>
                           <Label>Instructor (optional)</Label>
-                          <Select value={newClassStaff ?? ''} onValueChange={(v) => setNewClassStaff(v || null)}>
+                          <Select value={newClassStaff ?? '__none__'} onValueChange={(v) => setNewClassStaff(v === '__none__' ? null : v)}>
                             <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">—</SelectItem>
+                              <SelectItem value="__none__">—</SelectItem>
                               {(staff || []).map((s) => (
                                 <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                               ))}
@@ -346,10 +346,10 @@ export function ClassScheduleSettings() {
                         {(newClassLocation || currentLocationId) && (
                           <div>
                             <Label>Room (optional)</Label>
-                            <Select value={newClassFacility ?? ''} onValueChange={(v) => setNewClassFacility(v || null)}>
+                            <Select value={newClassFacility ?? '__none__'} onValueChange={(v) => setNewClassFacility(v === '__none__' ? null : v)}>
                               <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">—</SelectItem>
+                                <SelectItem value="__none__">—</SelectItem>
                                 {((addClassOpen && newClassLocation ? facilitiesForNewClass : facilities) || []).map((f) => (
                                   <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                                 ))}
