@@ -1960,12 +1960,12 @@ export default function PublicBooking() {
           const uniqueInstructors = Array.from(new Map(scheduledClasses.filter((r) => r.staff_id).map((r) => [r.staff_id!, { id: r.staff_id!, name: r.staff?.name ?? '' }])).values()).filter((c) => c.name);
           const uniqueFacilities = Array.from(new Map(scheduledClasses.filter((r) => r.facility_id).map((r) => [r.facility_id!, { id: r.facility_id!, name: r.facility?.name ?? '' }])).values()).filter((c) => c.name);
           return (
-          <div className="space-y-6">
+          <div className="space-y-6 w-full min-w-0">
             <Tabs value={classScheduleMainTab} onValueChange={(v) => {
               setClassScheduleMainTab(v as 'classes' | 'packages');
               if (v === 'packages') { setBookableType('package'); setSelectedService(null); setSelectedPackage(null); }
             }} className="w-full">
-              <TabsList className="grid w-full max-w-sm grid-cols-2 mb-4">
+              <TabsList className="grid w-full max-w-full sm:max-w-sm grid-cols-2 mb-4">
                 <TabsTrigger value="classes" className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
                   Book a class
@@ -1983,7 +1983,7 @@ export default function PublicBooking() {
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-2 items-center">
                   <Select value={classFilterClass || '__all__'} onValueChange={(v) => setClassFilterClass(v === '__all__' ? '' : v)}>
-                    <SelectTrigger className="w-[140px]"><SelectValue placeholder="Class" /></SelectTrigger>
+                    <SelectTrigger className="w-full min-w-0 sm:w-[140px]"><SelectValue placeholder="Class" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">Class</SelectItem>
                       {uniqueClasses.map((c) => (
@@ -1992,7 +1992,7 @@ export default function PublicBooking() {
                     </SelectContent>
                   </Select>
                   <Select value={classFilterInstructor || '__all__'} onValueChange={(v) => setClassFilterInstructor(v === '__all__' ? '' : v)}>
-                    <SelectTrigger className="w-[140px]"><SelectValue placeholder="Instructor" /></SelectTrigger>
+                    <SelectTrigger className="w-full min-w-0 sm:w-[140px]"><SelectValue placeholder="Instructor" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">Instructor</SelectItem>
                       {uniqueInstructors.map((c) => (
@@ -2001,7 +2001,7 @@ export default function PublicBooking() {
                     </SelectContent>
                   </Select>
                   <Select value={classFilterFacility || '__all__'} onValueChange={(v) => setClassFilterFacility(v === '__all__' ? '' : v)}>
-                    <SelectTrigger className="w-[140px]"><SelectValue placeholder="Facility" /></SelectTrigger>
+                    <SelectTrigger className="w-full min-w-0 sm:w-[140px]"><SelectValue placeholder="Facility" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">Facility</SelectItem>
                       {uniqueFacilities.map((c) => (
@@ -2017,44 +2017,46 @@ export default function PublicBooking() {
                 )}
               </div>
 
-              {/* Date navigation: 7 days */}
-              <div className="flex items-center gap-1 overflow-x-auto pb-2 mt-6">
-                <Button variant="outline" size="icon" className="shrink-0" onClick={() => setClassSelectedDate(addDays(selectedDate, -7))} aria-label="Previous week">
+              {/* Date navigation: 7 days - scrollable on mobile */}
+              <div className="flex items-center gap-1 sm:gap-2 mt-6">
+                <Button variant="outline" size="icon" className="shrink-0 h-9 w-9" onClick={() => setClassSelectedDate(addDays(selectedDate, -7))} aria-label="Previous week">
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
-                <div className="flex flex-1 gap-1 min-w-0 justify-between">
-                  {weekDays.map((d) => {
-                    const isSelected = format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
-                    const isPast = isBefore(d, today);
-                    return (
-                      <button
-                        key={d.toISOString()}
-                        type="button"
-                        onClick={() => !isPast && setClassSelectedDate(d)}
-                        disabled={isPast}
-                        className={cn(
-                          'shrink-0 rounded-md border px-2 py-2 text-center text-sm transition-colors min-w-[52px]',
-                          isSelected && 'border-primary bg-primary/10 font-medium',
-                          !isSelected && !isPast && 'border-border hover:bg-muted',
-                          isPast && 'opacity-50 cursor-not-allowed'
-                        )}
-                      >
-                        <div className="font-medium">{format(d, 'EEE')}</div>
-                        <div className="text-muted-foreground">{format(d, 'd MMM')}</div>
-                      </button>
-                    );
-                  })}
+                <div className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden pb-2 -mx-1 px-1 touch-pan-x">
+                  <div className="flex gap-1 sm:justify-between min-w-min sm:min-w-0">
+                    {weekDays.map((d) => {
+                      const isSelected = format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+                      const isPast = isBefore(d, today);
+                      return (
+                        <button
+                          key={d.toISOString()}
+                          type="button"
+                          onClick={() => !isPast && setClassSelectedDate(d)}
+                          disabled={isPast}
+                          className={cn(
+                            'shrink-0 rounded-md border px-2 py-2 text-center text-xs sm:text-sm transition-colors min-w-[48px] sm:min-w-[52px]',
+                            isSelected && 'border-primary bg-primary/10 font-medium',
+                            !isSelected && !isPast && 'border-border hover:bg-muted',
+                            isPast && 'opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <div className="font-medium">{format(d, 'EEE')}</div>
+                          <div className="text-muted-foreground">{format(d, 'd MMM')}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <Button variant="outline" size="icon" className="shrink-0" onClick={() => setClassSelectedDate(addDays(selectedDate, 7))} aria-label="Next week">
+                <Button variant="outline" size="icon" className="shrink-0 h-9 w-9" onClick={() => setClassSelectedDate(addDays(selectedDate, 7))} aria-label="Next week">
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
 
               {locations.length > 1 && (
                 <div className="flex flex-wrap gap-2 items-center">
-                  <span className="text-sm text-muted-foreground">Location:</span>
+                  <span className="text-sm text-muted-foreground w-full sm:w-auto">Location:</span>
                   {locations.map((loc) => (
-                    <Button key={loc.id} variant={selectedLocation?.id === loc.id ? 'default' : 'outline'} size="sm" onClick={() => setSelectedLocation(loc)}>{loc.name}</Button>
+                    <Button key={loc.id} variant={selectedLocation?.id === loc.id ? 'default' : 'outline'} size="sm" className="flex-1 sm:flex-initial min-w-0" onClick={() => setSelectedLocation(loc)}>{loc.name}</Button>
                   ))}
                 </div>
               )}
@@ -2090,8 +2092,8 @@ export default function PublicBooking() {
                     {withSpots.map(({ row, spotsLeft }) => {
                       const initials = (row.staff?.name ?? '?').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
                       return (
-                        <div key={row.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-card hover:bg-muted/30 transition-colors">
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div key={row.id} className="flex flex-col gap-3 p-4 bg-card hover:bg-muted/30 transition-colors sm:flex-row sm:items-center">
+                          <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                             <div className="shrink-0 space-y-0.5 text-sm">
                               <div className="font-medium">{format(new Date(`2000-01-01T${row.start_time}`), 'h:mm a')}</div>
                               <div className="text-muted-foreground">{row.service?.duration ?? 0} min</div>
@@ -2099,16 +2101,17 @@ export default function PublicBooking() {
                             <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center text-xs font-medium shrink-0">
                               {initials}
                             </div>
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <div className="font-medium">{row.service?.name}</div>
                               <div className="text-sm text-muted-foreground">{row.staff?.name ?? '—'}</div>
-                              <div className="text-xs text-muted-foreground">{row.facility?.name ?? '—'}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {[row.facility?.name, row.location?.name].filter(Boolean).join(' · ') || '—'}
+                              </div>
                             </div>
-                            <div className="text-sm text-muted-foreground shrink-0">{row.location?.name ?? '—'}</div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0 sm:pl-4">
-                            <Badge variant="secondary">{spotsLeft} left</Badge>
-                            <Button size="sm" onClick={() => { setClassSelectedSlot(row); setClassStep(3); }}>Book</Button>
+                          <div className="flex items-center gap-2 shrink-0 sm:pl-4 border-t border-border pt-3 sm:border-t-0 sm:pt-0 -mx-4 px-4 sm:mx-0 sm:px-0">
+                            <Badge variant="secondary" className="shrink-0">{spotsLeft} left</Badge>
+                            <Button size="sm" className="w-full sm:w-auto min-w-[80px]" onClick={() => { setClassSelectedSlot(row); setClassStep(3); }}>Book</Button>
                           </div>
                         </div>
                       );
