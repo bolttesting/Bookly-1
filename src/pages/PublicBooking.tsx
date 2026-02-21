@@ -791,17 +791,24 @@ export default function PublicBooking() {
   };
 
   const handleSubmit = async () => {
-    logger.debug('🚀 BOOKING SUBMITTED - Starting booking process');
+    const isPackageOnlyCheckout = !!(business?.use_class_schedule && classScheduleMainTab === 'packages' && selectedPackage);
+    logger.debug('🚀 BOOKING SUBMITTED - Starting booking process', { isPackageOnlyCheckout });
     logger.debug('Form state:', {
       business: !!business,
       selectedService: !!selectedService,
+      selectedPackage: !!selectedPackage,
       selectedDate: !!selectedDate,
       selectedTime: !!selectedTime,
       customerName,
       customerEmail,
     });
-    
-    if (!business || !effectiveService || !selectedDate || !selectedTime) {
+
+    if (isPackageOnlyCheckout) {
+      if (!business || !selectedPackage || !customerName?.trim() || !customerEmail?.trim()) {
+        toast.error('Please complete all steps.');
+        return;
+      }
+    } else if (!business || !effectiveService || !selectedDate || !selectedTime) {
       logger.error('❌ Missing required fields:', {
         business: !business,
         effectiveService: !effectiveService,
@@ -994,18 +1001,60 @@ export default function PublicBooking() {
           package_template_id: selectedPackage.id,
           business_id: business.id,
           expires_at: expiresAt.toISOString(),
-          bookings_remaining: selectedPackage.booking_limit - 1,
-          bookings_used: 1,
+          bookings_remaining: isPackageOnlyCheckout ? selectedPackage.booking_limit : selectedPackage.booking_limit - 1,
+          bookings_used: isPackageOnlyCheckout ? 0 : 1,
           status: 'active',
         }).select('id').single();
         if (cpErr) throw cpErr;
         customerPackageId = cp?.id ?? null;
       }
 
+      if (isPackageOnlyCheckout) {
+        const basePrice = Number(selectedPackage!.price);
+        let finalPrice = basePrice;
+        if (appliedCoupon) {
+          if (appliedCoupon.discountType === 'percentage') {
+            finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
+          } else {
+            finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
+          }
+        }
+        const hasStripe = business.stripe_connected;
+        const paymentTiming = business.payment_timing || 'advance';
+        const requiresPayment = business.require_payment && hasStripe && finalPrice > 0;
+        let paymentStatus: 'pending' | 'paid' | 'partial' = 'paid';
+        let requiresAdvancePayment = false;
+        let advanceAmount = 0;
+        if (requiresPayment) {
+          if (paymentTiming === 'advance') {
+            paymentStatus = 'pending';
+            requiresAdvancePayment = true;
+            advanceAmount = finalPrice;
+          } else if (paymentTiming === 'on_spot') {
+            paymentStatus = 'pending';
+          } else if (paymentTiming === 'partial') {
+            const partialPercentage = business.partial_payment_percentage || 50;
+            advanceAmount = (finalPrice * partialPercentage) / 100;
+            paymentStatus = 'partial';
+            requiresAdvancePayment = true;
+          }
+        }
+        if (requiresAdvancePayment && advanceAmount > 0) {
+          toast.info('Online payment for package purchases is not yet available. Please contact the studio to purchase a package.');
+          setSubmitting(false);
+          return;
+        }
+        setBookingComplete(true);
+        setCreatedCustomerId(customerId);
+        toast.success('Package purchased! You can now book classes using your credits.');
+        setSubmitting(false);
+        return;
+      }
+
       // Create appointment
-      const [hours, minutes] = selectedTime.split(':').map(Number);
-      const startTime = setMinutes(setHours(selectedDate, hours), minutes);
-      const endTime = addMinutes(startTime, effectiveService.duration);
+      const [hours, minutes] = selectedTime!.split(':').map(Number);
+      const startTime = setMinutes(setHours(selectedDate!, hours), minutes);
+      const endTime = addMinutes(startTime, effectiveService!.duration);
 
       logger.debug('📅 Appointment timing:', {
         selectedDate: selectedDate.toISOString(),
@@ -1571,6 +1620,7 @@ export default function PublicBooking() {
   }
 
   if (bookingComplete) {
+    const isPackagePurchase = selectedPackage && !selectedDate && (business?.use_class_schedule && classScheduleMainTab === 'packages');
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="glass-card max-w-md w-full">
@@ -1578,28 +1628,38 @@ export default function PublicBooking() {
             <div className="mx-auto h-16 w-16 rounded-full bg-success/20 flex items-center justify-center mb-4">
               <CheckCircle className="h-8 w-8 text-success" />
             </div>
-            <CardTitle className="text-2xl">Booking Confirmed!</CardTitle>
+            <CardTitle className="text-2xl">{isPackagePurchase ? 'Package Purchased!' : 'Booking Confirmed!'}</CardTitle>
             <CardDescription>
-              Your appointment has been scheduled
+              {isPackagePurchase ? 'You can now book classes using your credits.' : 'Your appointment has been scheduled'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="glass-card p-4 space-y-2">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Service</span>
+                <span className="text-muted-foreground">{isPackagePurchase ? 'Package' : 'Service'}</span>
                 <span className="font-medium">{selectedPackage?.name || effectiveService?.name}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Date</span>
-                <span className="font-medium">{selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy')}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Time</span>
-                <span className="font-medium">{selectedTime && format(new Date(`2000-01-01T${selectedTime}`), 'h:mm a')}</span>
-              </div>
+              {isPackagePurchase && selectedPackage && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Sessions</span>
+                  <span className="font-medium">{selectedPackage.booking_limit}</span>
+                </div>
+              )}
+              {!isPackagePurchase && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Date</span>
+                    <span className="font-medium">{selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Time</span>
+                    <span className="font-medium">{selectedTime && format(new Date(`2000-01-01T${selectedTime}`), 'h:mm a')}</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Price</span>
-                <span className="font-medium">{formatCurrencySimple(Number(selectedPackage?.price ?? effectiveService?.price), business?.currency || 'USD')}</span>
+                <span className="font-medium">{formatCurrencySimple(Number(selectedPackage?.price ?? effectiveService?.price ?? 0), business?.currency || 'USD')}</span>
               </div>
             </div>
             <p className="text-sm text-muted-foreground text-center">
@@ -1622,7 +1682,7 @@ export default function PublicBooking() {
                 setCustomerNotes('');
               }}
             >
-              Book Another Appointment
+              {isPackagePurchase ? 'Purchase Another Package' : 'Book Another Appointment'}
             </Button>
           </CardContent>
         </Card>
@@ -2451,8 +2511,11 @@ export default function PublicBooking() {
         <>
         {(() => {
           const hasMultipleLocations = locations.length > 1;
-          const totalSteps = hasMultipleLocations ? 5 : 4;
-          const adjustedStep = hasMultipleLocations ? step : (step > 1 ? step - 1 : step);
+          const isPackageOnly = !!(business?.use_class_schedule && classScheduleMainTab === 'packages');
+          const totalSteps = isPackageOnly ? (hasMultipleLocations ? 3 : 2) : (hasMultipleLocations ? 5 : 4);
+          const progressStep = isPackageOnly
+            ? (hasMultipleLocations ? (step <= 2 ? step : 3) : (step <= 1 ? 1 : 2))
+            : (hasMultipleLocations ? step : (step > 1 ? step - 1 : step));
           
           return (
             <div className="flex items-center justify-center gap-1 sm:gap-2 mb-6 sm:mb-8 overflow-x-auto pb-2">
@@ -2460,9 +2523,7 @@ export default function PublicBooking() {
                 <div key={s} className="flex items-center">
                   <div
                     className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                      step >= s
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-secondary text-muted-foreground'
+                      progressStep >= s ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'
                     }`}
                   >
                     {s}
@@ -2470,7 +2531,7 @@ export default function PublicBooking() {
                   {s < totalSteps && (
                     <div
                       className={`w-6 sm:w-12 h-1 mx-0.5 sm:mx-1 rounded ${
-                        step > s ? 'bg-primary' : 'bg-secondary'
+                        progressStep > s ? 'bg-primary' : 'bg-secondary'
                       }`}
                     />
                   )}
@@ -2701,7 +2762,13 @@ export default function PublicBooking() {
               {locations.length <= 1 && <div />}
               <Button
                 disabled={business?.use_class_schedule && classScheduleMainTab === 'packages' ? !selectedPackage : !effectiveService}
-                onClick={() => setStep(locations.length > 1 ? 3 : 2)}
+                onClick={() => {
+                  if (business?.use_class_schedule && classScheduleMainTab === 'packages') {
+                    setStep(locations.length > 1 ? 5 : 4);
+                  } else {
+                    setStep(locations.length > 1 ? 3 : 2);
+                  }
+                }}
               >
                 Continue
                 <ArrowRight className="h-4 w-4 ml-2" />
@@ -2710,8 +2777,8 @@ export default function PublicBooking() {
           </div>
         )}
 
-        {/* Step: Select Staff (Step 2 if no locations, Step 3 if locations) */}
-        {((locations.length <= 1 && step === 2) || (locations.length > 1 && step === 3)) && (
+        {/* Step: Select Staff (Step 2 if no locations, Step 3 if locations) - skip for package-only in class schedule */}
+        {!((business?.use_class_schedule && classScheduleMainTab === 'packages')) && ((locations.length <= 1 && step === 2) || (locations.length > 1 && step === 3)) && (
           <div className="space-y-6">
             <div className="text-center">
               <h2 className="text-xl sm:text-2xl font-display font-bold">Select a Staff Member</h2>
@@ -2768,8 +2835,8 @@ export default function PublicBooking() {
           </div>
         )}
 
-        {/* Step: Select Date & Time (Step 3 if no locations, Step 4 if locations) */}
-        {((locations.length <= 1 && step === 3) || (locations.length > 1 && step === 4)) && (
+        {/* Step: Select Date & Time (Step 3 if no locations, Step 4 if locations) - skip for package-only in class schedule */}
+        {!((business?.use_class_schedule && classScheduleMainTab === 'packages')) && ((locations.length <= 1 && step === 3) || (locations.length > 1 && step === 4)) && (
           <div className="space-y-6">
             <div className="text-center">
               <h2 className="text-xl sm:text-2xl font-display font-bold">Select Date & Time</h2>
@@ -2871,7 +2938,7 @@ export default function PublicBooking() {
           </div>
         )}
 
-        {/* Step: Customer Details (Step 4 if no locations, Step 5 if locations) */}
+        {/* Step: Customer Details / Checkout (Step 4 if no locations, Step 5 if locations - or direct from package in class schedule) */}
         {((locations.length <= 1 && step === 4) || (locations.length > 1 && step === 5)) && (
           <div className="space-y-6">
             <div className="text-center">
@@ -3175,34 +3242,46 @@ export default function PublicBooking() {
 
               <Card className="glass-card">
                 <CardHeader>
-                  <CardTitle className="text-lg">Booking Summary</CardTitle>
+                  <CardTitle className="text-lg">
+                    {(business?.use_class_schedule && classScheduleMainTab === 'packages') ? 'Package Summary' : 'Booking Summary'}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
                     <div className="flex justify-between py-2 border-b border-border">
-                      <span className="text-muted-foreground">Service</span>
+                      <span className="text-muted-foreground">{(business?.use_class_schedule && classScheduleMainTab === 'packages') ? 'Package' : 'Service'}</span>
                       <span className="font-medium">{selectedPackage?.name || effectiveService?.name}</span>
                     </div>
-                    <div className="flex justify-between py-2 border-b border-border">
-                      <span className="text-muted-foreground">Duration</span>
-                      <span className="font-medium">{effectiveService?.duration} min</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-border">
-                      <span className="text-muted-foreground">Staff</span>
-                      <span className="font-medium">{selectedStaff?.name || 'Any available'}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-border">
-                      <span className="text-muted-foreground">Date</span>
-                      <span className="font-medium">
-                        {selectedDate && format(selectedDate, 'MMM d, yyyy')}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-border">
-                      <span className="text-muted-foreground">Time</span>
-                      <span className="font-medium">
-                        {selectedTime && format(new Date(`2000-01-01T${selectedTime}`), 'h:mm a')}
-                      </span>
-                    </div>
+                    {(business?.use_class_schedule && classScheduleMainTab === 'packages') && selectedPackage && (
+                      <div className="flex justify-between py-2 border-b border-border">
+                        <span className="text-muted-foreground">Sessions</span>
+                        <span className="font-medium">{selectedPackage.booking_limit}</span>
+                      </div>
+                    )}
+                    {!((business?.use_class_schedule && classScheduleMainTab === 'packages')) && (
+                      <>
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span className="text-muted-foreground">Duration</span>
+                          <span className="font-medium">{effectiveService?.duration} min</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span className="text-muted-foreground">Staff</span>
+                          <span className="font-medium">{selectedStaff?.name || 'Any available'}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span className="text-muted-foreground">Date</span>
+                          <span className="font-medium">
+                            {selectedDate && format(selectedDate, 'MMM d, yyyy')}
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-border">
+                          <span className="text-muted-foreground">Time</span>
+                          <span className="font-medium">
+                            {selectedTime && format(new Date(`2000-01-01T${selectedTime}`), 'h:mm a')}
+                          </span>
+                        </div>
+                      </>
+                    )}
                     {appliedCoupon && (
                       <div className="flex justify-between py-2 border-b border-border">
                         <span className="text-muted-foreground">Discount ({appliedCoupon.code})</span>
@@ -3216,8 +3295,8 @@ export default function PublicBooking() {
                     <div className="flex justify-between py-2 text-lg">
                       <span className="font-semibold">Total</span>
                       <span className="font-bold text-primary">
-                        {effectiveService ? (() => {
-                          const basePrice = Number(selectedPackage?.price ?? effectiveService?.price);
+                        {(() => {
+                          const basePrice = Number(selectedPackage?.price ?? effectiveService?.price ?? 0);
                           let finalPrice = basePrice;
                           if (appliedCoupon) {
                             if (appliedCoupon.discountType === 'percentage') {
@@ -3227,7 +3306,7 @@ export default function PublicBooking() {
                             }
                           }
                           return formatCurrencySimple(finalPrice, business?.currency || 'USD');
-                        })() : formatCurrencySimple(0, business?.currency || 'USD')}
+                        })()}
                       </span>
                     </div>
                   </div>
@@ -3273,7 +3352,7 @@ export default function PublicBooking() {
                             type="button"
                             variant="outline"
                             onClick={async () => {
-                              if (!couponCode.trim() || !effectiveService || !business) return;
+                              if (!couponCode.trim() || !business || !(effectiveService || selectedPackage)) return;
                               
                               setIsApplyingCoupon(true);
                               setCouponError('');
@@ -3282,8 +3361,8 @@ export default function PublicBooking() {
                                 const { data, error } = await supabase.rpc('validate_coupon', {
                                   _coupon_code: couponCode.trim(),
                                   _business_id: business.id,
-                                  _purchase_amount: Number(selectedPackage?.price ?? effectiveService?.price),
-                                  _service_id: effectiveService.id,
+                                  _purchase_amount: Number(selectedPackage?.price ?? effectiveService?.price ?? 0),
+                                  _service_id: effectiveService?.id ?? null,
                                   _package_template_id: selectedPackage?.id || null,
                                 });
                                 
@@ -3324,7 +3403,8 @@ export default function PublicBooking() {
                     )}
                   </div>
                     
-                  {/* Recurring Appointment Options */}
+                  {/* Recurring Appointment Options - only for service bookings */}
+                  {!((business?.use_class_schedule && classScheduleMainTab === 'packages')) && (
                   <div className="space-y-4 pt-4 border-t border-border">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -3432,12 +3512,17 @@ export default function PublicBooking() {
                         </Collapsible>
                       )}
                   </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
 
             <div className="flex justify-between gap-3">
-              <Button variant="outline" onClick={() => setStep(locations.length > 1 ? 4 : 3)} className="flex-1 sm:flex-initial">
+              <Button
+                variant="outline"
+                onClick={() => setStep(business?.use_class_schedule && classScheduleMainTab === 'packages' ? (locations.length > 1 ? 2 : 1) : (locations.length > 1 ? 4 : 3))}
+                className="flex-1 sm:flex-initial"
+              >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
@@ -3450,11 +3535,11 @@ export default function PublicBooking() {
                   {submitting ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Booking...
+                      {(business?.use_class_schedule && classScheduleMainTab === 'packages') ? 'Processing...' : 'Booking...'}
                     </>
                   ) : (
                     <>
-                      Confirm Booking
+                      {(business?.use_class_schedule && classScheduleMainTab === 'packages') ? 'Confirm Purchase' : 'Confirm Booking'}
                       <CheckCircle className="h-4 w-4 ml-2" />
                     </>
                   )}
