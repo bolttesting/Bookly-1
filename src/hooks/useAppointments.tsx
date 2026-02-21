@@ -130,6 +130,7 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
               try {
                 await supabase.functions.invoke('send-welcome-email', {
                   body: {
+                    business_id: business.id,
                     customerEmail: fullAppointment.customer.email,
                     customerName: fullAppointment.customer.name,
                     businessName: business.name,
@@ -252,6 +253,7 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
 
               await supabase.functions.invoke('send-reschedule-email', {
                 body: {
+                  business_id: business.id,
                   customerEmail: data.customer.email,
                   customerName: data.customer.name,
                   serviceName: data.service.name,
@@ -379,6 +381,7 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
 
             await supabase.functions.invoke('send-cancellation-email', {
               body: {
+                business_id: business.id,
                 customerEmail: appointment.customer.email,
                 customerName: appointment.customer.name,
                 serviceName: appointment.service.name,

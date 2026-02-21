@@ -1,8 +1,10 @@
 // Send daily booking summary email to business owners/admins
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const PLATFORM_RESEND_KEY = Deno.env.get("RESEND_API_KEY");
+const DEFAULT_FROM = "Bookly <bookly@logixcontact.site>";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +12,7 @@ const corsHeaders = {
 };
 
 interface DailySummaryRequest {
+  business_id?: string;
   businessEmail: string;
   businessName: string;
   appointmentDate: string;
@@ -27,21 +30,39 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (!RESEND_API_KEY) {
-    return new Response(
-      JSON.stringify({ success: false, error: "RESEND_API_KEY not configured" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
-    );
-  }
-
   try {
     const {
+      business_id: businessId,
       businessEmail,
       businessName,
       appointmentDate,
       appointments,
       totalCount,
     }: DailySummaryRequest = await req.json();
+
+    let apiKey = PLATFORM_RESEND_KEY;
+    let from = DEFAULT_FROM;
+    if (businessId) {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      );
+      const { data: emailConfig } = await supabase
+        .from("business_email_config")
+        .select("from_email, from_name, resend_api_key")
+        .eq("business_id", businessId)
+        .maybeSingle();
+      if (emailConfig?.resend_api_key) {
+        apiKey = emailConfig.resend_api_key;
+        from = `${emailConfig.from_name || businessName || "Business"} <${emailConfig.from_email}>`;
+      }
+    }
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: "RESEND_API_KEY not configured" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
 
     if (!businessEmail) {
       return new Response(
@@ -115,10 +136,10 @@ serve(async (req) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: `Bookly <bookly@logixcontact.site>`,
+        from,
         to: [businessEmail],
         subject: `Daily Summary - ${appointmentDate} | ${businessName}`,
         html: htmlContent,

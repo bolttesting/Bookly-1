@@ -1280,6 +1280,7 @@ export default function PublicBooking() {
             try {
               await supabase.functions.invoke('send-welcome-email', {
                 body: {
+                  business_id: business.id,
                   customerEmail,
                   customerName,
                   businessName: business.name,
@@ -1339,6 +1340,7 @@ export default function PublicBooking() {
           const emailResult = await supabase.functions.invoke('send-booking-confirmation', {
           body: {
             appointmentId: appointment.id,
+            business_id: business.id,
             customerEmail,
             customerName,
             serviceName: selectedPackage?.name || effectiveService.name,
@@ -1499,6 +1501,7 @@ export default function PublicBooking() {
         const emailResult = await supabase.functions.invoke('send-booking-confirmation', {
           body: {
             appointmentId: createdAppointmentId,
+            business_id: business?.id,
             customerEmail,
             customerName,
             serviceName: selectedPackage?.name || effectiveService?.name || '',

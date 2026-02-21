@@ -126,6 +126,7 @@ export function CancelServiceDialog({
 
               await supabase.functions.invoke('send-reschedule-email', {
                 body: {
+                  business_id: service.business_id,
                   customerEmail: customer.email,
                   customerName: customer.name,
                   serviceName: serviceData?.name || service.name,

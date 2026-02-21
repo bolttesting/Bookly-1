@@ -136,6 +136,7 @@ serve(async (req) => {
         // Send follow-up email
         const emailResult = await supabaseClient.functions.invoke("send-followup-email", {
           body: {
+            business_id: followup.business_id,
             customerEmail: customer.email,
             customerName: customer.name,
             serviceName: service?.name || "Service",

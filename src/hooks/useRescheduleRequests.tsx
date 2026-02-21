@@ -244,6 +244,7 @@ export function useRescheduleRequests() {
           if (emailSettings?.send_reschedule_email === true) {
             await supabase.functions.invoke('send-reschedule-email', {
               body: {
+                business_id: business.id,
                 customerEmail: appointment.customer.email,
                 customerName: appointment.customer.name,
                 serviceName: (appointment.service as any)?.name || 'Service',

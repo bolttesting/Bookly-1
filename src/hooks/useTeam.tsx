@@ -164,6 +164,7 @@ export function useTeam() {
       const acceptUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/accept-invite?token=${inserted.token}`;
       const { data: emailResult, error: emailError } = await supabase.functions.invoke('send-team-invitation', {
         body: {
+          business_id: business.id,
           inviteeEmail: email.toLowerCase(),
           businessName: business.name || 'the team',
           inviterEmail: user.email || '',

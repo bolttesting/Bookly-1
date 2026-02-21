@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const PLATFORM_RESEND_KEY = Deno.env.get("RESEND_API_KEY");
+const DEFAULT_FROM = "Bookly <bookly@logixcontact.site>";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +10,7 @@ const corsHeaders = {
 };
 
 interface WelcomeEmailRequest {
+  business_id?: string;
   customerEmail: string;
   customerName: string;
   businessName: string;
@@ -23,19 +26,9 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (!RESEND_API_KEY) {
-    console.error("RESEND_API_KEY not configured");
-    return new Response(
-      JSON.stringify({ success: false, error: "Email service not configured. RESEND_API_KEY is missing." }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
-    );
-  }
-
   try {
     const {
+      business_id: businessId,
       customerEmail,
       customerName,
       businessName,
@@ -43,6 +36,36 @@ const handler = async (req: Request): Promise<Response> => {
       businessAddress,
       bookingUrl,
     }: WelcomeEmailRequest = await req.json();
+
+    let apiKey = PLATFORM_RESEND_KEY;
+    let from = DEFAULT_FROM;
+
+    if (businessId) {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      );
+      const { data: emailConfig } = await supabase
+        .from("business_email_config")
+        .select("from_email, from_name, resend_api_key")
+        .eq("business_id", businessId)
+        .maybeSingle();
+      if (emailConfig?.resend_api_key) {
+        apiKey = emailConfig.resend_api_key;
+        from = `${emailConfig.from_name || businessName || "Business"} <${emailConfig.from_email}>`;
+      }
+    }
+
+    if (!apiKey) {
+      console.error("No Resend API key (platform or business)");
+      return new Response(
+        JSON.stringify({ success: false, error: "Email service not configured. RESEND_API_KEY is missing." }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
 
     console.log("Sending welcome email to:", customerEmail);
 
@@ -114,10 +137,10 @@ const handler = async (req: Request): Promise<Response> => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: `Bookly <bookly@logixcontact.site>`,
+        from,
         to: [customerEmail],
         subject: `Welcome to ${businessName}!`,
         html: htmlContent,

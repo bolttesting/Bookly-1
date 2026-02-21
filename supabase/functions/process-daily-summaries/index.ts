@@ -120,6 +120,7 @@ serve(async (req) => {
 
         const { error: emailErr } = await supabaseClient.functions.invoke("send-daily-summary", {
           body: {
+            business_id,
             businessEmail: toEmail,
             businessName: business.name || "Business",
             appointmentDate: formattedDate,
