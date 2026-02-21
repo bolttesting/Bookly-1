@@ -2160,11 +2160,13 @@ export default function MyAppointments() {
                                     if (error) throw error;
                                     if (data && data.length > 0 && (data[0].valid === true || data[0].is_valid === true)) {
                                       const result = data[0];
+                                      const cData = result.coupon_data || {};
+                                      const isPct = (cData.discount_type ?? cData.discountType) === 'percentage';
                                       setAppliedCoupon({
                                         code: couponCode.trim(),
-                                        couponId: result.coupon_data?.id || '',
-                                        discount: Number(result.discount_amount ?? result.discountAmount ?? 0),
-                                        discountType: (result.coupon_data?.discount_type ?? result.coupon_data?.discountType) === 'percentage' ? 'percentage' : 'fixed',
+                                        couponId: cData.id || '',
+                                        discount: isPct ? Number(cData.discount_value ?? cData.discountValue ?? 0) : Number(result.discount_amount ?? result.discountAmount ?? 0),
+                                        discountType: isPct ? 'percentage' : 'fixed',
                                       });
                                       setCouponError('');
                                       toast.success('Coupon applied!');
