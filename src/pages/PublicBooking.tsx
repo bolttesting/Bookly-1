@@ -2337,14 +2337,15 @@ export default function PublicBooking() {
                                         _package_template_id: null,
                                       });
                                       if (error) throw error;
-                                      if (data && data.length > 0 && data[0].is_valid) {
+                                      if (data && data.length > 0 && (data[0].valid === true || data[0].is_valid === true)) {
                                         const result = data[0];
                                         setAppliedCoupon({
                                           code: couponCode.trim(),
                                           couponId: result.coupon_data?.id || '',
-                                          discount: Number(result.discount_amount),
-                                          discountType: result.coupon_data?.discount_type === 'percentage' ? 'percentage' : 'fixed',
+                                          discount: Number(result.discount_amount ?? result.discountAmount ?? 0),
+                                          discountType: (result.coupon_data?.discount_type ?? result.coupon_data?.discountType) === 'percentage' ? 'percentage' : 'fixed',
                                         });
+                                        setCouponError('');
                                         toast.success('Coupon applied successfully!');
                                       } else {
                                         setCouponError(data?.[0]?.message || 'Invalid coupon code');
@@ -3371,21 +3372,22 @@ export default function PublicBooking() {
                                 
                                 if (error) throw error;
                                 
-                                if (data && data.length > 0 && data[0].is_valid) {
+                                if (data && data.length > 0 && (data[0].valid === true || data[0].is_valid === true)) {
                                   const result = data[0];
                                   setAppliedCoupon({
                                     code: couponCode.trim(),
                                     couponId: result.coupon_data?.id || '',
-                                    discount: Number(result.discount_amount),
-                                    discountType: result.coupon_data?.discount_type === 'percentage' ? 'percentage' : 'fixed',
+                                    discount: Number(result.discount_amount ?? result.discountAmount ?? 0),
+                                    discountType: (result.coupon_data?.discount_type ?? result.coupon_data?.discountType) === 'percentage' ? 'percentage' : 'fixed',
                                   });
+                                  setCouponError('');
                                   toast.success('Coupon applied successfully!');
                                 } else {
                                   setCouponError(data?.[0]?.message || 'Invalid coupon code');
                                 }
                               } catch (error: any) {
-                                setCouponError(error.message || 'Failed to apply coupon');
-                                toast.error(error.message || 'Failed to apply coupon');
+                                setCouponError(error?.message || 'Failed to apply coupon');
+                                toast.error(error?.message || 'Failed to apply coupon');
                               } finally {
                                 setIsApplyingCoupon(false);
                               }
