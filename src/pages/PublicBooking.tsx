@@ -171,6 +171,7 @@ export default function PublicBooking() {
   const [classSelectedPackageId, setClassSelectedPackageId] = useState<string | null>(null);
   const [classBookingCustomerId, setClassBookingCustomerId] = useState<string | null>(null);
   const [classCustomerPackages, setClassCustomerPackages] = useState<any[]>([]);
+  const [classScheduleMainTab, setClassScheduleMainTab] = useState<'classes' | 'packages'>('classes');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -1900,6 +1901,22 @@ export default function PublicBooking() {
           const uniqueFacilities = Array.from(new Map(scheduledClasses.filter((r) => r.facility_id).map((r) => [r.facility_id!, { id: r.facility_id!, name: r.facility?.name ?? '' }])).values()).filter((c) => c.name);
           return (
           <div className="space-y-6">
+            <Tabs value={classScheduleMainTab} onValueChange={(v) => {
+              setClassScheduleMainTab(v as 'classes' | 'packages');
+              if (v === 'packages') { setBookableType('package'); setSelectedService(null); setSelectedPackage(null); }
+            }} className="w-full">
+              <TabsList className="grid w-full max-w-sm grid-cols-2 mb-4">
+                <TabsTrigger value="classes" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Book a class
+                </TabsTrigger>
+                <TabsTrigger value="packages" className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Packages
+                </TabsTrigger>
+              </TabsList>
+            {classScheduleMainTab === 'classes' && (
+            <>
             {classStep === 2 && (
             <>
               {/* Filters */}
@@ -2422,12 +2439,15 @@ export default function PublicBooking() {
                 </div>
               </div>
             )}
+            </>
+            )}
+            </Tabs>
           </div>
         );
         })()}
 
-        {/* Progress Steps and regular booking steps (hidden when using class schedule) */}
-        {!business?.use_class_schedule && (
+        {/* Progress Steps and regular booking steps (shown for non-class-schedule OR when Packages tab) */}
+        {(!business?.use_class_schedule || classScheduleMainTab === 'packages') && (
         <>
         {(() => {
           const hasMultipleLocations = locations.length > 1;
@@ -2513,10 +2533,15 @@ export default function PublicBooking() {
         {((locations.length <= 1 && step === 1) || (locations.length > 1 && step === 2)) && (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-xl sm:text-2xl font-display font-bold">Select a Service or Package</h2>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">Choose what you'd like to book</p>
+              <h2 className="text-xl sm:text-2xl font-display font-bold">
+                {business?.use_class_schedule && classScheduleMainTab === 'packages' ? 'Select a Package' : 'Select a Service or Package'}
+              </h2>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">
+                {business?.use_class_schedule && classScheduleMainTab === 'packages' ? 'Choose a package to purchase' : 'Choose what you\'d like to book'}
+              </p>
             </div>
 
+            {!(business?.use_class_schedule && classScheduleMainTab === 'packages') ? (
             <Tabs value={bookableType} onValueChange={(v) => { setBookableType(v as 'service' | 'package'); setSelectedService(null); setSelectedPackage(null); }} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-4">
                 <TabsTrigger value="service" className="flex items-center gap-2">
@@ -2620,6 +2645,51 @@ export default function PublicBooking() {
                 )}
               </TabsContent>
             </Tabs>
+            ) : (
+              /* Packages only (class schedule mode) */
+              packages.length === 0 ? (
+                <Card className="glass-card p-6 sm:p-8 text-center">
+                  <p className="text-sm sm:text-base text-muted-foreground">No packages available at this time.</p>
+                </Card>
+              ) : (
+                <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+                  {packages.map((pkg) => (
+                    <Card
+                      key={pkg.id}
+                      className={`glass-card cursor-pointer transition-all hover:border-primary/50 overflow-hidden ${
+                        selectedPackage?.id === pkg.id ? 'border-primary ring-2 ring-primary/20' : ''
+                      }`}
+                      onClick={() => { setSelectedPackage(pkg); setSelectedService(null); }}
+                    >
+                      <ImageSlideshow
+                        imageUrls={(pkg as { image_urls?: string[] }).image_urls}
+                        alt={pkg.name}
+                        className="rounded-none"
+                      />
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-start">
+                          <CardTitle className="text-lg">{pkg.name}</CardTitle>
+                          <span className="text-lg font-bold text-primary">
+                            {formatCurrencySimple(Number(pkg.price), business?.currency || 'USD')}
+                          </span>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">{pkg.booking_limit} sessions</Badge>
+                      </CardHeader>
+                      <CardContent>
+                        {pkg.description && (
+                          <p className="text-sm text-muted-foreground mb-2">{pkg.description}</p>
+                        )}
+                        {pkg.services && pkg.services.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            Includes: {pkg.services.map((s: { name: string }) => s.name).join(', ')}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )
+            )}
 
             <div className="flex justify-between">
               {locations.length > 1 && (
@@ -2630,7 +2700,7 @@ export default function PublicBooking() {
               )}
               {locations.length <= 1 && <div />}
               <Button
-                disabled={!effectiveService}
+                disabled={business?.use_class_schedule && classScheduleMainTab === 'packages' ? !selectedPackage : !effectiveService}
                 onClick={() => setStep(locations.length > 1 ? 3 : 2)}
               >
                 Continue
