@@ -669,7 +669,7 @@ export default function MyAppointments() {
   });
 
   // Class schedule: scheduled classes and appointments for spots (when business uses class schedule)
-  const { data: scheduledClasses = [], isLoading: scheduledClassesLoading } = useScheduledClasses(
+  const { rows: scheduledClasses = [], isLoading: scheduledClassesLoading } = useScheduledClasses(
     classScheduleMode && selectedBusiness?.id ? selectedBusiness.id : null
   );
 
@@ -1609,9 +1609,9 @@ export default function MyAppointments() {
                     const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
                     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
                     const hasFilters = !!(classFilterClass || classFilterInstructor || classFilterFacility);
-                    const uniqueClasses = Array.from(new Map(scheduledClasses.map((r) => [r.service_id, { id: r.service_id, name: r.service?.name ?? '' }])).values()).filter((c) => c.name);
-                    const uniqueInstructors = Array.from(new Map(scheduledClasses.filter((r) => r.staff_id).map((r) => [r.staff_id!, { id: r.staff_id!, name: r.staff?.name ?? '' }])).values()).filter((c) => c.name);
-                    const uniqueFacilities = Array.from(new Map(scheduledClasses.filter((r) => r.facility_id).map((r) => [r.facility_id!, { id: r.facility_id!, name: r.facility?.name ?? '' }])).values()).filter((c) => c.name);
+                    const uniqueClasses = Array.from(new Map(scheduledClasses.map((r) => [r.service_id, { id: r.service_id, name: r.service?.name ?? '' }])).values()).filter((c: { id: string; name: string }) => c.name);
+                    const uniqueInstructors = Array.from(new Map(scheduledClasses.filter((r) => r.staff_id).map((r) => [r.staff_id!, { id: r.staff_id!, name: r.staff?.name ?? '' }])).values()).filter((c: { id: string; name: string }) => c.name);
+                    const uniqueFacilities = Array.from(new Map(scheduledClasses.filter((r) => r.facility_id).map((r) => [r.facility_id!, { id: r.facility_id!, name: r.facility?.name ?? '' }])).values()).filter((c: { id: string; name: string }) => c.name);
                     const classModeLocations = locations;
 
                     return (
@@ -1640,7 +1640,7 @@ export default function MyAppointments() {
                                   <SelectTrigger className="w-[140px]"><SelectValue placeholder="Class" /></SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="__all__">Class</SelectItem>
-                                    {uniqueClasses.map((c) => (
+                                    {uniqueClasses.map((c: { id: string; name: string }) => (
                                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                     ))}
                                   </SelectContent>
@@ -1649,7 +1649,7 @@ export default function MyAppointments() {
                                   <SelectTrigger className="w-[140px]"><SelectValue placeholder="Instructor" /></SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="__all__">Instructor</SelectItem>
-                                    {uniqueInstructors.map((c) => (
+                                    {uniqueInstructors.map((c: { id: string; name: string }) => (
                                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                     ))}
                                   </SelectContent>
@@ -1658,7 +1658,7 @@ export default function MyAppointments() {
                                   <SelectTrigger className="w-[140px]"><SelectValue placeholder="Facility" /></SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="__all__">Facility</SelectItem>
-                                    {uniqueFacilities.map((c) => (
+                                    {uniqueFacilities.map((c: { id: string; name: string }) => (
                                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                     ))}
                                   </SelectContent>
@@ -1706,8 +1706,8 @@ export default function MyAppointments() {
                             {classModeLocations.length > 1 && (
                               <div className="flex flex-wrap gap-2 items-center">
                                 <span className="text-sm text-muted-foreground">Location:</span>
-                                {classModeLocations.map((loc: { id: string; name: string }) => (
-                                  <Button key={loc.id} variant={selectedLocation?.id === loc.id ? 'default' : 'outline'} size="sm" onClick={() => setSelectedLocation(loc)}>{loc.name}</Button>
+                                {classModeLocations.map((loc: { id: string; name: string; address?: string | null }) => (
+                                  <Button key={loc.id} variant={selectedLocation?.id === loc.id ? 'default' : 'outline'} size="sm" onClick={() => setSelectedLocation({ ...loc, address: loc.address ?? null })}>{loc.name}</Button>
                                 ))}
                               </div>
                             )}
@@ -1716,7 +1716,9 @@ export default function MyAppointments() {
                               const dayOfWeek = selectedDate.getDay();
                               const dateStr = format(selectedDate, 'yyyy-MM-dd');
                               const forDay = scheduledClasses.filter((r) => r.day_of_week === dayOfWeek);
-                              const byLocation = selectedLocation ? forDay.filter((r) => r.location_id === selectedLocation.id) : forDay;
+                              const byLocation = (selectedLocation && classModeLocations.length > 1)
+                                ? forDay.filter((r) => r.location_id === selectedLocation.id)
+                                : forDay;
                               const appointmentsList = classModeAppointments as { start_time: string; service_id: string; location_id?: string | null; staff_id?: string | null }[];
                               let withSpots = byLocation.map((row) => {
                                 const capacity = (row.service as { slot_capacity?: number })?.slot_capacity ?? 1;

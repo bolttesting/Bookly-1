@@ -48,6 +48,8 @@ interface Business {
   require_payment?: boolean;
   stripe_connected?: boolean;
   use_class_schedule?: boolean | null;
+  payment_timing?: 'advance' | 'on_spot' | 'partial' | null;
+  partial_payment_percentage?: number | null;
 }
 
 interface Service {
