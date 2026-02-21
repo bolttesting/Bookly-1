@@ -1958,7 +1958,7 @@ export default function PublicBooking() {
               </div>
 
               {/* Date navigation: 7 days */}
-              <div className="flex items-center gap-1 overflow-x-auto pb-2">
+              <div className="flex items-center gap-1 overflow-x-auto pb-2 mt-6">
                 <Button variant="outline" size="icon" className="shrink-0" onClick={() => setClassSelectedDate(addDays(selectedDate, -7))} aria-label="Previous week">
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
