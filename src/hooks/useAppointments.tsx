@@ -307,6 +307,34 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
           }
         }
 
+        // Send booking confirmation when admin confirms a pending booking
+        const justConfirmed = oldAppointment?.status !== 'confirmed' && data.status === 'confirmed';
+        if (justConfirmed && data.customer?.email && data.service && business) {
+          try {
+            const { data: confirmSettings } = await supabase
+              .from('reminder_settings')
+              .select('send_booking_confirmation')
+              .eq('business_id', business.id)
+              .maybeSingle();
+            if (confirmSettings?.send_booking_confirmation !== false) {
+              await supabase.functions.invoke('send-booking-confirmation', {
+                body: {
+                  appointmentId: data.id,
+                  business_id: business.id,
+                  customerEmail: data.customer.email,
+                  customerName: data.customer.name ?? 'Customer',
+                  serviceName: data.service.name,
+                  businessName: business.name,
+                  startTime: data.start_time,
+                  staffName: data.staff_member?.name,
+                },
+              });
+            }
+          } catch (confirmEmailError) {
+            console.error('Failed to send booking confirmation email:', confirmEmailError);
+          }
+        }
+
         // Create notification for business owners/admins about reschedule
         if (data.customer && data.service && business) {
           const oldDate = oldStart.toLocaleDateString('en-US', {
