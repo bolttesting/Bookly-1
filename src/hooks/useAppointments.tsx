@@ -101,13 +101,14 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
 
       if (error) throw error;
       
-      // Get full appointment data with relations for welcome email
+      // Get full appointment data with relations for welcome email and confirmation email
       const { data: fullAppointment } = await supabase
         .from('appointments')
         .select(`
           *,
           customer:customers(id, name, email),
-          service:services(id, name)
+          service:services(id, name),
+          staff_member:staff_members(id, name)
         `)
         .eq('id', data.id)
         .single();
@@ -155,6 +156,33 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
         } catch (welcomeCheckError) {
           console.error('Failed to check for welcome email:', welcomeCheckError);
           // Don't fail the appointment creation if welcome check fails
+        }
+      }
+
+      // Send booking confirmation email when enabled
+      if (fullAppointment?.customer?.email) {
+        try {
+          const { data: confirmSettings } = await supabase
+            .from('reminder_settings')
+            .select('send_booking_confirmation')
+            .eq('business_id', business.id)
+            .maybeSingle();
+          if (confirmSettings?.send_booking_confirmation !== false) {
+            await supabase.functions.invoke('send-booking-confirmation', {
+              body: {
+                appointmentId: data.id,
+                business_id: business.id,
+                customerEmail: fullAppointment.customer.email,
+                customerName: fullAppointment.customer.name ?? 'Customer',
+                serviceName: fullAppointment.service?.name ?? 'Appointment',
+                businessName: business.name,
+                startTime: data.start_time,
+                staffName: (fullAppointment as any)?.staff_member?.name ?? undefined,
+              },
+            });
+          }
+        } catch (confirmEmailError) {
+          console.error('Failed to send booking confirmation email:', confirmEmailError);
         }
       }
       

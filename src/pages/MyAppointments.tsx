@@ -791,10 +791,10 @@ export default function MyAppointments() {
         throw new Error('Please fill in all required fields');
       }
 
-      // Get or create customer
+      // Get or create customer (need id, name, email for confirmation email)
       let { data: customer } = await supabase
         .from('customers')
-        .select('id')
+        .select('id, name, email')
         .eq('business_id', selectedBusiness.id)
         .eq('user_id', user.id)
         .maybeSingle();
@@ -816,7 +816,7 @@ export default function MyAppointments() {
             email: profile?.email || user.email || null,
             status: 'active',
           })
-          .select('id')
+          .select('id, name, email')
           .single();
 
         if (customerError) throw customerError;
@@ -918,7 +918,7 @@ export default function MyAppointments() {
       // Create single appointment (respect auto_confirm_bookings)
       const { data: rs } = await supabase
         .from('reminder_settings')
-        .select('auto_confirm_bookings')
+        .select('auto_confirm_bookings, send_booking_confirmation')
         .eq('business_id', selectedBusiness.id)
         .maybeSingle();
       const bookingStatus = (rs?.auto_confirm_bookings === true) ? 'confirmed' : 'pending';
@@ -945,6 +945,67 @@ export default function MyAppointments() {
         .single();
 
       if (error) throw error;
+
+      // Send booking confirmation email when enabled
+      if (rs?.send_booking_confirmation !== false && customer?.email) {
+        try {
+          const [hours, minutes] = selectedTime.split(':').map(Number);
+          const startTimeIso = setMinutes(setHours(selectedDate, hours), minutes).toISOString();
+          await supabase.functions.invoke('send-booking-confirmation', {
+            body: {
+              appointmentId: appointment.id,
+              business_id: selectedBusiness.id,
+              customerEmail: customer.email,
+              customerName: customer.name ?? 'Customer',
+              serviceName: selectedService.name,
+              businessName: selectedBusiness.name,
+              startTime: startTimeIso,
+              staffName: selectedStaff?.name,
+            },
+          });
+        } catch (confirmErr) {
+          console.error('Failed to send booking confirmation email:', confirmErr);
+        }
+      }
+
+      // Send welcome email for first-time booker when enabled
+      if (customer?.email) {
+        try {
+          const { count } = await supabase
+            .from('appointments')
+            .select('id', { count: 'exact', head: true })
+            .eq('customer_id', customer.id)
+            .eq('business_id', selectedBusiness.id);
+          const isFirstBooking = count === 1;
+          if (isFirstBooking) {
+            const { data: emailSettings } = await supabase
+              .from('reminder_settings')
+              .select('send_welcome_email')
+              .eq('business_id', selectedBusiness.id)
+              .maybeSingle();
+            if (emailSettings?.send_welcome_email === true) {
+              const { data: biz } = await supabase
+                .from('businesses')
+                .select('phone, address, city')
+                .eq('id', selectedBusiness.id)
+                .single();
+              await supabase.functions.invoke('send-welcome-email', {
+                body: {
+                  business_id: selectedBusiness.id,
+                  customerEmail: customer.email,
+                  customerName: customer.name ?? 'Customer',
+                  businessName: selectedBusiness.name,
+                  businessPhone: biz?.phone ?? undefined,
+                  businessAddress: biz?.address ? `${biz.address}${biz?.city ? `, ${biz.city}` : ''}` : undefined,
+                  bookingUrl: `${window.location.origin}/book/${selectedBusiness.slug}`,
+                },
+              });
+            }
+          }
+        } catch (welcomeErr) {
+          console.error('Failed to send welcome email:', welcomeErr);
+        }
+      }
 
       // Record coupon usage for single appointment
       if (appliedCoupon?.couponId && customer?.id && appointment?.id) {
@@ -1007,7 +1068,7 @@ export default function MyAppointments() {
       }
       let { data: customer } = await supabase
         .from('customers')
-        .select('id')
+        .select('id, name, email')
         .eq('business_id', selectedBusiness.id)
         .eq('user_id', user.id)
         .maybeSingle();
@@ -1022,7 +1083,7 @@ export default function MyAppointments() {
             email: profile?.email || user.email || null,
             status: 'active',
           })
-          .select('id')
+          .select('id, name, email')
           .single();
         if (customerError) throw customerError;
         customer = newCustomer;
@@ -1048,7 +1109,7 @@ export default function MyAppointments() {
       }
       const { data: classRs } = await supabase
         .from('reminder_settings')
-        .select('auto_confirm_bookings')
+        .select('auto_confirm_bookings, send_booking_confirmation')
         .eq('business_id', selectedBusiness.id)
         .maybeSingle();
       const classBookingStatus = (classRs?.auto_confirm_bookings === true) ? 'confirmed' : 'pending';
@@ -1076,6 +1137,66 @@ export default function MyAppointments() {
         .select('id')
         .single();
       if (error) throw error;
+
+      // Send booking confirmation email when enabled
+      if (classRs?.send_booking_confirmation !== false && customer?.email) {
+        try {
+          await supabase.functions.invoke('send-booking-confirmation', {
+            body: {
+              appointmentId: appointment.id,
+              business_id: selectedBusiness.id,
+              customerEmail: customer.email,
+              customerName: customer.name ?? 'Customer',
+              serviceName: classSelectedSlot.service?.name ?? 'Class',
+              businessName: selectedBusiness.name,
+              startTime: startTime.toISOString(),
+              staffName: undefined,
+            },
+          });
+        } catch (confirmErr) {
+          console.error('Failed to send booking confirmation email:', confirmErr);
+        }
+      }
+
+      // Send welcome email for first-time booker when enabled
+      if (customer?.email) {
+        try {
+          const { count } = await supabase
+            .from('appointments')
+            .select('id', { count: 'exact', head: true })
+            .eq('customer_id', customer.id)
+            .eq('business_id', selectedBusiness.id);
+          const isFirstBooking = count === 1;
+          if (isFirstBooking) {
+            const { data: emailSettings } = await supabase
+              .from('reminder_settings')
+              .select('send_welcome_email')
+              .eq('business_id', selectedBusiness.id)
+              .maybeSingle();
+            if (emailSettings?.send_welcome_email === true) {
+              const { data: biz } = await supabase
+                .from('businesses')
+                .select('phone, address, city')
+                .eq('id', selectedBusiness.id)
+                .single();
+              await supabase.functions.invoke('send-welcome-email', {
+                body: {
+                  business_id: selectedBusiness.id,
+                  customerEmail: customer.email,
+                  customerName: customer.name ?? 'Customer',
+                  businessName: selectedBusiness.name,
+                  businessPhone: biz?.phone ?? undefined,
+                  businessAddress: biz?.address ? `${biz.address}${biz?.city ? `, ${biz.city}` : ''}` : undefined,
+                  bookingUrl: `${window.location.origin}/book/${selectedBusiness.slug}`,
+                },
+              });
+            }
+          }
+        } catch (welcomeErr) {
+          console.error('Failed to send welcome email:', welcomeErr);
+        }
+      }
+
       return appointment;
     },
     onSuccess: () => {
