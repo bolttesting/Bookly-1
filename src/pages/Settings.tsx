@@ -435,7 +435,18 @@ const Settings = () => {
                   <p className="font-medium">Auto-confirm Bookings</p>
                   <p className="text-sm text-muted-foreground break-words">Automatically confirm new bookings</p>
                 </div>
-                <Switch className="shrink-0" />
+                <Switch
+                  className="shrink-0"
+                  checked={reminderSettings?.auto_confirm_bookings ?? true}
+                  onCheckedChange={async (checked) => {
+                    try {
+                      await updateReminderSettings.mutateAsync({ auto_confirm_bookings: checked });
+                      toast.success(checked ? 'New bookings will be auto-confirmed' : 'New bookings will require confirmation');
+                    } catch {
+                      toast.error('Failed to update setting');
+                    }
+                  }}
+                />
               </div>
               <Separator />
               <div className="space-y-2 min-w-0">

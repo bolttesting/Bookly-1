@@ -860,8 +860,12 @@ export default function PublicBooking() {
             .eq('id', existingCustomer.id);
           
           if (updateError) {
-            logger.error('Error updating customer:', updateError);
-            // Don't fail booking if update fails, just log it
+            logger.debug('Direct customer link failed, trying RPC...', updateError);
+            const { error: rpcError } = await supabase.rpc('link_customer_to_user', {
+              p_customer_id: existingCustomer.id,
+              p_business_id: business.id,
+            });
+            if (rpcError) logger.error('Error linking customer to user:', rpcError);
           }
         }
       } else {
@@ -996,7 +1000,8 @@ export default function PublicBooking() {
         else if (dt === 'months') expiresAt.setMonth(now.getMonth() + dv);
         else if (dt === 'years') expiresAt.setFullYear(now.getFullYear() + dv);
         else expiresAt.setMonth(now.getMonth() + 1);
-        const { data: cp, error: cpErr } = await supabase.from('customer_packages').insert({
+        let cp: { id?: string } | null = null;
+        const insertResult = await supabase.from('customer_packages').insert({
           customer_id: customerId,
           package_template_id: selectedPackage.id,
           business_id: business.id,
@@ -1005,8 +1010,26 @@ export default function PublicBooking() {
           bookings_used: isPackageOnlyCheckout ? 0 : 1,
           status: 'active',
         }).select('id').single();
-        if (cpErr) throw cpErr;
-        customerPackageId = cp?.id ?? null;
+        if (insertResult.error) {
+          const isRls = insertResult.error.code === '42501' || insertResult.error.message?.toLowerCase().includes('row-level security') || insertResult.error.message?.toLowerCase().includes('violates row-level security');
+          if (isRls && loggedInUser) {
+            const { data: rpcId, error: rpcErr } = await supabase.rpc('create_customer_package_for_booking', {
+              p_customer_id: customerId,
+              p_package_template_id: selectedPackage.id,
+              p_business_id: business.id,
+              p_expires_at: expiresAt.toISOString(),
+              p_bookings_remaining: isPackageOnlyCheckout ? selectedPackage.booking_limit : selectedPackage.booking_limit - 1,
+              p_bookings_used: isPackageOnlyCheckout ? 0 : 1,
+            });
+            if (rpcErr) throw rpcErr;
+            customerPackageId = rpcId ?? null;
+          } else {
+            throw insertResult.error;
+          }
+        } else {
+          cp = insertResult.data;
+          customerPackageId = cp?.id ?? null;
+        }
       }
 
       if (isPackageOnlyCheckout) {
@@ -1190,6 +1213,13 @@ export default function PublicBooking() {
         }
       }
 
+      const { data: bookingReminderSettings } = await supabase
+        .from('reminder_settings')
+        .select('auto_confirm_bookings, send_booking_confirmation, send_welcome_email')
+        .eq('business_id', business.id)
+        .maybeSingle();
+      const initialStatus = (bookingReminderSettings?.auto_confirm_bookings !== false) ? 'confirmed' as const : 'pending' as const;
+
       const appointmentData = {
           business_id: business.id,
           customer_id: customerId,
@@ -1199,7 +1229,7 @@ export default function PublicBooking() {
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           price: finalPrice,
-          status: 'pending',
+          status: initialStatus,
           payment_status: paymentStatus,
           notes: customerNotes || null,
           package_id: customerPackageId,
@@ -1269,14 +1299,7 @@ export default function PublicBooking() {
         const isFirstBooking = !previousAppointments || previousAppointments.length === 0;
 
         if (isFirstBooking) {
-          // Check if welcome email is enabled
-          const { data: emailSettings } = await supabase
-            .from('reminder_settings')
-            .select('send_welcome_email')
-            .eq('business_id', business.id)
-            .maybeSingle();
-
-          if (emailSettings?.send_welcome_email === true) {
+          if (bookingReminderSettings?.send_welcome_email === true) {
             try {
               await supabase.functions.invoke('send-welcome-email', {
                 body: {
@@ -1311,14 +1334,7 @@ export default function PublicBooking() {
 
       // Send confirmation email (if enabled)
       try {
-        // Check if booking confirmation emails are enabled
-        const { data: emailSettings } = await supabase
-          .from('reminder_settings')
-          .select('send_booking_confirmation')
-          .eq('business_id', business.id)
-          .maybeSingle();
-
-        const shouldSendEmail = emailSettings?.send_booking_confirmation !== false; // Default to true if not set
+        const shouldSendEmail = bookingReminderSettings?.send_booking_confirmation !== false; // Default to true if not set
 
         if (!shouldSendEmail) {
           logger.debug('📧 Booking confirmation email is disabled in settings');
@@ -1481,8 +1497,15 @@ export default function PublicBooking() {
         logger.error('Failed to create reminders:', reminderError);
       }
 
-      // Send confirmation email
+      // Send confirmation email (if enabled)
       try {
+        const { data: payEmailSettings } = await supabase
+          .from('reminder_settings')
+          .select('send_booking_confirmation')
+          .eq('business_id', business?.id ?? '')
+          .maybeSingle();
+        const shouldSendPayEmail = payEmailSettings?.send_booking_confirmation !== false;
+        if (shouldSendPayEmail) {
         logger.debug('=== EMAIL DEBUG START (PAYMENT SUCCESS) ===');
         logger.debug('Attempting to send confirmation email to:', customerEmail);
         logger.debug('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
@@ -1528,6 +1551,7 @@ export default function PublicBooking() {
           }
         }
         logger.debug('=== EMAIL DEBUG END (PAYMENT SUCCESS) ===');
+        }
       } catch (emailError: any) {
         logger.error('=== EMAIL EXCEPTION (PAYMENT SUCCESS) ===');
         logger.error('Exception:', emailError);
@@ -2461,6 +2485,8 @@ export default function PublicBooking() {
                             startTime.setHours(h, m, 0, 0);
                             const duration = classSelectedSlot.service?.duration ?? 60;
                             const endTime = addMinutes(startTime, duration);
+                            const { data: classRs } = await supabase.from('reminder_settings').select('auto_confirm_bookings').eq('business_id', business.id).maybeSingle();
+                            const classStatus = (classRs?.auto_confirm_bookings !== false) ? 'confirmed' : 'pending';
                             const { data: newAppointment } = await supabase.from('appointments').insert({
                               business_id: business.id,
                               customer_id: customerId,
@@ -2470,7 +2496,7 @@ export default function PublicBooking() {
                               facility_id: classSelectedSlot.facility_id || null,
                               start_time: startTime.toISOString(),
                               end_time: endTime.toISOString(),
-                              status: 'confirmed',
+                              status: classStatus,
                               notes: customerNotes || null,
                               price: finalPrice,
                             }).select('id').single();

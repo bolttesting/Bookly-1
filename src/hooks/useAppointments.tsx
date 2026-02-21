@@ -76,6 +76,13 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
     mutationFn: async (appointmentData: AppointmentFormData) => {
       if (!business?.id) throw new Error('No business found');
 
+      const { data: rs } = await supabase
+        .from('reminder_settings')
+        .select('auto_confirm_bookings')
+        .eq('business_id', business.id)
+        .maybeSingle();
+      const status = (rs?.auto_confirm_bookings !== false) ? 'confirmed' : 'pending';
+
       const { data, error } = await supabase
         .from('appointments')
         .insert({
@@ -85,7 +92,7 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
           staff_id: appointmentData.staff_id || null,
           start_time: appointmentData.start_time,
           end_time: appointmentData.end_time,
-          status: appointmentData.status,
+          status,
           notes: appointmentData.notes || null,
           price: appointmentData.price || null,
         })

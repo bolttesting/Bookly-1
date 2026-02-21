@@ -18,6 +18,7 @@ export interface ReminderSettings {
   send_welcome_email?: boolean;
   send_followup_email?: boolean;
   followup_days_after?: number;
+  auto_confirm_bookings?: boolean;
   notify_new_bookings?: boolean;
   notify_cancellations?: boolean;
   notify_daily_summary?: boolean;
@@ -73,6 +74,7 @@ export function useReminderSettings() {
             send_welcome_email: false,
             send_followup_email: false,
             followup_days_after: 1,
+            auto_confirm_bookings: true,
             notify_new_bookings: true,
             notify_cancellations: true,
             notify_daily_summary: false,
