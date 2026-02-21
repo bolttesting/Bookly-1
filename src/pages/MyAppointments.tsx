@@ -1523,6 +1523,7 @@ export default function MyAppointments() {
                               className="glass-card cursor-pointer hover:border-primary/50 transition-all overflow-hidden"
                               onClick={() => {
                                 setSelectedBusiness(business);
+                                setSelectedLocation(null);
                                 setClassScheduleMode(true);
                                 setClassSelectedDate(startOfDay(new Date()));
                                 setClassStep(2);

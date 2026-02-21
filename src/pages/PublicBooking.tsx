@@ -282,17 +282,26 @@ export default function PublicBooking() {
     }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      let { data } = await supabase
         .from('customers')
         .select('id')
         .eq('business_id', business.id)
         .eq('user_id', loggedInUser.id)
         .maybeSingle();
+      if (!data?.id && loggedInUser.email) {
+        const { data: byEmail } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('business_id', business.id)
+          .ilike('email', loggedInUser.email)
+          .maybeSingle();
+        data = byEmail;
+      }
       if (!cancelled && data?.id) setClassBookingCustomerId(data.id);
       if (!cancelled && !data?.id) setClassBookingCustomerId(null);
     })();
     return () => { cancelled = true; };
-  }, [business?.id, loggedInUser?.id, classStep]);
+  }, [business?.id, loggedInUser?.id, loggedInUser?.email, classStep]);
 
   // Class confirm: fetch customer packages when we have customer id
   useEffect(() => {
