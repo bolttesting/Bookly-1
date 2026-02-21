@@ -52,6 +52,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { CustomerDashboardSidebar, type CustomerDashboardTab } from '@/components/CustomerDashboardSidebar';
 import { RescheduleRequestDialog } from '@/components/appointments/RescheduleRequestDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ImageSlideshow } from '@/components/ImageSlideshow';
 import { useScheduledClasses, type ScheduledClassRow } from '@/hooks/useScheduledClasses';
 
@@ -177,6 +178,13 @@ export default function MyAppointments() {
   const [classFilterClass, setClassFilterClass] = useState<string>('');
   const [classFilterInstructor, setClassFilterInstructor] = useState<string>('');
   const [classFilterFacility, setClassFilterFacility] = useState<string>('');
+  // Buy Package: confirm dialog with coupon
+  const [packagePurchaseDialogOpen, setPackagePurchaseDialogOpen] = useState(false);
+  const [packageToPurchase, setPackageToPurchase] = useState<PackageTemplate | null>(null);
+  const [buyPackageCouponCode, setBuyPackageCouponCode] = useState('');
+  const [buyPackageAppliedCoupon, setBuyPackageAppliedCoupon] = useState<{ code: string; couponId: string; discount: number; discountType: 'percentage' | 'fixed' } | null>(null);
+  const [buyPackageCouponError, setBuyPackageCouponError] = useState('');
+  const [isApplyingBuyPackageCoupon, setIsApplyingBuyPackageCoupon] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setHasMounted(true), 0);
@@ -1077,9 +1085,10 @@ export default function MyAppointments() {
     },
   });
 
-  // Handle package purchase
+  // Handle package purchase (optionally with applied coupon)
   const handlePackagePurchase = useMutation({
-    mutationFn: async (packageTemplate: PackageTemplate) => {
+    mutationFn: async (args: { packageTemplate: PackageTemplate; appliedCoupon?: { couponId: string; discount: number; discountType: 'percentage' | 'fixed' } }) => {
+      const { packageTemplate, appliedCoupon } = args;
       if (!user) throw new Error('User not found');
 
       // Get or create customer
@@ -1146,10 +1155,33 @@ export default function MyAppointments() {
         .single();
 
       if (error) throw error;
+
+      if (appliedCoupon?.couponId && customer?.id && customerPackage?.id) {
+        const basePrice = Number(packageTemplate.price);
+        const discountAmount = appliedCoupon.discountType === 'percentage'
+          ? (basePrice * appliedCoupon.discount / 100)
+          : appliedCoupon.discount;
+        try {
+          await supabase.rpc('record_coupon_usage', {
+            _coupon_id: appliedCoupon.couponId,
+            _customer_id: customer.id,
+            _user_id: user.id,
+            _order_id: customerPackage.id,
+            _discount_amount: discountAmount,
+          });
+        } catch (e) {
+          console.error('Failed to record coupon usage:', e);
+        }
+      }
       return customerPackage;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['my-packages'] });
+      setPackagePurchaseDialogOpen(false);
+      setPackageToPurchase(null);
+      setBuyPackageAppliedCoupon(null);
+      setBuyPackageCouponCode('');
+      setBuyPackageCouponError('');
       toast.success('Package purchased successfully!');
     },
     onError: (error: Error) => {
@@ -2488,20 +2520,17 @@ export default function MyAppointments() {
                             </div>
                             <Button
                               className="w-full"
-                              onClick={() => handlePackagePurchase.mutate(pkg)}
+                              onClick={() => {
+                                setPackageToPurchase(pkg);
+                                setBuyPackageCouponCode('');
+                                setBuyPackageAppliedCoupon(null);
+                                setBuyPackageCouponError('');
+                                setPackagePurchaseDialogOpen(true);
+                              }}
                               disabled={handlePackagePurchase.isPending}
                             >
-                              {handlePackagePurchase.isPending ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Processing...
-                                </>
-                              ) : (
-                                <>
-                                  <ShoppingBag className="mr-2 h-4 w-4" />
-                                  Purchase Package
-                                </>
-                              )}
+                              <ShoppingBag className="mr-2 h-4 w-4" />
+                              Purchase Package
                             </Button>
                           </CardContent>
                         </Card>
@@ -2875,6 +2904,122 @@ export default function MyAppointments() {
               rescheduleDeadlineHours={selectedAppointmentForReschedule.businessDeadlineHours}
             />
           )}
+
+          <Dialog open={packagePurchaseDialogOpen} onOpenChange={(open) => { setPackagePurchaseDialogOpen(open); if (!open) { setPackageToPurchase(null); setBuyPackageCouponCode(''); setBuyPackageAppliedCoupon(null); setBuyPackageCouponError(''); } }}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Confirm package purchase</DialogTitle>
+              </DialogHeader>
+              {packageToPurchase && (
+                <div className="space-y-4">
+                  <div>
+                    <p className="font-medium">{packageToPurchase.name}</p>
+                    <p className="text-sm text-muted-foreground">{packageToPurchase.description || 'No description'}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Coupon code"
+                      value={buyPackageCouponCode}
+                      onChange={(e) => { setBuyPackageCouponCode(e.target.value); setBuyPackageCouponError(''); }}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={async () => {
+                        if (!buyPackageCouponCode.trim() || !packageToPurchase) return;
+                        setIsApplyingBuyPackageCoupon(true);
+                        setBuyPackageCouponError('');
+                        try {
+                          const { data, error } = await supabase.rpc('validate_coupon', {
+                            _coupon_code: buyPackageCouponCode.trim(),
+                            _business_id: packageToPurchase.business_id,
+                            _purchase_amount: Number(packageToPurchase.price),
+                            _service_id: null,
+                            _package_template_id: packageToPurchase.id,
+                          });
+                          if (error) throw error;
+                          if (data && data.length > 0 && (data[0].valid === true || data[0].is_valid === true)) {
+                            const result = data[0];
+                            const cData = result.coupon_data || {};
+                            const isPct = (cData.discount_type ?? cData.discountType) === 'percentage';
+                            setBuyPackageAppliedCoupon({
+                              code: buyPackageCouponCode.trim(),
+                              couponId: cData.id || '',
+                              discount: isPct ? Number(cData.discount_value ?? cData.discountValue ?? 0) : Number(result.discount_amount ?? result.discountAmount ?? 0),
+                              discountType: isPct ? 'percentage' : 'fixed',
+                            });
+                            setBuyPackageCouponError('');
+                            toast.success('Coupon applied!');
+                          } else {
+                            setBuyPackageAppliedCoupon(null);
+                            setBuyPackageCouponError(data?.[0]?.message || 'Invalid coupon code');
+                          }
+                        } catch (err: any) {
+                          setBuyPackageAppliedCoupon(null);
+                          setBuyPackageCouponError(err.message || 'Failed to apply coupon');
+                          toast.error(err.message || 'Failed to apply coupon');
+                        } finally {
+                          setIsApplyingBuyPackageCoupon(false);
+                        }
+                      }}
+                      disabled={isApplyingBuyPackageCoupon || !buyPackageCouponCode.trim()}
+                    >
+                      {isApplyingBuyPackageCoupon ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                    </Button>
+                  </div>
+                  {buyPackageCouponError && <p className="text-sm text-red-600 dark:text-red-400">{buyPackageCouponError}</p>}
+                  {buyPackageAppliedCoupon && <p className="text-sm text-green-600 dark:text-green-400">Coupon &quot;{buyPackageAppliedCoupon.code}&quot; applied.</p>}
+                  <div className="border-t pt-3 space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span>Price</span>
+                      <span>{Number(packageToPurchase.price).toFixed(2)}</span>
+                    </div>
+                    {buyPackageAppliedCoupon ? (() => {
+                      const base = Number(packageToPurchase.price);
+                      const discountAmount = buyPackageAppliedCoupon.discountType === 'percentage'
+                        ? (base * buyPackageAppliedCoupon.discount / 100)
+                        : buyPackageAppliedCoupon.discount;
+                      const total = Math.max(0, base - discountAmount);
+                      return (
+                        <>
+                          <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>Discount</span>
+                            <span>-{discountAmount.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between font-medium pt-1">
+                            <span>Total</span>
+                            <span>{total.toFixed(2)}</span>
+                          </div>
+                        </>
+                      );
+                    })() : (
+                      <div className="flex justify-between font-medium pt-1">
+                        <span>Total</span>
+                        <span>{Number(packageToPurchase.price).toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPackagePurchaseDialogOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => {
+                    if (!packageToPurchase) return;
+                    handlePackagePurchase.mutate({
+                      packageTemplate: packageToPurchase,
+                      appliedCoupon: buyPackageAppliedCoupon ?? undefined,
+                    });
+                  }}
+                  disabled={handlePackagePurchase.isPending || !packageToPurchase}
+                >
+                  {handlePackagePurchase.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShoppingBag className="mr-2 h-4 w-4" />}
+                  Confirm Purchase
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </SidebarInset>
       </div>
     </SidebarProvider>
