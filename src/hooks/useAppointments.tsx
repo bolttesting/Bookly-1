@@ -81,7 +81,7 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
         .select('auto_confirm_bookings')
         .eq('business_id', business.id)
         .maybeSingle();
-      const status = (rs?.auto_confirm_bookings !== false) ? 'confirmed' : 'pending';
+      const status = (rs?.auto_confirm_bookings === true) ? 'confirmed' : 'pending';
 
       const { data, error } = await supabase
         .from('appointments')

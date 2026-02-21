@@ -1647,7 +1647,7 @@ export default function MyAppointments() {
                     const classModeLocations = locations;
 
                     return (
-                      <div className="space-y-6">
+                      <div className="space-y-6 min-w-0 overflow-hidden">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                           <Button variant="ghost" onClick={() => {
                             setClassScheduleMode(false);
@@ -1703,11 +1703,11 @@ export default function MyAppointments() {
                               )}
                             </div>
 
-                            <div className="flex items-center gap-1 overflow-x-auto pb-2">
-                              <Button variant="outline" size="icon" className="shrink-0" onClick={() => setClassSelectedDate(addDays(selectedDate, -7))} aria-label="Previous week">
+                            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto pb-2 min-w-0">
+                              <Button variant="outline" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10" onClick={() => setClassSelectedDate(addDays(selectedDate, -7))} aria-label="Previous week">
                                 <ArrowRight className="h-4 w-4 rotate-180" />
                               </Button>
-                              <div className="flex flex-1 gap-1 min-w-0 justify-between">
+                              <div className="flex flex-1 gap-1 sm:gap-2 min-w-0 overflow-x-auto">
                                 {weekDays.map((d) => {
                                   const isSelected = format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
                                   const isPast = isBefore(d, today);
@@ -1718,19 +1718,19 @@ export default function MyAppointments() {
                                       onClick={() => !isPast && setClassSelectedDate(d)}
                                       disabled={isPast}
                                       className={cn(
-                                        'shrink-0 rounded-md border px-2 py-2 text-center text-sm transition-colors min-w-[52px]',
+                                        'shrink-0 rounded-md border px-1.5 sm:px-2 py-1.5 sm:py-2 text-center text-xs sm:text-sm transition-colors min-w-[44px] sm:min-w-[52px]',
                                         isSelected && 'border-primary bg-primary/10 font-medium',
                                         !isSelected && !isPast && 'border-border hover:bg-muted',
                                         isPast && 'opacity-50 cursor-not-allowed'
                                       )}
                                     >
-                                      <div className="font-medium">{format(d, 'EEE')}</div>
-                                      <div className="text-muted-foreground">{format(d, 'd MMM')}</div>
+                                      <div className="font-medium truncate">{format(d, 'EEE')}</div>
+                                      <div className="text-muted-foreground truncate">{format(d, 'd MMM')}</div>
                                     </button>
                                   );
                                 })}
                               </div>
-                              <Button variant="outline" size="icon" className="shrink-0" onClick={() => setClassSelectedDate(addDays(selectedDate, 7))} aria-label="Next week">
+                              <Button variant="outline" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10" onClick={() => setClassSelectedDate(addDays(selectedDate, 7))} aria-label="Next week">
                                 <ArrowRight className="h-4 w-4" />
                               </Button>
                             </div>

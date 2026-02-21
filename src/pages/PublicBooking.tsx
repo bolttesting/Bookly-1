@@ -1218,7 +1218,7 @@ export default function PublicBooking() {
         .select('auto_confirm_bookings, send_booking_confirmation, send_welcome_email')
         .eq('business_id', business.id)
         .maybeSingle();
-      const initialStatus = (bookingReminderSettings?.auto_confirm_bookings !== false) ? 'confirmed' as const : 'pending' as const;
+      const initialStatus = (bookingReminderSettings?.auto_confirm_bookings === true) ? 'confirmed' as const : 'pending' as const;
 
       const appointmentData = {
           business_id: business.id,
@@ -2486,7 +2486,7 @@ export default function PublicBooking() {
                             const duration = classSelectedSlot.service?.duration ?? 60;
                             const endTime = addMinutes(startTime, duration);
                             const { data: classRs } = await supabase.from('reminder_settings').select('auto_confirm_bookings').eq('business_id', business.id).maybeSingle();
-                            const classStatus = (classRs?.auto_confirm_bookings !== false) ? 'confirmed' : 'pending';
+                            const classStatus = (classRs?.auto_confirm_bookings === true) ? 'confirmed' : 'pending';
                             const { data: newAppointment } = await supabase.from('appointments').insert({
                               business_id: business.id,
                               customer_id: customerId,
