@@ -35,17 +35,12 @@ export function SplitHoursEditor({ locationId, locationName }: SplitHoursEditorP
   const [rangesByDay, setRangesByDay] = useState<Record<number, Array<{ id?: string; start_time: string; end_time: string; display_order: number }>>>({});
   const initialized = useRef(false);
 
-  // Initialize and resync when hoursByDay changes (handles tab switch + cache refresh)
+  // Initialize once when hoursByDay is ready (do not overwrite local state on every render)
   useEffect(() => {
-    if (!isLoading && hoursByDay.length === 7) {
-      const dataSignature = hoursByDay.map(h => `${h.id}|${h.open_time}|${h.close_time}|${h.is_closed}`).join(';');
-      const prevSignature = localHours.length === 7
-        ? localHours.map(h => `${h.id}|${h.open_time}|${h.close_time}|${h.is_closed}`).join(';')
-        : '';
-      if (!initialized.current || dataSignature !== prevSignature) {
-        setLocalHours(hoursByDay);
+    if (isLoading || hoursByDay.length !== 7 || initialized.current) return;
 
-        const fetchRanges = async () => {
+    setLocalHours(hoursByDay);
+    const fetchRanges = async () => {
           const newRanges: typeof rangesByDay = {};
           for (const day of hoursByDay) {
             if (day.is_closed) continue;
@@ -83,9 +78,7 @@ export function SplitHoursEditor({ locationId, locationName }: SplitHoursEditorP
           setRangesByDay(newRanges);
           initialized.current = true;
         };
-        fetchRanges();
-      }
-    }
+    fetchRanges();
   }, [hoursByDay, isLoading]);
 
   // Reset when switching locations
