@@ -41,43 +41,54 @@ export function SplitHoursEditor({ locationId, locationName }: SplitHoursEditorP
 
     setLocalHours(hoursByDay);
     const fetchRanges = async () => {
-          const newRanges: typeof rangesByDay = {};
-          for (const day of hoursByDay) {
-            if (day.is_closed) continue;
-            if (day.id) {
-              const { data: ranges } = await supabase
-                .from('business_hour_ranges')
-                .select('*')
-                .eq('business_hours_id', day.id)
-                .order('display_order', { ascending: true })
-                .order('start_time', { ascending: true });
+      const newRanges: typeof rangesByDay = {};
+      const daysWithId = hoursByDay.filter((d) => !d.is_closed && d.id);
+      const bhIds = daysWithId.map((d) => d.id as string);
+      const dayByBhId: Record<string, number> = {};
+      hoursByDay.forEach((d) => { if (d.id) dayByBhId[d.id] = d.day; });
 
-              if (ranges && ranges.length > 0) {
-                newRanges[day.day] = ranges.map(r => ({
-                  id: r.id,
-                  start_time: r.start_time.slice(0, 5),
-                  end_time: r.end_time.slice(0, 5),
-                  display_order: r.display_order,
-                }));
-              } else {
-                newRanges[day.day] = [{
-                  start_time: day.open_time,
-                  end_time: day.close_time,
-                  display_order: 0,
-                }];
+      // Build defaults for every open day immediately (so UI is editable even if fetch fails)
+      for (const day of hoursByDay) {
+        if (day.is_closed) continue;
+        newRanges[day.day] = [{
+          start_time: day.open_time,
+          end_time: day.close_time,
+          display_order: 0,
+        }];
+      }
+
+      if (bhIds.length > 0) {
+        try {
+          const { data: allRanges, error } = await supabase
+            .from('business_hour_ranges')
+            .select('*')
+            .in('business_hours_id', bhIds)
+            .order('display_order', { ascending: true })
+            .order('start_time', { ascending: true });
+
+          if (!error && allRanges && allRanges.length > 0) {
+            const typed = allRanges as { business_hours_id: string; id: string; start_time: string; end_time: string; display_order: number }[];
+            for (const day of daysWithId) {
+              const dayRanges = typed.filter((r) => r.business_hours_id === day.id);
+              if (dayRanges.length > 0) {
+                newRanges[day.day] = dayRanges
+                  .sort((a, b) => (a.display_order - b.display_order) || a.start_time.localeCompare(b.start_time))
+                  .map((r) => ({
+                    id: r.id,
+                    start_time: r.start_time.slice(0, 5),
+                    end_time: r.end_time.slice(0, 5),
+                    display_order: r.display_order,
+                  }));
               }
-            } else {
-              // No DB row yet (e.g. default hours never saved) - use open/close from day so UI is editable
-              newRanges[day.day] = [{
-                start_time: day.open_time,
-                end_time: day.close_time,
-                display_order: 0,
-              }];
             }
           }
-          setRangesByDay(newRanges);
-          initialized.current = true;
-        };
+        } catch (_) {
+          // Keep default ranges so UI stays editable
+        }
+      }
+      setRangesByDay(newRanges);
+      initialized.current = true;
+    };
     fetchRanges();
   }, [hoursByDay, isLoading]);
 
