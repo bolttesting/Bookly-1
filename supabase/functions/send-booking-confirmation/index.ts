@@ -1,7 +1,7 @@
+// @ts-nocheck - Supabase Edge Function (Deno); IDE may not have Deno types
 /**
  * Send booking confirmation email via Resend.
- * Requires: RESEND_API_KEY in Supabase Edge Function secrets (or business's resend_api_key in business_email_config).
- * If using a custom "from" address (business_email_config), that domain must be verified in Resend.
+ * Same pattern as send-reschedule-email: business_id + business_email_config, else platform key.
  */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -33,17 +33,6 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    let body: BookingConfirmationRequest;
-    try {
-      body = await req.json();
-    } catch {
-      console.error("Invalid JSON body");
-      return new Response(
-        JSON.stringify({ success: false, error: "Invalid request body" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
-      );
-    }
-
     const {
       business_id: businessId,
       customerEmail,
@@ -52,19 +41,10 @@ const handler = async (req: Request): Promise<Response> => {
       businessName,
       startTime,
       staffName,
-    } = body;
-
-    if (!customerEmail?.trim()) {
-      console.error("Missing customerEmail");
-      return new Response(
-        JSON.stringify({ success: false, error: "customerEmail is required" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
-      );
-    }
+    }: BookingConfirmationRequest = await req.json();
 
     let apiKey = PLATFORM_RESEND_KEY;
     let from = DEFAULT_FROM;
-
     if (businessId) {
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL") ?? "",
@@ -78,29 +58,16 @@ const handler = async (req: Request): Promise<Response> => {
       if (emailConfig?.resend_api_key) {
         apiKey = emailConfig.resend_api_key;
         from = `${emailConfig.from_name || businessName || "Business"} <${emailConfig.from_email}>`;
-        console.log("Using business Resend config for business_id:", businessId);
-      } else {
-        console.log("No business_email_config or resend_api_key for business_id:", businessId, "- using platform key");
       }
-    } else {
-      console.log("No business_id in request - using platform RESEND_API_KEY");
     }
-
     if (!apiKey) {
-      console.error("No Resend API key (platform or business). Set RESEND_API_KEY in Supabase Edge Function secrets, or add Resend API key in Settings → Notifications for the business.");
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Email not configured. Add RESEND_API_KEY in Supabase (Edge Function secrets) or set your Resend API key in Settings → Notifications.",
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
+        JSON.stringify({ success: false, error: "Email service not configured. RESEND_API_KEY is missing." }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
       );
     }
 
-    console.log("Sending confirmation to:", customerEmail, "from:", from);
+    console.log("Sending confirmation to:", customerEmail);
 
     const formattedDate = new Date(startTime).toLocaleDateString("en-US", {
       weekday: "long",
@@ -191,24 +158,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!res.ok) {
       const errorText = await res.text();
-      console.error("Resend API error:", res.status, errorText);
-      let errMessage = errorText;
-      try {
-        const errJson = JSON.parse(errorText);
-        if (errJson.message) errMessage = errJson.message;
-      } catch {
-        // use errorText as-is
-      }
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `Resend error: ${errMessage}. If using a custom From address, verify that domain in Resend.`,
-        }),
-        {
-          status: 502,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
+      console.error("Resend API error:", errorText);
+      throw new Error(`Resend API error: ${errorText}`);
     }
 
     const data = await res.json();
