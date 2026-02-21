@@ -791,7 +791,7 @@ export default function PublicBooking() {
   };
 
   const handleSubmit = async () => {
-    const isPackageOnlyCheckout = !!(business?.use_class_schedule && classScheduleMainTab === 'packages' && selectedPackage);
+    const isPackageOnlyCheckout = !!selectedPackage;
     logger.debug('🚀 BOOKING SUBMITTED - Starting booking process', { isPackageOnlyCheckout });
     logger.debug('Form state:', {
       business: !!business,
@@ -1620,7 +1620,7 @@ export default function PublicBooking() {
   }
 
   if (bookingComplete) {
-    const isPackagePurchase = selectedPackage && !selectedDate && (business?.use_class_schedule && classScheduleMainTab === 'packages');
+    const isPackagePurchase = !!(selectedPackage && !selectedDate);
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="glass-card max-w-md w-full">
@@ -2511,7 +2511,7 @@ export default function PublicBooking() {
         <>
         {(() => {
           const hasMultipleLocations = locations.length > 1;
-          const isPackageOnly = !!(business?.use_class_schedule && classScheduleMainTab === 'packages');
+          const isPackageOnly = !!selectedPackage;
           const totalSteps = isPackageOnly ? (hasMultipleLocations ? 3 : 2) : (hasMultipleLocations ? 5 : 4);
           const progressStep = isPackageOnly
             ? (hasMultipleLocations ? (step <= 2 ? step : 3) : (step <= 1 ? 1 : 2))
@@ -2761,9 +2761,9 @@ export default function PublicBooking() {
               )}
               {locations.length <= 1 && <div />}
               <Button
-                disabled={business?.use_class_schedule && classScheduleMainTab === 'packages' ? !selectedPackage : !effectiveService}
+                disabled={selectedPackage ? !selectedPackage : !effectiveService}
                 onClick={() => {
-                  if (business?.use_class_schedule && classScheduleMainTab === 'packages') {
+                  if (selectedPackage) {
                     setStep(locations.length > 1 ? 5 : 4);
                   } else {
                     setStep(locations.length > 1 ? 3 : 2);
@@ -2777,8 +2777,8 @@ export default function PublicBooking() {
           </div>
         )}
 
-        {/* Step: Select Staff (Step 2 if no locations, Step 3 if locations) - skip for package-only in class schedule */}
-        {!((business?.use_class_schedule && classScheduleMainTab === 'packages')) && ((locations.length <= 1 && step === 2) || (locations.length > 1 && step === 3)) && (
+        {/* Step: Select Staff (Step 2 if no locations, Step 3 if locations) - skip for package purchase */}
+        {!selectedPackage && ((locations.length <= 1 && step === 2) || (locations.length > 1 && step === 3)) && (
           <div className="space-y-6">
             <div className="text-center">
               <h2 className="text-xl sm:text-2xl font-display font-bold">Select a Staff Member</h2>
@@ -2835,8 +2835,8 @@ export default function PublicBooking() {
           </div>
         )}
 
-        {/* Step: Select Date & Time (Step 3 if no locations, Step 4 if locations) - skip for package-only in class schedule */}
-        {!((business?.use_class_schedule && classScheduleMainTab === 'packages')) && ((locations.length <= 1 && step === 3) || (locations.length > 1 && step === 4)) && (
+        {/* Step: Select Date & Time (Step 3 if no locations, Step 4 if locations) - skip for package purchase */}
+        {!selectedPackage && ((locations.length <= 1 && step === 3) || (locations.length > 1 && step === 4)) && (
           <div className="space-y-6">
             <div className="text-center">
               <h2 className="text-xl sm:text-2xl font-display font-bold">Select Date & Time</h2>
@@ -3243,22 +3243,22 @@ export default function PublicBooking() {
               <Card className="glass-card">
                 <CardHeader>
                   <CardTitle className="text-lg">
-                    {(business?.use_class_schedule && classScheduleMainTab === 'packages') ? 'Package Summary' : 'Booking Summary'}
+                    {selectedPackage ? 'Package Summary' : 'Booking Summary'}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
                     <div className="flex justify-between py-2 border-b border-border">
-                      <span className="text-muted-foreground">{(business?.use_class_schedule && classScheduleMainTab === 'packages') ? 'Package' : 'Service'}</span>
+                      <span className="text-muted-foreground">{selectedPackage ? 'Package' : 'Service'}</span>
                       <span className="font-medium">{selectedPackage?.name || effectiveService?.name}</span>
                     </div>
-                    {(business?.use_class_schedule && classScheduleMainTab === 'packages') && selectedPackage && (
+                    {selectedPackage && (
                       <div className="flex justify-between py-2 border-b border-border">
                         <span className="text-muted-foreground">Sessions</span>
                         <span className="font-medium">{selectedPackage.booking_limit}</span>
                       </div>
                     )}
-                    {!((business?.use_class_schedule && classScheduleMainTab === 'packages')) && (
+                    {!selectedPackage && (
                       <>
                         <div className="flex justify-between py-2 border-b border-border">
                           <span className="text-muted-foreground">Duration</span>
@@ -3404,7 +3404,7 @@ export default function PublicBooking() {
                   </div>
                     
                   {/* Recurring Appointment Options - only for service bookings */}
-                  {!((business?.use_class_schedule && classScheduleMainTab === 'packages')) && (
+                  {!selectedPackage && (
                   <div className="space-y-4 pt-4 border-t border-border">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -3520,7 +3520,7 @@ export default function PublicBooking() {
             <div className="flex justify-between gap-3">
               <Button
                 variant="outline"
-                onClick={() => setStep(business?.use_class_schedule && classScheduleMainTab === 'packages' ? (locations.length > 1 ? 2 : 1) : (locations.length > 1 ? 4 : 3))}
+                onClick={() => setStep(selectedPackage ? (locations.length > 1 ? 2 : 1) : (locations.length > 1 ? 4 : 3))}
                 className="flex-1 sm:flex-initial"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
@@ -3535,11 +3535,11 @@ export default function PublicBooking() {
                   {submitting ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      {(business?.use_class_schedule && classScheduleMainTab === 'packages') ? 'Processing...' : 'Booking...'}
+                      {selectedPackage ? 'Processing...' : 'Booking...'}
                     </>
                   ) : (
                     <>
-                      {(business?.use_class_schedule && classScheduleMainTab === 'packages') ? 'Confirm Purchase' : 'Confirm Booking'}
+                      {selectedPackage ? 'Confirm Purchase' : 'Confirm Booking'}
                       <CheckCircle className="h-4 w-4 ml-2" />
                     </>
                   )}
