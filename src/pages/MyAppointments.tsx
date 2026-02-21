@@ -915,7 +915,14 @@ export default function MyAppointments() {
         return { id: newSeries.id, isRecurring: true };
       }
 
-      // Create single appointment
+      // Create single appointment (respect auto_confirm_bookings)
+      const { data: rs } = await supabase
+        .from('reminder_settings')
+        .select('auto_confirm_bookings')
+        .eq('business_id', selectedBusiness.id)
+        .maybeSingle();
+      const bookingStatus = (rs?.auto_confirm_bookings === true) ? 'confirmed' : 'pending';
+
       const [hours, minutes] = selectedTime.split(':').map(Number);
       const startTime = setMinutes(setHours(selectedDate, hours), minutes);
       const endTime = addMinutes(startTime, selectedService.duration);
@@ -931,7 +938,7 @@ export default function MyAppointments() {
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           price: finalPrice,
-          status: 'pending',
+          status: bookingStatus,
           notes: bookingNotes || null,
         })
         .select('id')
@@ -1039,6 +1046,13 @@ export default function MyAppointments() {
           })
           .eq('id', selectedCustomerPackageId);
       }
+      const { data: classRs } = await supabase
+        .from('reminder_settings')
+        .select('auto_confirm_bookings')
+        .eq('business_id', selectedBusiness.id)
+        .maybeSingle();
+      const classBookingStatus = (classRs?.auto_confirm_bookings === true) ? 'confirmed' : 'pending';
+
       const [h, m] = String(classSelectedSlot.start_time).slice(0, 5).split(':').map(Number);
       const startTime = setMinutes(setHours(new Date(classSelectedDate), h), m);
       const duration = classSelectedSlot.service?.duration ?? 60;
@@ -1056,7 +1070,7 @@ export default function MyAppointments() {
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           price: usingPackage ? 0 : Number(servicePrice),
-          status: 'confirmed',
+          status: classBookingStatus,
           notes: null,
         })
         .select('id')
