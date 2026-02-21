@@ -319,7 +319,10 @@ export function LocationHoursSettings() {
           onOpenChange={() => toggleLocation('default')}
         >
           <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-3 sm:p-4 bg-secondary/30 rounded-lg border cursor-pointer hover:bg-secondary/50 transition-colors gap-2">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between p-3 sm:p-4 bg-secondary/30 rounded-lg border cursor-pointer hover:bg-secondary/50 transition-colors gap-2 text-left focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+            >
               <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                 <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
                 <div className="min-w-0">
@@ -328,7 +331,7 @@ export function LocationHoursSettings() {
                 </div>
               </div>
               <ChevronDown className={`h-4 w-4 sm:h-5 sm:w-5 transition-transform shrink-0 ${openLocations.includes('default') ? 'rotate-180' : ''}`} />
-            </div>
+            </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-3 sm:pt-4 px-2 sm:px-4 space-y-6">
             <SplitHoursEditor locationId={null} />

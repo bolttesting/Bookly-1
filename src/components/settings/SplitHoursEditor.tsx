@@ -48,7 +48,8 @@ export function SplitHoursEditor({ locationId, locationName }: SplitHoursEditorP
         const fetchRanges = async () => {
           const newRanges: typeof rangesByDay = {};
           for (const day of hoursByDay) {
-            if (day.id && !day.is_closed) {
+            if (day.is_closed) continue;
+            if (day.id) {
               const { data: ranges } = await supabase
                 .from('business_hour_ranges')
                 .select('*')
@@ -70,6 +71,13 @@ export function SplitHoursEditor({ locationId, locationName }: SplitHoursEditorP
                   display_order: 0,
                 }];
               }
+            } else {
+              // No DB row yet (e.g. default hours never saved) - use open/close from day so UI is editable
+              newRanges[day.day] = [{
+                start_time: day.open_time,
+                end_time: day.close_time,
+                display_order: 0,
+              }];
             }
           }
           setRangesByDay(newRanges);
