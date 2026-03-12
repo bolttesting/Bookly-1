@@ -109,8 +109,8 @@ const Landing = () => {
             <span className="text-lg sm:text-xl font-display font-bold">Bookly</span>
           </Link>
           
-          {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center gap-6 xl:gap-8">
+          {/* Desktop Navigation - full nav from md (768px) up */}
+          <div className="hidden md:flex items-center gap-6 xl:gap-8">
             <a 
               href="#about" 
               className="text-muted-foreground hover:text-foreground transition-all duration-300 relative group py-2"
@@ -179,18 +179,15 @@ const Landing = () => {
             </a>
           </div>
           
-          {/* Desktop Actions */}
-          <div className="hidden lg:flex items-center gap-3">
+          {/* Header actions: theme + Get started (always visible), hamburger (mobile only) */}
+          <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
-            <Button asChild className="glow text-sm sm:text-base px-4">
+            <Button asChild className="glow text-sm sm:text-base px-3 sm:px-4" size="sm">
               <Link to="/auth">Get started</Link>
             </Button>
-          </div>
-
-          {/* Mobile Menu */}
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild className="lg:hidden">
-              <Button variant="ghost" size="icon">
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild className="md:hidden shrink-0">
+                <Button variant="ghost" size="icon">
                 <Menu className="h-6 w-6" />
                 <span className="sr-only">Open menu</span>
               </Button>
@@ -289,6 +286,7 @@ const Landing = () => {
               </div>
             </SheetContent>
           </Sheet>
+          </div>
         </div>
       </nav>
 
