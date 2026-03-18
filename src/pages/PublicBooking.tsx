@@ -2044,13 +2044,13 @@ export default function PublicBooking() {
                 )}
               </div>
 
-              {/* Date navigation: 7 days - scrollable on mobile */}
+              {/* Date navigation: 7 days - scrollable on mobile, full width on desktop */}
               <div className="flex items-center gap-1 sm:gap-2 mt-6">
                 <Button variant="outline" size="icon" className="shrink-0 h-9 w-9" onClick={() => setClassSelectedDate(addDays(selectedDate, -7))} aria-label="Previous week">
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
-                <div className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden pb-2 -mx-1 px-1 touch-pan-x">
-                  <div className="flex gap-1 sm:justify-between min-w-min sm:min-w-0">
+                <div className="flex-1 min-w-0 overflow-x-auto sm:overflow-visible overflow-y-hidden pb-2 -mx-1 px-1 touch-pan-x">
+                  <div className="flex gap-1 min-w-min sm:min-w-0 sm:flex-1">
                     {weekDays.map((d) => {
                       const isSelected = format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
                       const isPast = isBefore(d, today);
@@ -2061,7 +2061,7 @@ export default function PublicBooking() {
                           onClick={() => !isPast && setClassSelectedDate(d)}
                           disabled={isPast}
                           className={cn(
-                            'shrink-0 rounded-md border px-2 py-2 text-center text-xs sm:text-sm transition-colors min-w-[48px] sm:min-w-[52px]',
+                            'shrink-0 sm:shrink sm:flex-1 sm:min-w-0 rounded-md border px-2 py-2 text-center text-xs sm:text-sm transition-colors min-w-[48px]',
                             isSelected && 'border-primary bg-primary/10 font-medium',
                             !isSelected && !isPast && 'border-border hover:bg-muted',
                             isPast && 'opacity-50 cursor-not-allowed'

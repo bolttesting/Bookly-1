@@ -1838,11 +1838,11 @@ export default function MyAppointments() {
                               )}
                             </div>
 
-                            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto pb-2 min-w-0">
+                            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto sm:overflow-visible pb-2 min-w-0">
                               <Button variant="outline" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10" onClick={() => setClassSelectedDate(addDays(selectedDate, -7))} aria-label="Previous week">
                                 <ArrowRight className="h-4 w-4 rotate-180" />
                               </Button>
-                              <div className="flex flex-1 gap-1 sm:gap-2 min-w-0 overflow-x-auto">
+                              <div className="flex flex-1 gap-1 sm:gap-2 min-w-0 overflow-x-auto sm:overflow-visible">
                                 {weekDays.map((d) => {
                                   const isSelected = format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
                                   const isPast = isBefore(d, today);
@@ -1853,7 +1853,7 @@ export default function MyAppointments() {
                                       onClick={() => !isPast && setClassSelectedDate(d)}
                                       disabled={isPast}
                                       className={cn(
-                                        'shrink-0 rounded-md border px-1.5 sm:px-2 py-1.5 sm:py-2 text-center text-xs sm:text-sm transition-colors min-w-[44px] sm:min-w-[52px]',
+                                        'shrink-0 sm:shrink sm:flex-1 sm:min-w-0 rounded-md border px-1.5 sm:px-2 py-1.5 sm:py-2 text-center text-xs sm:text-sm transition-colors min-w-[44px]',
                                         isSelected && 'border-primary bg-primary/10 font-medium',
                                         !isSelected && !isPast && 'border-border hover:bg-muted',
                                         isPast && 'opacity-50 cursor-not-allowed'
