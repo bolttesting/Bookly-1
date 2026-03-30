@@ -31,15 +31,17 @@ export function PageTransition({ children, key }: PageTransitionProps) {
     }
   }, [key, location.pathname]);
 
+  // Do not use transform (translate) on this wrapper — it breaks position:sticky
+  // (e.g. landing stacking cards). Opacity-only transition is sticky-safe.
   return (
     <div
       className={cn(
-        'w-full min-h-full transition-all duration-300 ease-in-out',
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        "w-full min-h-full transition-opacity duration-300 ease-in-out",
+        isVisible ? "opacity-100" : "opacity-0"
       )}
       style={{
-        transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        willChange: 'opacity, transform',
+        transitionTimingFunction: "cubic-bezier(0.4, 0, 0.2, 1)",
+        willChange: "opacity",
       }}
     >
       {children}

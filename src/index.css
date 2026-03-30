@@ -141,15 +141,17 @@
     @apply border-border;
   }
 
+  /* clip: horizontal bleed without creating the scrollport that breaks position:sticky (overflow-x:hidden often does). */
   html {
-    @apply scroll-smooth;
-    overflow-x: hidden;
+    overflow-x: clip;
+    scroll-behavior: auto;
+    position: relative;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', sans-serif;
-    overflow-x: hidden;
+    overflow-x: clip;
     width: 100%;
     min-width: 100%;
   }

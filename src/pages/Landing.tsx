@@ -10,30 +10,29 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useReviews } from "@/hooks/useReviews";
 import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { useFooterLinks } from "@/hooks/useFooterLinks";
+import { TestimonialsMarqueeSection, reviewsToMarqueeItems } from "@/components/ui/testimonials-columns-1";
+import { LandingHoverFooter } from "@/components/LandingHoverFooter";
+import {
+  StackingCardsShowcase,
+  BOOKLY_STACKING_CARDS,
+} from "@/components/ui/stacking-card";
+import { FeatureCarousel } from "@/components/ui/feature-carousel";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatCurrencySimple, getCurrencyByCode } from "@/lib/currency";
 import { Loader2 } from "lucide-react";
 import { 
   Calendar, 
-  Users, 
-  Clock, 
-  BarChart3, 
   CheckCircle, 
   ArrowRight,
   Sparkles,
   Shield,
-  Zap,
-  Star,
   Mail,
   Phone,
   MapPin,
   TrendingUp,
   Award,
   Globe,
-  Smartphone,
-  CreditCard,
-  MessageSquare,
   Heart,
   Menu,
   X,
@@ -52,8 +51,8 @@ const Landing = () => {
   const [heroRef, heroVisible] = useScrollAnimation({ threshold: 0.2 });
   const [featuresRef, featuresVisible] = useScrollAnimation({ threshold: 0.1 });
   const [aboutRef, aboutVisible] = useScrollAnimation({ threshold: 0.2 });
-  const [servicesRef, servicesVisible] = useScrollAnimation({ threshold: 0.1 });
-  const [testimonialsRef, testimonialsVisible] = useScrollAnimation({ threshold: 0.2 });
+  const [servicesRef] = useScrollAnimation({ threshold: 0.1 });
+  const [testimonialsRef] = useScrollAnimation({ threshold: 0.2 });
   const [pricingRef, pricingVisible] = useScrollAnimation({ threshold: 0.2 });
   const [contactRef, contactVisible] = useScrollAnimation({ threshold: 0.2 });
   const [blogRef, blogVisible] = useScrollAnimation({ threshold: 0.2 });
@@ -90,15 +89,8 @@ const Landing = () => {
     }
   }, [aboutVisible, statsVisible, startUsers, startBookings, startRating]);
 
-  // Stagger animation for feature cards
-  const [featureCardsVisible, setFeatureCardsVisible] = useState(false);
-  useEffect(() => {
-    if (featuresVisible && !featureCardsVisible) {
-      setFeatureCardsVisible(true);
-    }
-  }, [featuresVisible, featureCardsVisible]);
   return (
-    <div className="min-h-screen bg-background w-full overflow-x-hidden">
+    <div className="min-h-screen bg-background w-full max-w-[100vw]">
       {/* Navigation */}
       <nav className={`fixed top-0 left-0 right-0 z-50 glass-card border-b border-border/50 backdrop-blur-xl transition-all duration-300 ${navScrolled ? 'shadow-lg' : ''}`}>
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
@@ -449,63 +441,24 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section ref={featuresRef} id="features" className="py-12 sm:py-16 md:py-20 px-4 sm:px-6">
-        <div className="container mx-auto max-w-6xl">
-          <div className={`text-center space-y-3 sm:space-y-4 mb-8 sm:mb-12 md:mb-16 transition-all duration-700 ${featuresVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold px-2">
+      {/* Features Section — carousel + stacked chips */}
+      <section ref={featuresRef} id="features" className="px-4 py-12 sm:px-6 sm:py-16 md:py-20">
+        <div className="container mx-auto max-w-7xl">
+          <div
+            className={`mb-8 space-y-3 text-center sm:mb-12 sm:space-y-4 md:mb-16 transition-all duration-700 ${featuresVisible ? "translate-y-0 opacity-100" : "translate-y-10 opacity-0"}`}
+          >
+            <h2 className="px-2 font-display text-2xl font-bold sm:text-3xl md:text-4xl">
               Everything you need to <span className="gradient-text">scale</span>
             </h2>
-            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-2 sm:px-4">
+            <p className="mx-auto max-w-2xl px-2 text-base text-muted-foreground sm:px-4 sm:text-lg md:text-xl">
               Powerful features designed for service businesses of all sizes
             </p>
           </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {[
-              {
-                icon: Calendar,
-                title: "Smart Scheduling",
-                description: "Drag-and-drop calendar with real-time availability and conflict detection"
-              },
-              {
-                icon: Users,
-                title: "Client Management",
-                description: "Keep track of client history, preferences, and spending patterns"
-              },
-              {
-                icon: Clock,
-                title: "Automated Reminders",
-                description: "Reduce no-shows with SMS and email reminders"
-              },
-              {
-                icon: BarChart3,
-                title: "Analytics Dashboard",
-                description: "Track revenue, appointments, and staff performance"
-              },
-              {
-                icon: Shield,
-                title: "Secure Payments",
-                description: "Accept deposits and payments online with Stripe integration"
-              },
-              {
-                icon: Zap,
-                title: "Staff Management",
-                description: "Assign services, set schedules, and track commissions"
-              }
-            ].map((feature, i) => (
-              <div 
-                key={i} 
-                className={`glass-card p-6 rounded-xl hover-lift group transition-all duration-500 ${featureCardsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
-                style={{ transitionDelay: `${i * 100}ms` }}
-              >
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-300">
-                  <feature.icon className="w-6 h-6 text-primary group-hover:rotate-12 transition-transform duration-300" />
-                </div>
-                <h3 className="text-lg font-display font-semibold mb-2 group-hover:text-primary transition-colors">{feature.title}</h3>
-                <p className="text-muted-foreground">{feature.description}</p>
-              </div>
-            ))}
+
+          <div
+            className={`transition-all delay-100 duration-700 ${featuresVisible ? "translate-y-0 opacity-100" : "translate-y-10 opacity-0"}`}
+          >
+            <FeatureCarousel />
           </div>
         </div>
       </section>
@@ -703,109 +656,19 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Services Section */}
-      <section ref={servicesRef} id="services" className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 bg-muted/30">
-        <div className="container mx-auto max-w-6xl">
-          <div className={`text-center space-y-3 sm:space-y-4 mb-8 sm:mb-12 md:mb-16 transition-all duration-700 ${servicesVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold px-2">
-              Everything you need to <span className="gradient-text">succeed</span>
-            </h2>
-            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-2 sm:px-4">
-              Comprehensive tools and features designed for service businesses
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {[
-              {
-                icon: Smartphone,
-                title: "Mobile App",
-                description: "Manage your business on the go with our mobile-optimized dashboard"
-              },
-              {
-                icon: CreditCard,
-                title: "Payment Processing",
-                description: "Accept payments online with secure Stripe integration"
-              },
-              {
-                icon: MessageSquare,
-                title: "Automated Reminders",
-                description: "Reduce no-shows with SMS and email notifications"
-              },
-              {
-                icon: BarChart3,
-                title: "Analytics & Reports",
-                description: "Track performance with detailed insights and reports"
-              },
-              {
-                icon: Users,
-                title: "Team Management",
-                description: "Manage staff schedules, commissions, and permissions"
-              },
-              {
-                icon: Calendar,
-                title: "Multi-location",
-                description: "Manage multiple locations from a single dashboard"
-              }
-            ].map((service, i) => (
-              <div 
-                key={i} 
-                className={`glass-card p-6 rounded-xl hover-lift group transition-all duration-500 ${servicesVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
-                style={{ transitionDelay: `${i * 100}ms` }}
-              >
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-300">
-                  <service.icon className="w-6 h-6 text-primary group-hover:rotate-12 transition-transform duration-300" />
-                </div>
-                <h3 className="text-lg font-display font-semibold mb-2 group-hover:text-primary transition-colors">{service.title}</h3>
-                <p className="text-muted-foreground">{service.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Services — motion stacking cards (scroll-driven) */}
+      <section ref={servicesRef} id="services" className="scroll-mt-20">
+        <StackingCardsShowcase projects={BOOKLY_STACKING_CARDS} />
       </section>
 
-      {/* Testimonials Section */}
-      <section ref={testimonialsRef} className="py-12 sm:py-20 px-4 sm:px-6">
-        <div className="container mx-auto max-w-6xl">
-          <div className={`text-center space-y-4 mb-10 sm:mb-16 transition-all duration-700 ${testimonialsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-            <h2 className="text-3xl sm:text-4xl font-display font-bold">
-              Loved by <span className="gradient-text">businesses</span> worldwide
-            </h2>
-            <p className="text-lg sm:text-xl text-muted-foreground">
-              See what our customers have to say
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-6">
-            {(reviews.length > 0 ? reviews : [
-              { id: '1', name: "Sarah Johnson", role: "Salon Owner", content: "Bookly has transformed how we manage appointments. Our booking rate increased by 40% in just the first month!", rating: 5 },
-              { id: '2', name: "Michael Chen", role: "Fitness Studio Manager", content: "The automated reminders have reduced our no-shows significantly. The analytics dashboard is incredibly insightful.", rating: 5 },
-              { id: '3', name: "Emily Rodriguez", role: "Consultant", content: "Easy to use, beautiful interface, and excellent customer support. Bookly has become essential to our business.", rating: 5 },
-            ]).slice(0, 6).map((testimonial, i) => (
-              <div 
-                key={testimonial.id || i} 
-                className={`glass-card p-6 rounded-xl hover-lift transition-all duration-500 ${testimonialsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
-                style={{ transitionDelay: `${i * 150}ms` }}
-              >
-                <div className="flex items-center gap-1 mb-4">
-                  {[...Array(testimonial.rating || 5)].map((_, j) => (
-                    <Star key={j} className="w-4 h-4 fill-warning text-warning animate-pulse" style={{ animationDelay: `${j * 100}ms` }} />
-                  ))}
-                </div>
-                <p className="text-muted-foreground mb-4 italic">"{testimonial.content}"</p>
-                <div>
-                  <p className="font-semibold">{testimonial.name}</p>
-                  <p className="text-sm text-muted-foreground">{testimonial.role || ''}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Testimonials: marquee UI + Supabase `reviews` (add/edit in Super Admin). Empty DB → placeholder quotes until real ones exist. */}
+      <section ref={testimonialsRef} className="py-12 sm:py-20 bg-background relative overflow-hidden">
+        <TestimonialsMarqueeSection items={reviewsToMarqueeItems(reviews)} />
       </section>
 
       {/* Blog Section */}
       {blogPosts.length > 0 && (
-        <section ref={blogRef} className="py-12 sm:py-20 px-4 sm:px-6 bg-muted/20">
+        <section id="blog" ref={blogRef} className="py-12 sm:py-20 px-4 sm:px-6 bg-muted/20">
           <div className="container mx-auto max-w-6xl">
             <div className={`text-center space-y-4 mb-10 sm:mb-12 transition-all duration-700 ${blogVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
               <h2 className="text-3xl sm:text-4xl font-display font-bold">
@@ -963,46 +826,11 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 px-6 border-t border-border/50">
-        <div className="container mx-auto max-w-6xl">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-display font-bold">Bookly</span>
-            </div>
-            
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              {footerLinks.length > 0 ? (
-                footerLinks.map((link) =>
-                  link.url.startsWith('/') ? (
-                    <Link key={link.id} to={link.url} className="hover:text-foreground transition-colors">
-                      {link.label}
-                    </Link>
-                  ) : (
-                    <a key={link.id} href={link.url} className="hover:text-foreground transition-colors">
-                      {link.label}
-                    </a>
-                  )
-                )
-              ) : (
-                <>
-                  <Link to="/auth" className="hover:text-foreground transition-colors">Sign In</Link>
-                  <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-                  <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-                  <a href="#" className="hover:text-foreground transition-colors">Contact</a>
-                </>
-              )}
-            </div>
-            
-            <p className="text-sm text-muted-foreground">
-              {siteSettings?.footer_copyright || '© 2024 Bookly. All rights reserved.'}
-            </p>
-          </div>
-        </div>
-      </footer>
+      <LandingHoverFooter
+        footerLinks={footerLinks}
+        siteSettings={siteSettings}
+        hasBlog={blogPosts.length > 0}
+      />
 
       {/* Back to top - portal to body so it floats above all content, not stuck in footer */}
       {showBackToTop && createPortal(

@@ -39,6 +39,9 @@ const CustomerAuth = lazy(() => import("./pages/CustomerAuth"));
 const MyAppointments = lazy(() => import("./pages/MyAppointments"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const MovingLanding = lazy(() => import("./pages/MovingLanding"));
+const StackingCardDemo = lazy(() =>
+  import("@/components/ui/stacking-card-demo").then((m) => ({ default: m.DemoOne }))
+);
 const BlogPost = lazy(() => import("./pages/BlogPost"));
 const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
@@ -78,6 +81,7 @@ function AppRoutes() {
         <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/moving-demo" element={<MovingLanding />} />
+        <Route path="/stacking-demo" element={<StackingCardDemo />} />
         <Route path="/auth" element={<UnifiedAuth />} />
         <Route path="/business-auth" element={<Auth />} />
         <Route path="/customer-login" element={<CustomerAuth />} />
