@@ -463,9 +463,9 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
         });
       }
 
-      // Send cancellation email if enabled
-      if (appointment && appointment.customer && appointment.service && business) {
-        // Check if cancellation email is enabled
+      // Send cancellation email if enabled (requires customer email — Resend needs a valid "to")
+      const cancelCustomerEmail = appointment?.customer?.email?.trim();
+      if (appointment && cancelCustomerEmail && appointment.service && business) {
         const { data: emailSettings } = await supabase
           .from('reminder_settings')
           .select('send_cancellation_email')
@@ -478,11 +478,11 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
             const formattedDate = appointmentDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             const formattedTime = appointmentDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
-            await supabase.functions.invoke('send-cancellation-email', {
+            const { error: cancelFnError } = await supabase.functions.invoke('send-cancellation-email', {
               body: {
                 business_id: business.id,
-                customerEmail: appointment.customer.email,
-                customerName: appointment.customer.name,
+                customerEmail: cancelCustomerEmail,
+                customerName: appointment.customer?.name ?? 'Customer',
                 serviceName: appointment.service.name,
                 businessName: business.name,
                 appointmentDate: formattedDate,
@@ -490,9 +490,13 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
                 staffName: appointment.staff_member?.name,
               },
             });
+            if (cancelFnError) {
+              console.error('send-cancellation-email failed:', cancelFnError.message, cancelFnError);
+              toast.error('Appointment cancelled, but the customer email could not be sent. Check Resend and Edge Function logs.');
+            }
           } catch (emailError) {
             console.error('Failed to send cancellation email:', emailError);
-            // Don't fail the deletion if email fails
+            toast.error('Appointment cancelled, but sending the cancellation email failed.');
           }
         }
       }

@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.complete-subscription-checkout]
 verify_jwt = false
+
+[functions.send-test-emails]
+verify_jwt = true
