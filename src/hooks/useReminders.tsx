@@ -85,6 +85,17 @@ export function useReminderSettings() {
           .single();
 
         if (createError) {
+          // Concurrent first loads can both insert; second hits unique on business_id.
+          if (createError.code === '23505') {
+            const { data: existing, error: refetchError } = await supabase
+              .from('reminder_settings')
+              .select('*')
+              .eq('business_id', business.id)
+              .maybeSingle();
+            if (!refetchError && existing) {
+              return existing as ReminderSettings;
+            }
+          }
           console.error('Error creating reminder settings:', createError);
           return null;
         }
