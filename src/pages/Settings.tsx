@@ -29,7 +29,6 @@ import { ClassScheduleSettings } from '@/components/settings/ClassScheduleSettin
 import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
 import { TIMEZONES } from '@/lib/timezones';
 import { cn } from '@/lib/utils';
-import { SEND_TEST_EMAILS_FUNCTION } from '@/lib/edgeFunctions';
 
 const Settings = () => {
   const { user } = useAuth();
@@ -53,17 +52,6 @@ const Settings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [logoDragActive, setLogoDragActive] = useState(false);
   const [stripeConnectEmail, setStripeConnectEmail] = useState('');
-  const [testEmailRecipient, setTestEmailRecipient] = useState('');
-  const [testEmailResults, setTestEmailResults] = useState<
-    | {
-        success?: boolean;
-        sent?: number;
-        failedCount?: number;
-        results?: Array<{ function: string; ok: boolean; status: number; body: unknown }>;
-      }
-    | null
-  >(null);
-  const [testEmailsRunning, setTestEmailsRunning] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,12 +59,6 @@ const Settings = () => {
       setStripeConnectEmail(user?.email || business?.email || '');
     }
   }, [user?.email, business?.email]);
-
-  useEffect(() => {
-    if (user?.email) {
-      setTestEmailRecipient((prev) => (prev.trim() === '' ? user.email! : prev));
-    }
-  }, [user?.email]);
 
   // Handle subscription checkout redirect from Stripe
   const processedCheckoutRef = useRef<string | null>(null);
@@ -199,50 +181,6 @@ const Settings = () => {
     setEmbedCopied(true);
     toast.success('Embed code copied!');
     setTimeout(() => setEmbedCopied(false), 2000);
-  };
-
-  const handleSendTestEmails = async () => {
-    const to = testEmailRecipient.trim().toLowerCase();
-    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-      toast.error('Enter a valid email address');
-      return;
-    }
-    setTestEmailsRunning(true);
-    setTestEmailResults(null);
-    try {
-      const { data, error } = await supabase.functions.invoke(SEND_TEST_EMAILS_FUNCTION, {
-        body: { toEmail: to },
-      });
-      if (error) {
-        if (error instanceof FunctionsHttpError) {
-          const ctx = await error.context.json().catch(() => ({}));
-          toast.error((ctx as { error?: string })?.error || error.message || 'Test emails request failed');
-        } else {
-          toast.error(error.message || 'Test emails request failed');
-        }
-        return;
-      }
-      setTestEmailResults(
-        data as {
-          success?: boolean;
-          sent?: number;
-          failedCount?: number;
-          results?: Array<{ function: string; ok: boolean; status: number; body: unknown }>;
-        },
-      );
-      const failed = (data as { failedCount?: number; sent?: number })?.failedCount ?? 0;
-      const sent = (data as { sent?: number })?.sent ?? 0;
-      if (failed > 0) {
-        toast.warning(`${sent - failed}/${sent} test emails succeeded. Expand details below for errors (Resend logs, API keys, domain).`);
-      } else {
-        toast.success(`${sent} test emails sent to ${to}. Check inbox and spam.`);
-      }
-    } catch (e) {
-      console.error(e);
-      toast.error('Could not run email tests');
-    } finally {
-      setTestEmailsRunning(false);
-    }
   };
 
   return (
@@ -1254,64 +1192,6 @@ const Settings = () => {
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 Failed to load email notification settings
-              </div>
-            )}
-          </div>
-
-          {/* Test transactional emails (owner/admin) */}
-          <div className="glass-card p-4 sm:p-6 border-dashed border-primary/30">
-            <div className="flex items-center gap-2 mb-2">
-              <Mail className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Test transactional emails</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Sends one sample of each customer/business email (confirmation, cancellation, reschedule, reminder,
-              welcome, follow-up, team invite, daily summary) to the address below using your live Resend setup.
-              Deploy <code className="text-xs bg-muted px-1 rounded">supabase functions deploy send-test-emails</code>{' '}
-              (slug must match <code className="text-xs bg-muted px-1 rounded">{SEND_TEST_EMAILS_FUNCTION}</code>
-              {SEND_TEST_EMAILS_FUNCTION !== 'send-test-emails' ? ' via VITE_SUPABASE_SEND_TEST_EMAILS_FUNCTION' : ''}) and set{' '}
-              <code className="text-xs bg-muted px-1 rounded">RESEND_API_KEY</code> in Supabase.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 sm:items-end max-w-xl">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="test-email-recipient">Send all samples to</Label>
-                <Input
-                  id="test-email-recipient"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  value={testEmailRecipient}
-                  onChange={(e) => setTestEmailRecipient(e.target.value)}
-                  disabled={testEmailsRunning}
-                />
-              </div>
-              <Button type="button" onClick={handleSendTestEmails} disabled={testEmailsRunning || !business?.id}>
-                {testEmailsRunning ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending…
-                  </>
-                ) : (
-                  'Send all test emails'
-                )}
-              </Button>
-            </div>
-            {testEmailResults?.results && testEmailResults.results.length > 0 && (
-              <div className="mt-4 space-y-2">
-                <p className="text-sm font-medium">Results</p>
-                <ul className="text-sm space-y-1">
-                  {testEmailResults.results.map((r) => (
-                    <li key={r.function} className={r.ok ? 'text-green-600 dark:text-green-400' : 'text-destructive'}>
-                      {r.function}: {r.ok ? 'OK' : `Failed (${r.status})`}
-                    </li>
-                  ))}
-                </ul>
-                <details className="text-xs">
-                  <summary className="cursor-pointer text-muted-foreground py-1">Raw response</summary>
-                  <pre className="mt-2 bg-muted p-3 rounded-md overflow-auto max-h-56 whitespace-pre-wrap break-all">
-                    {JSON.stringify(testEmailResults, null, 2)}
-                  </pre>
-                </details>
               </div>
             )}
           </div>
