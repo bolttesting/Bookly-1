@@ -42,7 +42,7 @@ export function useReminderSettings() {
   const { business } = useBusiness();
   const queryClient = useQueryClient();
 
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isFetching, isPending } = useQuery({
     queryKey: ['reminder-settings', business?.id],
     queryFn: async (): Promise<ReminderSettings | null> => {
       if (!business?.id) return null;
@@ -53,7 +53,8 @@ export function useReminderSettings() {
         .eq('business_id', business.id)
         .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      // maybeSingle(): real errors only (RLS, network). No row => data null, error null.
+      if (error) {
         console.error('Error fetching reminder settings:', error);
         return null;
       }
@@ -95,6 +96,10 @@ export function useReminderSettings() {
     },
     enabled: !!business?.id,
   });
+
+  // With enabled: false, React Query v5 keeps isPending false while data is undefined — Settings
+  // would show "Failed to load". Treat "no business yet" and active fetch as loading.
+  const isLoading = !business?.id || isFetching || isPending;
 
   const updateSettings = useMutation({
     mutationFn: async (updates: Partial<ReminderSettings>) => {
