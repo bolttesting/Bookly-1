@@ -163,8 +163,8 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
   );
 
   return (
-    <footer className="relative h-fit rounded-3xl overflow-hidden mx-4 sm:mx-6 lg:mx-8 mb-6 sm:mb-8 border border-border bg-card/40 backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto p-8 sm:p-12 lg:p-14 z-40 relative">
+    <footer className="relative h-fit rounded-3xl overflow-hidden mx-2 sm:mx-4 lg:mx-6 mb-6 sm:mb-8 border border-border bg-card/40 backdrop-blur-sm">
+      <div className="w-full max-w-[min(100%,92rem)] mx-auto px-6 sm:px-10 lg:px-14 xl:px-16 py-8 sm:py-12 lg:py-14 z-40 relative">
         {/* Brand — mobile only (desktop uses first grid column) */}
         <div className="flex flex-col space-y-4 pb-4 mb-2 md:hidden">
           <Link to="/" className="flex items-center gap-2 w-fit">
@@ -201,16 +201,15 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
           </AccordionItem>
           <AccordionItem value="legal" className="border-border">
             <AccordionTrigger className="text-foreground text-base font-semibold py-3 hover:no-underline">
-              Legal
+              Privacy &amp; legal
             </AccordionTrigger>
             <AccordionContent className="pb-4">{legalList}</AccordionContent>
           </AccordionItem>
         </Accordion>
 
-        {/* Desktop: multi-column grid */}
-        <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-10 md:gap-8 lg:gap-12 pb-10">
-          {/* Brand column on desktop only (mobile brand is above) */}
-          <div className="flex flex-col space-y-4 lg:col-span-1">
+        {/* Desktop / tablet: brand + menus including Privacy & legal */}
+        <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-5 gap-10 md:gap-x-12 md:gap-y-10 lg:gap-12 pb-6 lg:pb-10">
+          <div className="flex flex-col space-y-4 md:col-span-2 lg:col-span-1 lg:max-w-sm">
             <Link to="/" className="flex items-center gap-2 w-fit">
               <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
                 <Calendar className="w-5 h-5 text-primary-foreground" />
@@ -237,24 +236,25 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
             <h4 className="text-foreground text-base font-semibold mb-5">Contact</h4>
             {contactList}
           </div>
+
+          <div>
+            <h4 className="text-foreground text-base font-semibold mb-5">Privacy &amp; legal</h4>
+            {legalList}
+          </div>
         </div>
+      </div>
 
-        <div className="hidden md:flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm text-muted-foreground pb-6 -mt-2">
-          <Link to="/privacy" className="hover:text-primary transition-colors">
-            Privacy Policy
-          </Link>
-          <Link to="/terms" className="hover:text-primary transition-colors">
-            Terms of Service
-          </Link>
-          <Link to="/cookies" className="hover:text-primary transition-colors">
-            Cookie Policy
-          </Link>
+      {/* Large wordmark — sits above the bottom bar (socials + copyright) */}
+      <div className="hidden md:flex w-full items-center justify-center pointer-events-none px-4 min-h-[12rem] lg:min-h-[16rem] py-6 lg:py-10">
+        <div className="w-full max-w-6xl xl:max-w-7xl h-[200px] lg:h-[280px] pointer-events-auto">
+          <TextHoverEffect text="Bookly" className="z-10 w-full h-full max-h-[280px]" />
         </div>
+      </div>
 
-        <hr className="border-t border-border my-8" />
-
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-muted-foreground">
-          <div className="flex flex-wrap justify-center md:justify-start gap-5">
+      <div className="w-full max-w-[min(100%,92rem)] mx-auto px-6 sm:px-10 lg:px-14 xl:px-16 relative z-40">
+        <hr className="border-t border-border/80" />
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-6 text-sm text-muted-foreground pt-8 pb-8 sm:pb-10">
+          <div className="flex flex-wrap justify-center sm:justify-start gap-5">
             <a href="#" aria-label="Facebook" className="hover:text-primary transition-colors">
               <Facebook className="h-5 w-5" />
             </a>
@@ -265,14 +265,7 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
               <Linkedin className="h-5 w-5" />
             </a>
           </div>
-          <p className="text-center md:text-right">{copyright}</p>
-        </div>
-      </div>
-
-      {/* Decorative wordmark — desktop only */}
-      <div className="lg:flex hidden h-[24rem] -mt-44 -mb-28 w-full items-center justify-center pointer-events-none">
-        <div className="w-full max-w-4xl h-full pointer-events-auto">
-          <TextHoverEffect text="Bookly" className="z-50 w-full h-full max-h-[280px]" />
+          <p className="text-center sm:text-right max-w-xl sm:max-w-none">{copyright}</p>
         </div>
       </div>
 
