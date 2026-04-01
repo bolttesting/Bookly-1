@@ -32,10 +32,13 @@ type AppRole = 'owner' | 'admin' | 'staff';
 
 async function fetchBusinessAndRole(userId: string): Promise<{ business: Business | null; role: AppRole | null }> {
   try {
+    // Pick one business deterministically; maybeSingle() errors if the user has 2+ rows.
     const { data: roleData, error: roleError } = await supabase
       .from('user_roles')
       .select('business_id, role')
       .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(1)
       .maybeSingle();
     if (roleError) {
       console.warn('[useBusiness] user_roles fetch failed:', roleError.message);

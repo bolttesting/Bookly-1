@@ -25,6 +25,31 @@ export interface ReminderSettings {
   notify_marketing_updates?: boolean;
 }
 
+/** After Google OAuth, REST can run before the JWT is in the client; RLS then blocks insert. PKCE may strip the URL before we read it, so we poll briefly when the first session is empty. */
+async function ensureAuthSessionReady(): Promise<boolean> {
+  const { data: { session: first } } = await supabase.auth.getSession();
+  if (first?.access_token) return true;
+
+  if (typeof window === 'undefined') return false;
+
+  const hash = window.location.hash ?? '';
+  const search = window.location.search ?? '';
+  const oauthReturn =
+    hash.includes('access_token') ||
+    hash.includes('code=') ||
+    search.includes('code=');
+
+  const maxAttempts = oauthReturn ? 20 : 8;
+  const delayMs = oauthReturn ? 100 : 50;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((r) => setTimeout(r, delayMs));
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) return true;
+  }
+  return false;
+}
+
 export interface AppointmentReminder {
   id: string;
   appointment_id: string;
@@ -46,6 +71,12 @@ export function useReminderSettings() {
     queryKey: ['reminder-settings', business?.id],
     queryFn: async (): Promise<ReminderSettings | null> => {
       if (!business?.id) return null;
+
+      const sessionOk = await ensureAuthSessionReady();
+      if (!sessionOk) {
+        console.warn('[useReminderSettings] Auth session not ready; cannot load reminder_settings');
+        return null;
+      }
 
       const { data, error } = await supabase
         .from('reminder_settings')

@@ -38,6 +38,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
+          // OAuth redirect can briefly leave REST calls without a JWT; refetch tenant data after sign-in.
+          if (session?.user && event === 'SIGNED_IN') {
+            queryClient.invalidateQueries({ queryKey: ['business'] });
+            queryClient.invalidateQueries({ queryKey: ['reminder-settings'] });
+          }
         }
       );
 
@@ -46,6 +51,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        if (typeof window !== 'undefined' && session?.user) {
+          const h = window.location.hash ?? '';
+          const s = window.location.search ?? '';
+          const oauthReturn =
+            h.includes('access_token') || h.includes('code=') || s.includes('code=');
+          if (oauthReturn) {
+            queryClient.invalidateQueries({ queryKey: ['business'] });
+            queryClient.invalidateQueries({ queryKey: ['reminder-settings'] });
+          }
+        }
       }).catch((err) => {
         console.error('Error getting session:', err);
         setLoading(false);
@@ -100,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     queryClient.removeQueries({ queryKey: ['business'] });
+    queryClient.removeQueries({ queryKey: ['reminder-settings'] });
     queryClient.removeQueries({ queryKey: ['appointments'] });
 
     // End server + local session first. Clearing React state *before* this can leave
