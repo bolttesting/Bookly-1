@@ -28,7 +28,7 @@ import { LocationsSettings } from '@/components/settings/LocationsSettings';
 import { ClassScheduleSettings } from '@/components/settings/ClassScheduleSettings';
 import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
 import { TIMEZONES } from '@/lib/timezones';
-import { cn } from '@/lib/utils';
+import { cn, formatErrorMessage } from '@/lib/utils';
 
 /** Uses a render prop so inner JSX is not evaluated until `settings` exists (avoids crashing on undefined). */
 function ReminderSettingsPlaceholder({
@@ -40,7 +40,7 @@ function ReminderSettingsPlaceholder({
 }: {
   loading: boolean;
   settings: ReminderSettings | undefined;
-  loadError: Error | null;
+  loadError: unknown | null;
   onRetry: () => void;
   children: (rs: ReminderSettings) => ReactNode;
 }) {
@@ -53,7 +53,7 @@ function ReminderSettingsPlaceholder({
   }
   if (settings) return <>{children(settings)}</>;
 
-  const msg = loadError?.message ?? '';
+  const msg = formatErrorMessage(loadError);
   const notAllowed = msg.includes('Not allowed for this business');
   const rpcMissing = /could not find|does not exist|PGRST202|42883|unknown function/i.test(msg);
 
@@ -73,8 +73,8 @@ function ReminderSettingsPlaceholder({
           <code className="text-xs bg-muted px-1 rounded">ensure_reminder_settings_for_business</code> on your Supabase
           project, then retry.
         </p>
-      ) : loadError ? (
-        <p className="text-xs font-mono break-all">{msg}</p>
+      ) : loadError != null && msg ? (
+        <p className="text-xs font-mono break-all whitespace-pre-wrap">{msg}</p>
       ) : (
         <p>Something went wrong. Try again.</p>
       )}
@@ -103,13 +103,8 @@ const Settings = () => {
   } = useReminderSettings();
 
   const reminderSettingsLoadError =
-    reminderSettingsQueryError instanceof Error
-      ? reminderSettingsQueryError
-      : reminderSettingsQueryError != null
-        ? new Error(String(reminderSettingsQueryError))
-        : reminderSettingsIsError
-          ? new Error('Unknown error loading reminder settings')
-          : null;
+    reminderSettingsQueryError ??
+    (reminderSettingsIsError ? new Error('Unknown error loading reminder settings') : null);
   const { emailConfig, smsConfig, isLoading: channelConfigLoading, saveEmail, saveSms, removeEmailConfig, removeSmsConfig, isSavingEmail, isSavingSms } = useBusinessChannelConfig();
   const [searchParams, setSearchParams] = useSearchParams();
   const [emailFromName, setEmailFromName] = useState('');
