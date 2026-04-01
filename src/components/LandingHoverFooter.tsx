@@ -1,6 +1,12 @@
 import { Link } from "react-router-dom";
 import { Calendar, Mail, Phone, MapPin, Facebook, Instagram, Linkedin } from "lucide-react";
 import { TextHoverEffect, FooterBackgroundGradient } from "@/components/ui/hover-footer";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import type { FooterLink } from "@/hooks/useFooterLinks";
 import type { SiteSettings } from "@/hooks/useSiteSettings";
 import { cn } from "@/lib/utils";
@@ -51,12 +57,135 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
 
   const accent = "text-primary";
 
+  const exploreList = (
+    <ul className="space-y-3 pt-1">
+      {EXPLORE_LINKS.map((item) => (
+        <li key={item.href}>
+          <a
+            href={item.href}
+            className="text-sm text-muted-foreground hover:text-primary transition-colors"
+            onClick={(e) => scrollToHash(e, item.href)}
+          >
+            {item.label}
+          </a>
+        </li>
+      ))}
+      {hasBlog && (
+        <li>
+          <a
+            href="#blog"
+            className="text-sm text-muted-foreground hover:text-primary transition-colors"
+            onClick={(e) => scrollToHash(e, "#blog")}
+          >
+            Blog
+          </a>
+        </li>
+      )}
+    </ul>
+  );
+
+  const linksList = (
+    <ul className="space-y-3 pt-1">
+      {footerLinks.length > 0 ? (
+        footerLinks.map((link) => (
+          <li key={link.id}>
+            <FooterLinkItem link={link} />
+          </li>
+        ))
+      ) : (
+        <>
+          <li>
+            <Link to="/auth" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              Sign in
+            </Link>
+          </li>
+          <li>
+            <a
+              href="#contact"
+              className="text-sm text-muted-foreground hover:text-primary transition-colors"
+              onClick={(e) => scrollToHash(e, "#contact")}
+            >
+              Support
+            </a>
+          </li>
+        </>
+      )}
+    </ul>
+  );
+
+  const contactList = (
+    <ul className="space-y-4 pt-1">
+      {email && (
+        <li className="flex items-start gap-3">
+          <Mail className={cn("h-[18px] w-[18px] shrink-0 mt-0.5", accent)} aria-hidden />
+          <a href={`mailto:${email}`} className="text-sm text-muted-foreground hover:text-primary transition-colors break-all">
+            {email}
+          </a>
+        </li>
+      )}
+      {phone && (
+        <li className="flex items-start gap-3">
+          <Phone className={cn("h-[18px] w-[18px] shrink-0 mt-0.5", accent)} aria-hidden />
+          <a href={`tel:${phone.replace(/\s/g, "")}`} className="text-sm text-muted-foreground hover:text-primary transition-colors">
+            {phone}
+          </a>
+        </li>
+      )}
+      {address && (
+        <li className="flex items-start gap-3">
+          <MapPin className={cn("h-[18px] w-[18px] shrink-0 mt-0.5", accent)} aria-hidden />
+          <span className="text-sm text-muted-foreground">{address}</span>
+        </li>
+      )}
+      {!email && !phone && !address && (
+        <li className="text-sm text-muted-foreground">Contact details can be set in site settings.</li>
+      )}
+    </ul>
+  );
+
   return (
     <footer className="relative h-fit rounded-3xl overflow-hidden mx-4 sm:mx-6 lg:mx-8 mb-6 sm:mb-8 border border-border bg-card/40 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto p-8 sm:p-12 lg:p-14 z-40 relative">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 md:gap-8 lg:gap-12 pb-10">
-          {/* Brand */}
-          <div className="flex flex-col space-y-4">
+        {/* Brand — mobile only (desktop uses first grid column) */}
+        <div className="flex flex-col space-y-4 pb-4 mb-2 md:hidden">
+          <Link to="/" className="flex items-center gap-2 w-fit">
+            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
+              <Calendar className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <span className="text-2xl sm:text-3xl font-display font-bold text-foreground">Bookly</span>
+          </Link>
+          <p className="text-sm text-muted-foreground leading-relaxed max-w-md">
+            The all-in-one booking platform for service businesses. Manage appointments, clients, and staff from one
+            place.
+          </p>
+        </div>
+
+        {/* Mobile: collapsible menu groups */}
+        <Accordion type="multiple" className="md:hidden mb-8">
+          <AccordionItem value="explore" className="border-border">
+            <AccordionTrigger className="text-foreground text-base font-semibold py-3 hover:no-underline">
+              Explore
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">{exploreList}</AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="links" className="border-border">
+            <AccordionTrigger className="text-foreground text-base font-semibold py-3 hover:no-underline">
+              Links
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">{linksList}</AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="contact" className="border-border">
+            <AccordionTrigger className="text-foreground text-base font-semibold py-3 hover:no-underline">
+              Contact
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">{contactList}</AccordionContent>
+          </AccordionItem>
+        </Accordion>
+
+        {/* Desktop: multi-column grid */}
+        <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-10 md:gap-8 lg:gap-12 pb-10">
+          {/* Brand column on desktop only (mobile brand is above) */}
+          <div className="flex flex-col space-y-4 lg:col-span-1">
             <Link to="/" className="flex items-center gap-2 w-fit">
               <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
                 <Calendar className="w-5 h-5 text-primary-foreground" />
@@ -69,96 +198,19 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
             </p>
           </div>
 
-          {/* Explore */}
           <div>
             <h4 className="text-foreground text-base font-semibold mb-5">Explore</h4>
-            <ul className="space-y-3">
-              {EXPLORE_LINKS.map((item) => (
-                <li key={item.href}>
-                  <a
-                    href={item.href}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                    onClick={(e) => scrollToHash(e, item.href)}
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              ))}
-              {hasBlog && (
-                <li>
-                  <a
-                    href="#blog"
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                    onClick={(e) => scrollToHash(e, "#blog")}
-                  >
-                    Blog
-                  </a>
-                </li>
-              )}
-            </ul>
+            {exploreList}
           </div>
 
-          {/* Footer links from CMS */}
           <div>
             <h4 className="text-foreground text-base font-semibold mb-5">Links</h4>
-            <ul className="space-y-3">
-              {footerLinks.length > 0 ? (
-                footerLinks.map((link) => (
-                  <li key={link.id}>
-                    <FooterLinkItem link={link} />
-                  </li>
-                ))
-              ) : (
-                <>
-                  <li>
-                    <Link to="/auth" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                      Sign in
-                    </Link>
-                  </li>
-                  <li>
-                    <a
-                      href="#contact"
-                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                      onClick={(e) => scrollToHash(e, "#contact")}
-                    >
-                      Support
-                    </a>
-                  </li>
-                </>
-              )}
-            </ul>
+            {linksList}
           </div>
 
-          {/* Contact */}
           <div>
             <h4 className="text-foreground text-base font-semibold mb-5">Contact</h4>
-            <ul className="space-y-4">
-              {email && (
-                <li className="flex items-start gap-3">
-                  <Mail className={cn("h-[18px] w-[18px] shrink-0 mt-0.5", accent)} aria-hidden />
-                  <a href={`mailto:${email}`} className="text-sm text-muted-foreground hover:text-primary transition-colors break-all">
-                    {email}
-                  </a>
-                </li>
-              )}
-              {phone && (
-                <li className="flex items-start gap-3">
-                  <Phone className={cn("h-[18px] w-[18px] shrink-0 mt-0.5", accent)} aria-hidden />
-                  <a href={`tel:${phone.replace(/\s/g, "")}`} className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                    {phone}
-                  </a>
-                </li>
-              )}
-              {address && (
-                <li className="flex items-start gap-3">
-                  <MapPin className={cn("h-[18px] w-[18px] shrink-0 mt-0.5", accent)} aria-hidden />
-                  <span className="text-sm text-muted-foreground">{address}</span>
-                </li>
-              )}
-              {!email && !phone && !address && (
-                <li className="text-sm text-muted-foreground">Contact details can be set in site settings.</li>
-              )}
-            </ul>
+            {contactList}
           </div>
         </div>
 

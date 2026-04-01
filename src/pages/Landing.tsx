@@ -172,12 +172,14 @@ const Landing = () => {
             </a>
           </div>
           
-          {/* Header actions: theme + Get started (always visible), hamburger (mobile only) */}
+          {/* Desktop: theme + Get started in header. Mobile: only hamburger (theme + CTA live in sheet). */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
-            <Button asChild className="glow text-sm sm:text-base px-3 sm:px-4" size="sm">
-              <Link to="/auth?from=landing">Get started</Link>
-            </Button>
+            <div className="hidden md:flex items-center gap-2 sm:gap-3">
+              <ThemeToggle />
+              <Button asChild className="glow text-sm sm:text-base px-3 sm:px-4" size="sm">
+                <Link to="/auth?from=landing">Get started</Link>
+              </Button>
+            </div>
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild className="md:hidden shrink-0">
                 <Button variant="ghost" size="icon">
