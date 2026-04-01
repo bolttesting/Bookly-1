@@ -29,6 +29,7 @@ import { ClassScheduleSettings } from '@/components/settings/ClassScheduleSettin
 import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
 import { TIMEZONES } from '@/lib/timezones';
 import { cn } from '@/lib/utils';
+import { SEND_TEST_EMAILS_FUNCTION } from '@/lib/edgeFunctions';
 
 const Settings = () => {
   const { user } = useAuth();
@@ -209,7 +210,7 @@ const Settings = () => {
     setTestEmailsRunning(true);
     setTestEmailResults(null);
     try {
-      const { data, error } = await supabase.functions.invoke('send-test-emails', {
+      const { data, error } = await supabase.functions.invoke(SEND_TEST_EMAILS_FUNCTION, {
         body: { toEmail: to },
       });
       if (error) {
@@ -1266,7 +1267,9 @@ const Settings = () => {
             <p className="text-sm text-muted-foreground mb-4">
               Sends one sample of each customer/business email (confirmation, cancellation, reschedule, reminder,
               welcome, follow-up, team invite, daily summary) to the address below using your live Resend setup.
-              Deploy the <code className="text-xs bg-muted px-1 rounded">send-test-emails</code> Edge Function and set{' '}
+              Deploy <code className="text-xs bg-muted px-1 rounded">supabase functions deploy send-test-emails</code>{' '}
+              (slug must match <code className="text-xs bg-muted px-1 rounded">{SEND_TEST_EMAILS_FUNCTION}</code>
+              {SEND_TEST_EMAILS_FUNCTION !== 'send-test-emails' ? ' via VITE_SUPABASE_SEND_TEST_EMAILS_FUNCTION' : ''}) and set{' '}
               <code className="text-xs bg-muted px-1 rounded">RESEND_API_KEY</code> in Supabase.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:items-end max-w-xl">

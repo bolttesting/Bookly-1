@@ -1,4 +1,4 @@
-project_id = "fkdlxssjllqncdbkcddi"
+project_id = "qecedmwvnhrshcwdpirt"
 
 [functions.send-booking-confirmation]
 verify_jwt = false
@@ -42,5 +42,7 @@ verify_jwt = false
 [functions.complete-subscription-checkout]
 verify_jwt = false
 
+# JWT is validated inside the function (getUser). verify_jwt=true breaks browser
+# OPTIONS preflight and shows as a CORS error in DevTools.
 [functions.send-test-emails]
-verify_jwt = true
+verify_jwt = false

@@ -10,6 +10,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
+    "deploy:send-test-emails": "npx --yes supabase@latest functions deploy send-test-emails --project-ref qecedmwvnhrshcwdpirt",
     "setup-super-admin": "node _unwanted/setup-super-admin.js",
     "change-super-admin-password": "node _unwanted/change-super-admin-password.js",
     "create-super-admin": "node _unwanted/create-super-admin-user.js"
