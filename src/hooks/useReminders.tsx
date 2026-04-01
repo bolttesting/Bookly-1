@@ -25,29 +25,92 @@ export interface ReminderSettings {
   notify_marketing_updates?: boolean;
 }
 
-/** After Google OAuth, REST can run before the JWT is in the client; RLS then blocks insert. PKCE may strip the URL before we read it, so we poll briefly when the first session is empty. */
-async function ensureAuthSessionReady(): Promise<boolean> {
-  const { data: { session: first } } = await supabase.auth.getSession();
-  if (first?.access_token) return true;
-
-  if (typeof window === 'undefined') return false;
-
-  const hash = window.location.hash ?? '';
-  const search = window.location.search ?? '';
-  const oauthReturn =
-    hash.includes('access_token') ||
-    hash.includes('code=') ||
-    search.includes('code=');
-
-  const maxAttempts = oauthReturn ? 20 : 8;
-  const delayMs = oauthReturn ? 100 : 50;
-
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, delayMs));
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) return true;
+function normalizeReminderSettingsRpcData(data: unknown): ReminderSettings | null {
+  if (data == null) return null;
+  if (Array.isArray(data)) {
+    const row = data[0];
+    return row && typeof row === 'object' ? (row as ReminderSettings) : null;
   }
-  return false;
+  if (typeof data === 'object') return data as ReminderSettings;
+  return null;
+}
+
+function isRpcNotDeployedError(err: { code?: string; message?: string }): boolean {
+  const msg = (err.message ?? '').toLowerCase();
+  return (
+    err.code === 'PGRST202' ||
+    err.code === '42883' ||
+    msg.includes('could not find') ||
+    msg.includes('does not exist') ||
+    msg.includes('unknown function')
+  );
+}
+
+/** Prefer DB RPC (bypasses RLS on insert); falls back to REST if migration not applied yet. */
+async function loadReminderSettingsRow(businessId: string): Promise<ReminderSettings> {
+  const { data, error } = await supabase.rpc('ensure_reminder_settings_for_business', {
+    p_business_id: businessId,
+  });
+
+  if (!error) {
+    const row = normalizeReminderSettingsRpcData(data);
+    if (row) return row;
+    throw new Error('No reminder settings returned');
+  }
+
+  if (!isRpcNotDeployedError(error)) {
+    console.error('ensure_reminder_settings_for_business:', error);
+    throw error;
+  }
+
+  const { data: existing, error: selErr } = await supabase
+    .from('reminder_settings')
+    .select('*')
+    .eq('business_id', businessId)
+    .maybeSingle();
+  if (selErr) {
+    console.error('Error fetching reminder settings:', selErr);
+    throw selErr;
+  }
+  if (existing) return existing as ReminderSettings;
+
+  const { data: inserted, error: insErr } = await supabase
+    .from('reminder_settings')
+    .insert({
+      business_id: businessId,
+      enable_email_reminders: true,
+      enable_sms_reminders: false,
+      reminder_hours_before: [24, 2],
+      send_reminder_on_booking: true,
+      send_booking_confirmation: true,
+      send_cancellation_email: true,
+      send_reschedule_email: true,
+      send_welcome_email: false,
+      send_followup_email: false,
+      followup_days_after: 1,
+      auto_confirm_bookings: true,
+      notify_new_bookings: true,
+      notify_cancellations: true,
+      notify_daily_summary: false,
+      notify_marketing_updates: false,
+    })
+    .select()
+    .single();
+
+  if (insErr) {
+    if (insErr.code === '23505') {
+      const { data: row, error: again } = await supabase
+        .from('reminder_settings')
+        .select('*')
+        .eq('business_id', businessId)
+        .maybeSingle();
+      if (!again && row) return row as ReminderSettings;
+    }
+    console.error('Error creating reminder settings:', insErr);
+    throw insErr;
+  }
+
+  return inserted as ReminderSettings;
 }
 
 export interface AppointmentReminder {
@@ -69,74 +132,17 @@ export function useReminderSettings() {
 
   const { data: settings, isFetching, isPending } = useQuery({
     queryKey: ['reminder-settings', business?.id],
-    queryFn: async (): Promise<ReminderSettings | null> => {
-      if (!business?.id) return null;
-
-      const sessionOk = await ensureAuthSessionReady();
-      if (!sessionOk) {
-        console.warn('[useReminderSettings] Auth session not ready; cannot load reminder_settings');
-        return null;
-      }
-
-      const { data, error } = await supabase
-        .from('reminder_settings')
-        .select('*')
-        .eq('business_id', business.id)
-        .maybeSingle();
-
-      // maybeSingle(): real errors only (RLS, network). No row => data null, error null.
-      if (error) {
-        console.error('Error fetching reminder settings:', error);
-        return null;
-      }
-
-      // If no settings exist, create default
-      if (!data) {
-        const { data: newSettings, error: createError } = await supabase
-          .from('reminder_settings')
-          .insert({
-            business_id: business.id,
-            enable_email_reminders: true,
-            enable_sms_reminders: false,
-            reminder_hours_before: [24, 2],
-            send_reminder_on_booking: true,
-            send_booking_confirmation: true,
-            send_cancellation_email: true,
-            send_reschedule_email: true,
-            send_welcome_email: false,
-            send_followup_email: false,
-            followup_days_after: 1,
-            auto_confirm_bookings: true,
-            notify_new_bookings: true,
-            notify_cancellations: true,
-            notify_daily_summary: false,
-            notify_marketing_updates: false,
-          })
-          .select()
-          .single();
-
-        if (createError) {
-          // Concurrent first loads can both insert; second hits unique on business_id.
-          if (createError.code === '23505') {
-            const { data: existing, error: refetchError } = await supabase
-              .from('reminder_settings')
-              .select('*')
-              .eq('business_id', business.id)
-              .maybeSingle();
-            if (!refetchError && existing) {
-              return existing as ReminderSettings;
-            }
-          }
-          console.error('Error creating reminder settings:', createError);
-          return null;
-        }
-
-        return newSettings as ReminderSettings;
-      }
-
-      return data as ReminderSettings;
+    queryFn: async (): Promise<ReminderSettings> => {
+      if (!business?.id) throw new Error('No business');
+      return loadReminderSettingsRow(business.id);
     },
     enabled: !!business?.id,
+    retry: (failureCount, err) => {
+      const msg = String((err as Error)?.message ?? '');
+      if (msg.includes('Not allowed for this business')) return false;
+      return failureCount < 5;
+    },
+    retryDelay: (attempt) => Math.min(400 * 2 ** attempt, 5000),
   });
 
   // With enabled: false, React Query v5 keeps isPending false while data is undefined — Settings
@@ -207,14 +213,9 @@ export function useAppointmentReminders(appointmentId?: string) {
     mutationFn: async (appointmentId: string) => {
       if (!business?.id) throw new Error('Business not found');
 
-      // Get reminder settings
-      const { data: settings } = await supabase
-        .from('reminder_settings')
-        .select('*')
-        .eq('business_id', business.id)
-        .maybeSingle();
+      const settings = await loadReminderSettingsRow(business.id);
 
-      if (!settings || (!settings.enable_email_reminders && !settings.enable_sms_reminders)) {
+      if (!settings.enable_email_reminders && !settings.enable_sms_reminders) {
         return; // No reminders enabled
       }
 
