@@ -19,6 +19,7 @@ import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { CURRENCIES } from '@/lib/currency';
 import { toast } from 'sonner';
 import type { FooterLink } from '@/hooks/useFooterLinks';
+import { DEFAULT_SUPPORT_EMAIL } from '@/lib/site';
 
 export default function SuperAdminSiteSettings() {
   const { settings, isLoading, update, isUpdating } = useSiteSettings();
@@ -100,7 +101,7 @@ export default function SuperAdminSiteSettings() {
                 type="email"
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
-                placeholder="support@bookly.com"
+                placeholder={DEFAULT_SUPPORT_EMAIL}
               />
             </div>
             <div className="space-y-2">

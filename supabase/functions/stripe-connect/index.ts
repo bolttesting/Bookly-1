@@ -3,7 +3,7 @@
 // Deploy: supabase functions deploy stripe-connect
 // Set in Supabase Dashboard > Project Settings > Edge Functions > Secrets:
 //   STRIPE_SECRET_KEY - your Stripe secret key
-//   SITE_URL - your app URL (e.g. https://your-app.vercel.app) for Stripe redirects
+//   SITE_URL - your app URL (default in code: https://bookly.my); override for staging or http://localhost:8081 locally
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14?target=denonext";
@@ -53,9 +53,9 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const siteUrl = Deno.env.get("SITE_URL") || "http://localhost:8081";
-    if (siteUrl.includes("localhost") && Deno.env.get("SITE_URL") === undefined) {
-      console.warn("SITE_URL not set. Add your production URL (e.g. https://your-app.vercel.app) in Supabase Edge Function Secrets.");
+    const siteUrl = Deno.env.get("SITE_URL") || "https://bookly.my";
+    if (!Deno.env.get("SITE_URL")) {
+      console.warn("SITE_URL secret not set; using default https://bookly.my. Set SITE_URL in Edge Function secrets for staging or http://localhost:8081 for local.");
     }
 
     let ownerEmail = (typeof bodyEmail === "string" && bodyEmail.trim()) ? bodyEmail.trim() : null;

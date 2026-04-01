@@ -17,8 +17,16 @@ For full functionality you need a [Supabase](https://supabase.com) project. Crea
 
 - `VITE_SUPABASE_URL` – your Supabase project URL  
 - `VITE_SUPABASE_PUBLISHABLE_KEY` – your Supabase anon/public key  
+- `VITE_SITE_URL` (optional) – public site origin, e.g. `https://bookly.my` (defaults to that in code if unset)
 
 The app runs without these (using placeholders) so the UI loads, but auth, data, and real booking will not work until you configure a real Supabase project and run the required migrations/Edge Functions.
+
+### Production domain (`bookly.my`)
+
+- Deploy the Vite build behind **HTTPS** at `https://bookly.my` (and configure DNS).
+- In **Supabase → Authentication → URL configuration**, add `https://bookly.my` (and any OAuth redirect URLs you use).
+- In **Supabase Edge Function secrets**, set **`SITE_URL`** to `https://bookly.my` (or rely on the function default, which matches that URL). For local Edge testing, set `SITE_URL=http://localhost:8081`.
+- Configure **SPF/DKIM** for `noreply@bookly.my` (and `support@bookly.my`) if you send mail from those addresses.
 
 ## Build
 

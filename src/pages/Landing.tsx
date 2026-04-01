@@ -20,6 +20,7 @@ import { FeatureCarousel } from "@/components/ui/feature-carousel";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatCurrencySimple, getCurrencyByCode } from "@/lib/currency";
+import { DEFAULT_SUPPORT_EMAIL } from "@/lib/site";
 import { Loader2 } from "lucide-react";
 import { 
   Calendar, 
@@ -758,8 +759,8 @@ const Landing = () => {
                     </div>
                     <div>
                       <p className="font-medium">Email</p>
-                      <a href={`mailto:${siteSettings?.contact_email || 'support@bookly.com'}`} className="text-muted-foreground hover:text-primary transition-colors">
-                        {siteSettings?.contact_email || 'support@bookly.com'}
+                      <a href={`mailto:${siteSettings?.contact_email || DEFAULT_SUPPORT_EMAIL}`} className="text-muted-foreground hover:text-primary transition-colors">
+                        {siteSettings?.contact_email || DEFAULT_SUPPORT_EMAIL}
                       </a>
                     </div>
                   </div>

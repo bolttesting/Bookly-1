@@ -11,7 +11,7 @@ const corsHeaders = {
 };
 
 const PLATFORM_RESEND_KEY = Deno.env.get("RESEND_API_KEY");
-const DEFAULT_FROM = "Bookly <bookly@logixcontact.site>";
+const DEFAULT_FROM = "Bookly <noreply@bookly.my>";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {

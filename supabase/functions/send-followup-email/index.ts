@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const PLATFORM_RESEND_KEY = Deno.env.get("RESEND_API_KEY");
-const DEFAULT_FROM = "Bookly <bookly@logixcontact.site>";
+const DEFAULT_FROM = "Bookly <noreply@bookly.my>";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

@@ -1,6 +1,6 @@
 // @ts-nocheck - Deno/Edge Runtime; IDE lacks types but deploys correctly
 // Creates Stripe Checkout session for subscription plan upgrade
-// Set STRIPE_SECRET_KEY and SITE_URL in Supabase Edge Function Secrets
+// Set STRIPE_SECRET_KEY and SITE_URL in Supabase Edge Function Secrets (defaults to https://bookly.my if SITE_URL unset)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14?target=denonext";
@@ -41,7 +41,7 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const siteUrl = Deno.env.get("SITE_URL") || "http://localhost:8081";
+    const siteUrl = Deno.env.get("SITE_URL") || "https://bookly.my";
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey!);
 
