@@ -1,3 +1,4 @@
+// @ts-nocheck - Supabase Edge Function (Deno); IDE may not have Deno types
 // Supabase Edge Function to process and send scheduled follow-up emails
 // This should be called periodically (via cron job) - recommended: every hour
 
@@ -9,22 +10,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
-  }
-
-  if (!RESEND_API_KEY) {
-    console.error("RESEND_API_KEY not configured");
-    return new Response(
-      JSON.stringify({ success: false, error: "Email service not configured" }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
-    );
   }
 
   try {
@@ -129,8 +117,12 @@ serve(async (req) => {
           hour12: true,
         });
 
-        const bookingUrl = business?.slug 
-          ? `${Deno.env.get("PUBLIC_URL") || "https://your-domain.com"}/book/${business.slug}`
+        const siteOrigin =
+          Deno.env.get("SITE_URL")?.replace(/\/$/, "") ||
+          Deno.env.get("PUBLIC_URL")?.replace(/\/$/, "") ||
+          "https://bookly.my";
+        const bookingUrl = business?.slug
+          ? `${siteOrigin}/book/${business.slug}`
           : null;
 
         // Send follow-up email
@@ -194,7 +186,7 @@ serve(async (req) => {
         success: true,
         message: "Follow-up emails processed",
         total: scheduledFollowups.length,
-        success: successCount,
+        sent: successCount,
         failed: failCount,
         results,
       }),
