@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
+import { flushSync } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -98,15 +99,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    // Clear UI state immediately so ProtectedRoute and /auth don’t race (UnifiedAuth was
-    // redirecting back to /dashboard while session was still in React state for a frame).
-    setSession(null);
-    setUser(null);
-    setLoading(false);
     queryClient.removeQueries({ queryKey: ['business'] });
     queryClient.removeQueries({ queryKey: ['appointments'] });
+
+    // End server + local session first. Clearing React state *before* this can leave
+    // localStorage/session alive so the next visit to /auth still looks "logged in".
     const { error } = await supabase.auth.signOut({ scope: 'global' });
-    if (error) console.error('[useAuth] signOut:', error.message);
+    if (error) console.error('[useAuth] signOut (global):', error.message);
+
+    let { data: { session: remaining } } = await supabase.auth.getSession();
+    if (remaining) {
+      await supabase.auth.signOut({ scope: 'local' });
+      ({ data: { session: remaining } } = await supabase.auth.getSession());
+    }
+    if (remaining) {
+      console.warn('[useAuth] Session still present after signOut; clearing client state anyway');
+    }
+
+    flushSync(() => {
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+    });
   };
 
   return (

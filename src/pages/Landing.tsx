@@ -176,7 +176,7 @@ const Landing = () => {
           <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
             <Button asChild className="glow text-sm sm:text-base px-3 sm:px-4" size="sm">
-              <Link to="/auth">Get started</Link>
+              <Link to="/auth?from=landing">Get started</Link>
             </Button>
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild className="md:hidden shrink-0">
@@ -272,7 +272,7 @@ const Landing = () => {
                   </div>
                   <div className="px-4">
                     <Button className="w-full glow" asChild>
-                      <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>Get started</Link>
+                      <Link to="/auth?from=landing" onClick={() => setMobileMenuOpen(false)}>Get started</Link>
                     </Button>
                   </div>
                 </div>
@@ -312,7 +312,7 @@ const Landing = () => {
             
             <div className={`flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 transition-all duration-1000 delay-400 w-full sm:w-auto ${heroVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
               <Button size="lg" className="glow text-base sm:text-lg px-6 sm:px-8 py-5 sm:py-6 w-full sm:w-auto hover:scale-105 transition-transform duration-300" asChild>
-                <Link to="/auth">
+                <Link to="/auth?from=landing">
                   Start for Free
                   <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Link>
@@ -582,7 +582,7 @@ const Landing = () => {
                       size="lg"
                       asChild
                     >
-                      <Link to="/auth">
+                      <Link to="/auth?from=landing">
                         {plan.price === 0 ? 'Get Started Free' : 'Start Free Trial'}
                       </Link>
                     </Button>
@@ -726,7 +726,7 @@ const Landing = () => {
                 className="glow text-sm sm:text-base md:text-lg px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-6 w-full sm:w-auto hover:scale-105 transition-transform duration-300" 
                 asChild
               >
-                <Link to="/auth" className="flex items-center justify-center gap-2">
+                <Link to="/auth?from=landing" className="flex items-center justify-center gap-2">
                   Start Your Free Trial
                   <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>

@@ -42,7 +42,9 @@ export default function UnifiedAuth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirect');
-  const { user, loading: authLoading, signIn, signUp, signInWithGoogle } = useAuth();
+  /** Landing CTAs use /auth?from=landing — always show login/signup, don’t bounce to dashboard */
+  const fromLanding = searchParams.get('from') === 'landing';
+  const { user, loading: authLoading, signIn, signUp, signInWithGoogle, signOut } = useAuth();
   
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [isLoading, setIsLoading] = useState(false);
@@ -80,14 +82,13 @@ export default function UnifiedAuth() {
 
   // Redirect if already logged in (this page is for business only)
   useEffect(() => {
-    if (user && !authLoading) {
-      if (redirectTo) {
-        navigate(redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`, { replace: true });
-      } else {
-        navigate('/dashboard', { replace: true });
-      }
+    if (fromLanding || !user || authLoading) return;
+    if (redirectTo) {
+      navigate(redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`, { replace: true });
+    } else {
+      navigate('/dashboard', { replace: true });
     }
-  }, [user, authLoading, navigate, redirectTo]);
+  }, [user, authLoading, navigate, redirectTo, fromLanding]);
 
   const resetRedirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/auth` : '';
 
@@ -256,6 +257,29 @@ export default function UnifiedAuth() {
             </div>
             <span className="text-2xl font-display font-bold gradient-text">Bookly</span>
           </div>
+
+          {fromLanding && user && !authLoading && !isRecovery && (
+            <div className="mb-4 rounded-lg border border-border bg-muted/40 p-3 text-center text-sm">
+              <p className="text-muted-foreground mb-2">
+                You&apos;re already signed in{user.email ? ` as ${user.email}` : ''}.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/dashboard', { replace: true })}>
+                  Go to dashboard
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => {
+                    await signOut();
+                  }}
+                >
+                  Sign out
+                </Button>
+              </div>
+            </div>
+          )}
 
           {isRecovery ? (
             <Card className="glass-card border-border/50">
