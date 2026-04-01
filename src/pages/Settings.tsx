@@ -18,7 +18,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 import { useBusinessSubscription } from '@/hooks/useBusinessSubscription';
-import { useReminderSettings } from '@/hooks/useReminders';
+import { useReminderSettings, type ReminderSettings } from '@/hooks/useReminders';
 import { useBusinessChannelConfig } from '@/hooks/useBusinessChannelConfig';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,18 +30,19 @@ import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
 import { TIMEZONES } from '@/lib/timezones';
 import { cn } from '@/lib/utils';
 
+/** Uses a render prop so inner JSX is not evaluated until `settings` exists (avoids crashing on undefined). */
 function ReminderSettingsPlaceholder({
   loading,
-  hasData,
+  settings,
   loadError,
   onRetry,
   children,
 }: {
   loading: boolean;
-  hasData: boolean;
+  settings: ReminderSettings | undefined;
   loadError: Error | null;
   onRetry: () => void;
-  children: ReactNode;
+  children: (rs: ReminderSettings) => ReactNode;
 }) {
   if (loading) {
     return (
@@ -50,7 +51,7 @@ function ReminderSettingsPlaceholder({
       </div>
     );
   }
-  if (hasData) return <>{children}</>;
+  if (settings) return <>{children(settings)}</>;
 
   const msg = loadError?.message ?? '';
   const notAllowed = msg.includes('Not allowed for this business');
@@ -906,10 +907,11 @@ const Settings = () => {
 
             <ReminderSettingsPlaceholder
               loading={reminderSettingsLoading}
-              hasData={!!reminderSettings}
+              settings={reminderSettings}
               loadError={reminderSettingsLoadError}
               onRetry={() => void refetchReminderSettings()}
             >
+              {(rs) => (
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-secondary/50 rounded-lg">
                   <div className="flex-1">
@@ -919,7 +921,7 @@ const Settings = () => {
                     </p>
                   </div>
                   <Switch
-                    checked={reminderSettings.enable_email_reminders}
+                    checked={rs.enable_email_reminders}
                     onCheckedChange={async (checked) => {
                       await updateReminderSettings.mutateAsync({ enable_email_reminders: checked });
                     }}
@@ -934,7 +936,7 @@ const Settings = () => {
                     </p>
                   </div>
                   <Switch
-                    checked={reminderSettings.enable_sms_reminders}
+                    checked={rs.enable_sms_reminders}
                     onCheckedChange={async (checked) => {
                       await updateReminderSettings.mutateAsync({ enable_sms_reminders: checked });
                     }}
@@ -947,7 +949,7 @@ const Settings = () => {
                   <Label>Reminder Times (hours before appointment)</Label>
                   <div className="flex flex-wrap gap-2">
                     {[1, 2, 6, 12, 24, 48].map((hours) => {
-                      const isSelected = reminderSettings.reminder_hours_before?.includes(hours);
+                      const isSelected = rs.reminder_hours_before?.includes(hours);
                       return (
                         <Button
                           key={hours}
@@ -955,7 +957,7 @@ const Settings = () => {
                           variant={isSelected ? 'default' : 'outline'}
                           size="sm"
                           onClick={async () => {
-                            const current = reminderSettings.reminder_hours_before || [];
+                            const current = rs.reminder_hours_before || [];
                             const updated = isSelected
                               ? current.filter((h) => h !== hours)
                               : [...current, hours].sort((a, b) => a - b);
@@ -968,7 +970,7 @@ const Settings = () => {
                     })}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Selected: {reminderSettings.reminder_hours_before?.join(', ') || 'None'} hours before
+                    Selected: {rs.reminder_hours_before?.join(', ') || 'None'} hours before
                   </p>
                 </div>
 
@@ -982,13 +984,14 @@ const Settings = () => {
                     </p>
                   </div>
                   <Switch
-                    checked={reminderSettings.send_reminder_on_booking}
+                    checked={rs.send_reminder_on_booking}
                     onCheckedChange={async (checked) => {
                       await updateReminderSettings.mutateAsync({ send_reminder_on_booking: checked });
                     }}
                   />
                 </div>
               </div>
+              )}
             </ReminderSettingsPlaceholder>
           </div>
 
@@ -1147,10 +1150,11 @@ const Settings = () => {
 
             <ReminderSettingsPlaceholder
               loading={reminderSettingsLoading}
-              hasData={!!reminderSettings}
+              settings={reminderSettings}
               loadError={reminderSettingsLoadError}
               onRetry={() => void refetchReminderSettings()}
             >
+              {(rs) => (
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-secondary/50 rounded-lg">
                   <div className="flex-1">
@@ -1160,7 +1164,7 @@ const Settings = () => {
                     </p>
                   </div>
                   <Switch
-                    checked={reminderSettings.send_booking_confirmation ?? true}
+                    checked={rs.send_booking_confirmation ?? true}
                     onCheckedChange={async (checked) => {
                       await updateReminderSettings.mutateAsync({ send_booking_confirmation: checked });
                     }}
@@ -1175,7 +1179,7 @@ const Settings = () => {
                     </p>
                   </div>
                   <Switch
-                    checked={reminderSettings.send_cancellation_email ?? true}
+                    checked={rs.send_cancellation_email ?? true}
                     onCheckedChange={async (checked) => {
                       await updateReminderSettings.mutateAsync({ send_cancellation_email: checked });
                     }}
@@ -1190,7 +1194,7 @@ const Settings = () => {
                     </p>
                   </div>
                   <Switch
-                    checked={reminderSettings.send_reschedule_email ?? true}
+                    checked={rs.send_reschedule_email ?? true}
                     onCheckedChange={async (checked) => {
                       await updateReminderSettings.mutateAsync({ send_reschedule_email: checked });
                     }}
@@ -1205,7 +1209,7 @@ const Settings = () => {
                     </p>
                   </div>
                   <Switch
-                    checked={reminderSettings.send_welcome_email ?? false}
+                    checked={rs.send_welcome_email ?? false}
                     onCheckedChange={async (checked) => {
                       await updateReminderSettings.mutateAsync({ send_welcome_email: checked });
                     }}
@@ -1223,18 +1227,18 @@ const Settings = () => {
                       </p>
                     </div>
                     <Switch
-                      checked={reminderSettings.send_followup_email ?? false}
+                      checked={rs.send_followup_email ?? false}
                       onCheckedChange={async (checked) => {
                         await updateReminderSettings.mutateAsync({ send_followup_email: checked });
                       }}
                     />
                   </div>
 
-                  {reminderSettings.send_followup_email && (
+                  {rs.send_followup_email && (
                     <div className="space-y-2 pl-4 border-l-2 border-primary/20">
                       <Label>Send follow-up after (days)</Label>
                       <Select
-                        value={String(reminderSettings.followup_days_after ?? 1)}
+                        value={String(rs.followup_days_after ?? 1)}
                         onValueChange={async (value) => {
                           await updateReminderSettings.mutateAsync({ followup_days_after: parseInt(value) });
                         }}
@@ -1251,12 +1255,13 @@ const Settings = () => {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        Follow-up email will be sent {reminderSettings.followup_days_after ?? 1} day(s) after appointment
+                        Follow-up email will be sent {rs.followup_days_after ?? 1} day(s) after appointment
                       </p>
                     </div>
                   )}
                 </div>
               </div>
+              )}
             </ReminderSettingsPlaceholder>
           </div>
 
@@ -1268,10 +1273,11 @@ const Settings = () => {
             </p>
             <ReminderSettingsPlaceholder
               loading={reminderSettingsLoading}
-              hasData={!!reminderSettings}
+              settings={reminderSettings}
               loadError={reminderSettingsLoadError}
               onRetry={() => void refetchReminderSettings()}
             >
+              {(rs) => (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1279,7 +1285,7 @@ const Settings = () => {
                     <p className="text-sm text-muted-foreground">Get notified when customers book (in-app)</p>
                   </div>
                   <Switch
-                    checked={reminderSettings.notify_new_bookings ?? true}
+                    checked={rs.notify_new_bookings ?? true}
                     onCheckedChange={async (checked) => {
                       await updateReminderSettings.mutateAsync({ notify_new_bookings: checked });
                     }}
@@ -1292,7 +1298,7 @@ const Settings = () => {
                     <p className="text-sm text-muted-foreground">Get notified when customers cancel (in-app)</p>
                   </div>
                   <Switch
-                    checked={reminderSettings.notify_cancellations ?? true}
+                    checked={rs.notify_cancellations ?? true}
                     onCheckedChange={async (checked) => {
                       await updateReminderSettings.mutateAsync({ notify_cancellations: checked });
                     }}
@@ -1305,7 +1311,7 @@ const Settings = () => {
                     <p className="text-sm text-muted-foreground">Receive daily booking summary via email</p>
                   </div>
                   <Switch
-                    checked={reminderSettings.notify_daily_summary ?? false}
+                    checked={rs.notify_daily_summary ?? false}
                     onCheckedChange={async (checked) => {
                       await updateReminderSettings.mutateAsync({ notify_daily_summary: checked });
                     }}
@@ -1318,13 +1324,14 @@ const Settings = () => {
                     <p className="text-sm text-muted-foreground">Tips and feature announcements (saved for future use)</p>
                   </div>
                   <Switch
-                    checked={reminderSettings.notify_marketing_updates ?? false}
+                    checked={rs.notify_marketing_updates ?? false}
                     onCheckedChange={async (checked) => {
                       await updateReminderSettings.mutateAsync({ notify_marketing_updates: checked });
                     }}
                   />
                 </div>
               </div>
+              )}
             </ReminderSettingsPlaceholder>
           </div>
         </TabsContent>
