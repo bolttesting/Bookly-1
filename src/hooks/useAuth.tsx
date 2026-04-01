@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
@@ -15,6 +16,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,7 +98,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Clear UI state immediately so ProtectedRoute and /auth don’t race (UnifiedAuth was
+    // redirecting back to /dashboard while session was still in React state for a frame).
+    setSession(null);
+    setUser(null);
+    setLoading(false);
+    queryClient.removeQueries({ queryKey: ['business'] });
+    queryClient.removeQueries({ queryKey: ['appointments'] });
+    const { error } = await supabase.auth.signOut({ scope: 'global' });
+    if (error) console.error('[useAuth] signOut:', error.message);
   };
 
   return (

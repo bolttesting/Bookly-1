@@ -82,9 +82,9 @@ export default function UnifiedAuth() {
   useEffect(() => {
     if (user && !authLoading) {
       if (redirectTo) {
-        navigate(redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`);
+        navigate(redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`, { replace: true });
       } else {
-        navigate('/dashboard');
+        navigate('/dashboard', { replace: true });
       }
     }
   }, [user, authLoading, navigate, redirectTo]);

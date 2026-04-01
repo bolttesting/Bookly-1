@@ -168,18 +168,33 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
             .eq('business_id', business.id)
             .maybeSingle();
           if (confirmSettings?.send_booking_confirmation !== false) {
-            await supabase.functions.invoke('send-booking-confirmation', {
-              body: {
-                appointmentId: data.id,
-                business_id: business.id,
-                customerEmail: fullAppointment.customer.email,
-                customerName: fullAppointment.customer.name ?? 'Customer',
-                serviceName: fullAppointment.service?.name ?? 'Appointment',
-                businessName: business.name,
-                startTime: data.start_time,
-                staffName: (fullAppointment as any)?.staff_member?.name ?? undefined,
+            const { data: createConfirmData, error: createConfirmError } = await supabase.functions.invoke(
+              'send-booking-confirmation',
+              {
+                body: {
+                  appointmentId: data.id,
+                  business_id: business.id,
+                  customerEmail: fullAppointment.customer.email,
+                  customerName: fullAppointment.customer.name ?? 'Customer',
+                  serviceName: fullAppointment.service?.name ?? 'Appointment',
+                  businessName: business.name,
+                  startTime: data.start_time,
+                  staffName: (fullAppointment as any)?.staff_member?.name ?? undefined,
+                },
               },
-            });
+            );
+            if (createConfirmError) {
+              console.error('send-booking-confirmation failed (create):', createConfirmError.message, createConfirmError);
+              toast.error('Appointment created, but the confirmation email could not be sent.');
+            } else if (
+              createConfirmData &&
+              typeof createConfirmData === 'object' &&
+              'success' in createConfirmData &&
+              (createConfirmData as { success?: boolean }).success === false
+            ) {
+              console.error('send-booking-confirmation returned success: false (create)', createConfirmData);
+              toast.error('Appointment created, but the confirmation email was rejected.');
+            }
           }
         } catch (confirmEmailError) {
           console.error('Failed to send booking confirmation email:', confirmEmailError);
@@ -308,30 +323,51 @@ export function useAppointments(dateRange?: { start: Date; end: Date }) {
         }
 
         // Send booking confirmation when admin confirms a pending booking
+        const businessId = business?.id ?? data.business_id;
+        const businessName = business?.name ?? 'Business';
+        const mergedCustomer = data.customer ?? oldAppointment?.customer;
+        const mergedService = data.service ?? oldAppointment?.service;
+        const customerEmail = mergedCustomer?.email ?? null;
         const justConfirmed = oldAppointment?.status !== 'confirmed' && data.status === 'confirmed';
-        if (justConfirmed && data.customer?.email && data.service && business) {
+        if (justConfirmed && customerEmail && mergedService && businessId) {
           try {
             const { data: confirmSettings } = await supabase
               .from('reminder_settings')
               .select('send_booking_confirmation')
-              .eq('business_id', business.id)
+              .eq('business_id', businessId)
               .maybeSingle();
             if (confirmSettings?.send_booking_confirmation !== false) {
-              await supabase.functions.invoke('send-booking-confirmation', {
-                body: {
-                  appointmentId: data.id,
-                  business_id: business.id,
-                  customerEmail: data.customer.email,
-                  customerName: data.customer.name ?? 'Customer',
-                  serviceName: data.service.name,
-                  businessName: business.name,
-                  startTime: data.start_time,
-                  staffName: data.staff_member?.name,
+              const { data: confirmFnData, error: confirmFnError } = await supabase.functions.invoke(
+                'send-booking-confirmation',
+                {
+                  body: {
+                    appointmentId: data.id,
+                    business_id: businessId,
+                    customerEmail,
+                    customerName: mergedCustomer?.name ?? 'Customer',
+                    serviceName: mergedService.name,
+                    businessName,
+                    startTime: data.start_time,
+                    staffName: data.staff_member?.name ?? (oldAppointment as Appointment)?.staff_member?.name,
+                  },
                 },
-              });
+              );
+              if (confirmFnError) {
+                console.error('send-booking-confirmation failed:', confirmFnError.message, confirmFnError);
+                toast.error('Booking saved, but the confirmation email could not be sent. Check Resend and Edge Function logs.');
+              } else if (
+                confirmFnData &&
+                typeof confirmFnData === 'object' &&
+                'success' in confirmFnData &&
+                (confirmFnData as { success?: boolean }).success === false
+              ) {
+                console.error('send-booking-confirmation returned success: false', confirmFnData);
+                toast.error('Booking saved, but the confirmation email was rejected by the email service.');
+              }
             }
           } catch (confirmEmailError) {
             console.error('Failed to send booking confirmation email:', confirmEmailError);
+            toast.error('Booking saved, but sending the confirmation email failed.');
           }
         }
 
