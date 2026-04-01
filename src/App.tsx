@@ -42,7 +42,11 @@ const MovingLanding = lazy(() => import("./pages/MovingLanding"));
 const StackingCardDemo = lazy(() =>
   import("@/components/ui/stacking-card-demo").then((m) => ({ default: m.DemoOne }))
 );
+const BlogIndex = lazy(() => import("./pages/BlogIndex"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
+const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
+const CookiePolicy = lazy(() => import("./pages/legal/CookiePolicy"));
 const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 const SuperAdminOverview = lazy(() => import("./pages/super-admin/SuperAdminOverview"));
@@ -87,7 +91,11 @@ function AppRoutes() {
         <Route path="/customer-login" element={<CustomerAuth />} />
         <Route path="/my-appointments" element={<MyAppointments />} />
         <Route path="/book/:slug" element={<PublicBooking />} />
+        <Route path="/blog" element={<BlogIndex />} />
         <Route path="/blog/:slug" element={<BlogPost />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/cookies" element={<CookiePolicy />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
         <Route path="/super-admin" element={<SuperAdmin />}>
           <Route index element={<SuperAdminOverview />} />

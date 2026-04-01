@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { useSeo } from '@/hooks/useSeo';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Please enter a valid email address'),
@@ -45,6 +46,13 @@ export default function UnifiedAuth() {
   /** Landing CTAs use /auth?from=landing — always show login/signup, don’t bounce to dashboard */
   const fromLanding = searchParams.get('from') === 'landing';
   const { user, loading: authLoading, signIn, signUp, signInWithGoogle, signOut } = useAuth();
+
+  useSeo({
+    title: 'Sign in or sign up',
+    description:
+      'Sign in or create a free Bookly account to manage appointments, staff, clients, reminders, and your public booking page.',
+    path: '/auth',
+  });
   
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [isLoading, setIsLoading] = useState(false);

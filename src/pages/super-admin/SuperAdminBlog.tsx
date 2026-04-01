@@ -17,6 +17,8 @@ import {
 import { Loader2, Plus, Pencil, Trash2, FileText, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { BlogPost } from '@/hooks/useBlogPosts';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SITE_ORIGIN } from '@/lib/site';
 
 function slugify(text: string) {
   return text
@@ -39,6 +41,9 @@ export default function SuperAdminBlog() {
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [published, setPublished] = useState(false);
+  const [metaTitle, setMetaTitle] = useState('');
+  const [metaDescription, setMetaDescription] = useState('');
+  const [formTab, setFormTab] = useState('content');
 
   const resetForm = () => {
     setEditing(null);
@@ -48,6 +53,9 @@ export default function SuperAdminBlog() {
     setContent('');
     setImageUrl('');
     setPublished(false);
+    setMetaTitle('');
+    setMetaDescription('');
+    setFormTab('content');
   };
 
   const openCreate = () => {
@@ -63,6 +71,9 @@ export default function SuperAdminBlog() {
     setContent(p.content);
     setImageUrl(p.image_url ?? '');
     setPublished(p.published);
+    setMetaTitle(p.meta_title ?? '');
+    setMetaDescription(p.meta_description ?? '');
+    setFormTab('content');
     setDialogOpen(true);
   };
 
@@ -87,6 +98,8 @@ export default function SuperAdminBlog() {
           content,
           image_url: imageUrl || null,
           published,
+          meta_title: metaTitle.trim() || null,
+          meta_description: metaDescription.trim() || null,
         });
         toast.success('Blog post updated');
       } else {
@@ -97,6 +110,8 @@ export default function SuperAdminBlog() {
           content,
           image_url: imageUrl || null,
           published,
+          meta_title: metaTitle.trim() || null,
+          meta_description: metaDescription.trim() || null,
         });
         toast.success('Blog post created');
       }
@@ -123,7 +138,9 @@ export default function SuperAdminBlog() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-display font-bold truncate">Blog</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">Manage blog posts shown on the home page</p>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Create and publish articles for <span className="text-foreground font-medium">/blog</span> and the home page
+          </p>
         </div>
         <Button onClick={openCreate} className="gap-2 shrink-0 w-full sm:w-auto">
           <Plus className="h-4 w-4" />
@@ -134,7 +151,7 @@ export default function SuperAdminBlog() {
       <Card className="glass-card overflow-hidden min-w-0 max-w-full">
         <CardHeader>
           <CardTitle>Blog Posts</CardTitle>
-          <CardDescription>Published posts appear in the blog section on the landing page</CardDescription>
+          <CardDescription>Published posts are listed on /blog and can appear on the landing page</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -166,6 +183,7 @@ export default function SuperAdminBlog() {
                         <Badge variant="secondary" className="text-xs">Draft</Badge>
                       )}
                     </div>
+                    <p className="text-xs text-muted-foreground font-mono truncate mt-0.5">/{p.slug}</p>
                     {p.excerpt && (
                       <p className="text-sm text-muted-foreground truncate mt-1">{p.excerpt}</p>
                     )}
@@ -189,116 +207,161 @@ export default function SuperAdminBlog() {
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit Blog Post' : 'New Blog Post'}</DialogTitle>
-            <DialogDescription>Content appears in the blog section on the landing page</DialogDescription>
+            <DialogDescription>
+              Only super admins can publish. Featured images must be uploaded from your device.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="blog-title">Title</Label>
-              <Input
-                id="blog-title"
-                value={title}
-                onChange={(e) => handleTitleChange(e.target.value)}
-                required
-                placeholder="Post title"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="blog-slug">Slug (URL-friendly)</Label>
-              <Input
-                id="blog-slug"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                placeholder="my-blog-post"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="blog-excerpt">Excerpt</Label>
-              <textarea
-                id="blog-excerpt"
-                value={excerpt}
-                onChange={(e) => setExcerpt(e.target.value)}
-                rows={2}
-                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Short summary"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="blog-content">Content</Label>
-              <textarea
-                id="blog-content"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                required
-                rows={8}
-                className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Full blog content (plain text or simple HTML)"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Featured Image</Label>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex gap-2 flex-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="gap-2"
-                  >
-                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                    {isUploading ? 'Uploading...' : 'Upload image'}
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/gif,image/webp"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      try {
-                        const url = await uploadImage(file);
-                        setImageUrl(url);
-                      } catch {}
-                      e.target.value = '';
-                    }}
+            <Tabs value={formTab} onValueChange={setFormTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="content">Content</TabsTrigger>
+                <TabsTrigger value="seo">Slug &amp; SEO</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="content" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="blog-title">Title</Label>
+                  <Input
+                    id="blog-title"
+                    value={title}
+                    onChange={(e) => handleTitleChange(e.target.value)}
+                    required
+                    placeholder="Post title"
                   />
-                  {imageUrl && (
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="blog-excerpt">Excerpt</Label>
+                  <textarea
+                    id="blog-excerpt"
+                    value={excerpt}
+                    onChange={(e) => setExcerpt(e.target.value)}
+                    rows={2}
+                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Short summary (used in listings and as default meta description)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="blog-content">Content</Label>
+                  <textarea
+                    id="blog-content"
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    required
+                    rows={8}
+                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Full post body (plain text or HTML)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Featured image</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Upload from your computer only (JPG, PNG, GIF, WebP — max 5MB). Stored in your Bookly storage bucket.
+                  </p>
+                  <div className="flex gap-2 flex-wrap items-center">
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      onClick={() => setImageUrl('')}
-                      className="text-destructive hover:text-destructive"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="gap-2"
                     >
-                      <X className="h-4 w-4" />
+                      {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      {isUploading ? 'Uploading...' : 'Choose image'}
                     </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const url = await uploadImage(file);
+                          setImageUrl(url);
+                        } catch {
+                          /* toast from hook */
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                    {imageUrl && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setImageUrl('')}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  {imageUrl && (
+                    <div className="mt-2 rounded-lg overflow-hidden border bg-muted aspect-video max-w-[300px]">
+                      <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                    </div>
                   )}
                 </div>
-                <Input
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="Or paste image URL"
-                  className="flex-1"
-                />
-              </div>
-              {imageUrl && (
-                <div className="mt-2 rounded-lg overflow-hidden border bg-muted aspect-video max-w-[300px]">
-                  <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="blog-published"
+                    checked={published}
+                    onChange={(e) => setPublished(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  <Label htmlFor="blog-published">Published (visible on /blog and home teaser)</Label>
                 </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="blog-published"
-                checked={published}
-                onChange={(e) => setPublished(e.target.checked)}
-                className="rounded border-input"
-              />
-              <Label htmlFor="blog-published">Published (visible on home page)</Label>
-            </div>
+              </TabsContent>
+
+              <TabsContent value="seo" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="blog-slug">Slug (URL path)</Label>
+                  <Input
+                    id="blog-slug"
+                    value={slug}
+                    onChange={(e) => setSlug(e.target.value)}
+                    placeholder="my-blog-post"
+                  />
+                  <p className="text-xs text-muted-foreground break-all">
+                    Public URL: {SITE_ORIGIN}/blog/{slug.trim() || 'your-slug'}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="blog-meta-title">Meta title</Label>
+                    <span className="text-xs text-muted-foreground tabular-nums">{metaTitle.length}/60</span>
+                  </div>
+                  <Input
+                    id="blog-meta-title"
+                    value={metaTitle}
+                    onChange={(e) => setMetaTitle(e.target.value)}
+                    placeholder="Leave blank to use post title"
+                    maxLength={120}
+                  />
+                  <p className="text-xs text-muted-foreground">Search engines often show ~50–60 characters.</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="blog-meta-desc">Meta description</Label>
+                    <span className="text-xs text-muted-foreground tabular-nums">{metaDescription.length}/160</span>
+                  </div>
+                  <textarea
+                    id="blog-meta-desc"
+                    value={metaDescription}
+                    onChange={(e) => setMetaDescription(e.target.value)}
+                    rows={4}
+                    maxLength={320}
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    placeholder="Leave blank to use excerpt"
+                  />
+                  <p className="text-xs text-muted-foreground">Often ~150–160 characters in search results.</p>
+                </div>
+              </TabsContent>
+            </Tabs>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                 Cancel

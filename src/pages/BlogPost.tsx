@@ -1,13 +1,69 @@
+import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useBlogPostBySlug } from '@/hooks/useBlogPostBySlug';
+import { useSeo } from '@/hooks/useSeo';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { ArrowLeft, Calendar, Loader2, FileText } from 'lucide-react';
 import { format } from 'date-fns';
+import { SITE_ORIGIN } from '@/lib/site';
+import { injectJsonLd, removeJsonLd } from '@/lib/seo';
+
+function blogOgImage(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith('http')) return url;
+  return `${SITE_ORIGIN}${url.startsWith('/') ? url : `/${url}`}`;
+}
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
   const { post, isLoading } = useBlogPostBySlug(slug);
+
+  const notFound = !isLoading && !post;
+  const seoTitle =
+    post?.meta_title?.trim() ||
+    post?.title ||
+    (isLoading ? 'Blog post' : notFound ? 'Post not found' : 'Blog');
+  const seoDescription =
+    post?.meta_description?.trim() ||
+    post?.excerpt ||
+    post?.title ||
+    'Articles about booking, scheduling, and running a service business with Bookly.';
+
+  useSeo({
+    title: seoTitle,
+    description: seoDescription,
+    path: `/blog/${slug ?? ''}`,
+    ogType: 'article',
+    ogImage: blogOgImage(post?.image_url ?? undefined),
+    noindex: notFound,
+  });
+
+  useEffect(() => {
+    if (!post || !slug) {
+      removeJsonLd('bookly-blog-jsonld');
+      return;
+    }
+    const img = blogOgImage(post.image_url);
+    const schemaDescription =
+      post.meta_description?.trim() || post.excerpt || undefined;
+    injectJsonLd('bookly-blog-jsonld', {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: post.meta_title?.trim() || post.title,
+      ...(schemaDescription ? { description: schemaDescription } : {}),
+      datePublished: post.created_at,
+      ...(img ? { image: [img] } : {}),
+      author: { '@type': 'Organization', name: 'Bookly' },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Bookly',
+        logo: { '@type': 'ImageObject', url: `${SITE_ORIGIN}/favicon.svg` },
+      },
+      mainEntityOfPage: { '@type': 'WebPage', '@id': `${SITE_ORIGIN}/blog/${slug}` },
+    });
+    return () => removeJsonLd('bookly-blog-jsonld');
+  }, [post, slug]);
 
   if (isLoading) {
     return (

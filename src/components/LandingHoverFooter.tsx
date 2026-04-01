@@ -72,13 +72,12 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
       ))}
       {hasBlog && (
         <li>
-          <a
-            href="#blog"
+          <Link
+            to="/blog"
             className="text-sm text-muted-foreground hover:text-primary transition-colors"
-            onClick={(e) => scrollToHash(e, "#blog")}
           >
             Blog
-          </a>
+          </Link>
         </li>
       )}
     </ul>
@@ -143,6 +142,26 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
     </ul>
   );
 
+  const legalList = (
+    <ul className="space-y-3 pt-1">
+      <li>
+        <Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+          Privacy Policy
+        </Link>
+      </li>
+      <li>
+        <Link to="/terms" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+          Terms of Service
+        </Link>
+      </li>
+      <li>
+        <Link to="/cookies" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+          Cookie Policy
+        </Link>
+      </li>
+    </ul>
+  );
+
   return (
     <footer className="relative h-fit rounded-3xl overflow-hidden mx-4 sm:mx-6 lg:mx-8 mb-6 sm:mb-8 border border-border bg-card/40 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto p-8 sm:p-12 lg:p-14 z-40 relative">
@@ -180,6 +199,12 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
             </AccordionTrigger>
             <AccordionContent className="pb-4">{contactList}</AccordionContent>
           </AccordionItem>
+          <AccordionItem value="legal" className="border-border">
+            <AccordionTrigger className="text-foreground text-base font-semibold py-3 hover:no-underline">
+              Legal
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">{legalList}</AccordionContent>
+          </AccordionItem>
         </Accordion>
 
         {/* Desktop: multi-column grid */}
@@ -212,6 +237,18 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
             <h4 className="text-foreground text-base font-semibold mb-5">Contact</h4>
             {contactList}
           </div>
+        </div>
+
+        <div className="hidden md:flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm text-muted-foreground pb-6 -mt-2">
+          <Link to="/privacy" className="hover:text-primary transition-colors">
+            Privacy Policy
+          </Link>
+          <Link to="/terms" className="hover:text-primary transition-colors">
+            Terms of Service
+          </Link>
+          <Link to="/cookies" className="hover:text-primary transition-colors">
+            Cookie Policy
+          </Link>
         </div>
 
         <hr className="border-t border-border my-8" />

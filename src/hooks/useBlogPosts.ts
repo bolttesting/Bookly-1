@@ -9,6 +9,10 @@ export interface BlogPost {
   content: string;
   image_url: string | null;
   published: boolean;
+  /** Overrides page & Open Graph title when set */
+  meta_title: string | null;
+  /** Overrides meta & Open Graph description when set */
+  meta_description: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -44,7 +48,10 @@ export function useBlogPosts(adminView = false) {
       if (error) throw error;
       return created as BlogPost;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blogPosts'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blogPosts'] });
+      queryClient.invalidateQueries({ queryKey: ['blogPost'] });
+    },
   });
 
   const updateMutation = useMutation({
@@ -62,7 +69,10 @@ export function useBlogPosts(adminView = false) {
       if (error) throw error;
       return updated as BlogPost;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blogPosts'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blogPosts'] });
+      queryClient.invalidateQueries({ queryKey: ['blogPost'] });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -70,7 +80,10 @@ export function useBlogPosts(adminView = false) {
       const { error } = await supabase.from('blog_posts').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blogPosts'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blogPosts'] });
+      queryClient.invalidateQueries({ queryKey: ['blogPost'] });
+    },
   });
 
   return {

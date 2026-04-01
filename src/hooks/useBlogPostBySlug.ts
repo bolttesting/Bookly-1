@@ -1,17 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-
-export interface BlogPost {
-  id: string;
-  title: string;
-  slug: string;
-  excerpt: string | null;
-  content: string;
-  image_url: string | null;
-  published: boolean;
-  created_at: string;
-  updated_at: string;
-}
+import type { BlogPost } from '@/hooks/useBlogPosts';
 
 export function useBlogPostBySlug(slug: string | undefined) {
   const { data, isLoading, error } = useQuery({

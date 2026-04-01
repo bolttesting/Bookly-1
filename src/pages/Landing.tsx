@@ -21,6 +21,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatCurrencySimple, getCurrencyByCode } from "@/lib/currency";
 import { DEFAULT_SUPPORT_EMAIL } from "@/lib/site";
+import { useSeo } from "@/hooks/useSeo";
+import { buildLandingJsonLd, DEFAULT_SEO_DESCRIPTION, DEFAULT_SEO_TITLE, injectJsonLd, removeJsonLd } from "@/lib/seo";
 import { Loader2 } from "lucide-react";
 import { 
   Calendar, 
@@ -62,6 +64,17 @@ const Landing = () => {
   const { posts: blogPosts } = useBlogPosts(false);
   const { links: footerLinks } = useFooterLinks();
   const [showBackToTop, setShowBackToTop] = useState(false);
+
+  useSeo({
+    title: DEFAULT_SEO_TITLE,
+    description: DEFAULT_SEO_DESCRIPTION,
+    path: "/",
+  });
+
+  useEffect(() => {
+    injectJsonLd("bookly-landing-jsonld", buildLandingJsonLd());
+    return () => removeJsonLd("bookly-landing-jsonld");
+  }, []);
 
   // Count-up animations for stats
   const [usersCount, startUsers] = useCountUp(10, 2000, 0);
@@ -285,6 +298,7 @@ const Landing = () => {
         </div>
       </nav>
 
+      <main id="main-content" className="w-full">
       {/* Hero Section */}
       <section ref={heroRef} className="pt-24 sm:pt-28 md:pt-32 pb-12 sm:pb-16 md:pb-20 px-4 sm:px-6 relative overflow-hidden w-full">
         {/* Background effects with floating animations */}
@@ -706,6 +720,16 @@ const Landing = () => {
                 </Link>
               ))}
             </div>
+            <div
+              className={`flex justify-center mt-10 sm:mt-12 transition-all duration-700 ${blogVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+            >
+              <Button variant="outline" size="lg" asChild className="gap-2">
+                <Link to="/blog">
+                  View all articles
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </section>
       )}
@@ -828,6 +852,7 @@ const Landing = () => {
           </div>
         </div>
       </section>
+      </main>
 
       <LandingHoverFooter
         footerLinks={footerLinks}
