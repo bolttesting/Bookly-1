@@ -193,17 +193,17 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
             </AccordionTrigger>
             <AccordionContent className="pb-4">{linksList}</AccordionContent>
           </AccordionItem>
-          <AccordionItem value="contact" className="border-border">
-            <AccordionTrigger className="text-foreground text-base font-semibold py-3 hover:no-underline">
-              Contact
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">{contactList}</AccordionContent>
-          </AccordionItem>
           <AccordionItem value="legal" className="border-border">
             <AccordionTrigger className="text-foreground text-base font-semibold py-3 hover:no-underline">
               Privacy &amp; legal
             </AccordionTrigger>
             <AccordionContent className="pb-4">{legalList}</AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="contact" className="border-border">
+            <AccordionTrigger className="text-foreground text-base font-semibold py-3 hover:no-underline">
+              Contact
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">{contactList}</AccordionContent>
           </AccordionItem>
         </Accordion>
 
@@ -233,27 +233,18 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
           </div>
 
           <div>
-            <h4 className="text-foreground text-base font-semibold mb-5">Contact</h4>
-            {contactList}
-          </div>
-
-          <div>
             <h4 className="text-foreground text-base font-semibold mb-5">Privacy &amp; legal</h4>
             {legalList}
           </div>
-        </div>
-      </div>
 
-      {/* Large wordmark — sits above the bottom bar (socials + copyright) */}
-      <div className="hidden md:flex w-full items-center justify-center pointer-events-none px-4 min-h-[12rem] lg:min-h-[16rem] py-6 lg:py-10">
-        <div className="w-full max-w-6xl xl:max-w-7xl h-[200px] lg:h-[280px] pointer-events-auto">
-          <TextHoverEffect text="Bookly" className="z-10 w-full h-full max-h-[280px]" />
+          <div>
+            <h4 className="text-foreground text-base font-semibold mb-5">Contact</h4>
+            {contactList}
+          </div>
         </div>
-      </div>
 
-      <div className="w-full max-w-[min(100%,92rem)] mx-auto px-6 sm:px-10 lg:px-14 xl:px-16 relative z-40">
-        <hr className="border-t border-border/80" />
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-6 text-sm text-muted-foreground pt-8 pb-8 sm:pb-10">
+        <hr className="border-t border-border/80 mt-2 md:mt-0" />
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-6 text-sm text-muted-foreground pt-8 pb-6 md:pb-8">
           <div className="flex flex-wrap justify-center sm:justify-start gap-5">
             <a href="#" aria-label="Facebook" className="hover:text-primary transition-colors">
               <Facebook className="h-5 w-5" />
@@ -266,6 +257,13 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
             </a>
           </div>
           <p className="text-center sm:text-right max-w-xl sm:max-w-none">{copyright}</p>
+        </div>
+      </div>
+
+      {/* Large wordmark — below socials + copyright */}
+      <div className="hidden md:flex w-full items-center justify-center pointer-events-none px-4 min-h-[12rem] lg:min-h-[16rem] py-4 lg:py-8 pb-8 lg:pb-10">
+        <div className="w-full max-w-6xl xl:max-w-7xl h-[200px] lg:h-[280px] pointer-events-auto">
+          <TextHoverEffect text="Bookly" className="z-10 w-full h-full max-h-[280px]" />
         </div>
       </div>
 
