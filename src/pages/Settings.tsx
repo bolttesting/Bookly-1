@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { User, Building2, CreditCard, Bell, Link2, Copy, Check, ExternalLink, Clock, Download, QrCode, Code2, MapPin, DollarSign, CheckCircle, Package, Loader2, Upload, X, Mail, MessageSquare, CalendarDays } from "lucide-react";
@@ -30,6 +30,60 @@ import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
 import { TIMEZONES } from '@/lib/timezones';
 import { cn } from '@/lib/utils';
 
+function ReminderSettingsPlaceholder({
+  loading,
+  hasData,
+  loadError,
+  onRetry,
+  children,
+}: {
+  loading: boolean;
+  hasData: boolean;
+  loadError: Error | null;
+  onRetry: () => void;
+  children: ReactNode;
+}) {
+  if (loading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (hasData) return <>{children}</>;
+
+  const msg = loadError?.message ?? '';
+  const notAllowed = msg.includes('Not allowed for this business');
+  const rpcMissing = /could not find|does not exist|PGRST202|42883|unknown function/i.test(msg);
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground space-y-3 max-w-xl mx-auto text-left">
+      <p className="font-medium text-foreground">Couldn’t load these settings</p>
+      {notAllowed ? (
+        <p>
+          Your current sign-in is probably a different Supabase user than the one that created this workspace. Using
+          Google and email/password with the same inbox often creates two separate accounts unless you enable automatic
+          identity linking in the Supabase Auth settings. Try the sign-in method you used when you set up the business,
+          or ask an owner to invite this account on the Team page.
+        </p>
+      ) : rpcMissing ? (
+        <p>
+          The database may be missing the latest migration. Apply{' '}
+          <code className="text-xs bg-muted px-1 rounded">ensure_reminder_settings_for_business</code> on your Supabase
+          project, then retry.
+        </p>
+      ) : loadError ? (
+        <p className="text-xs font-mono break-all">{msg}</p>
+      ) : (
+        <p>Something went wrong. Try again.</p>
+      )}
+      <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+        Retry
+      </Button>
+    </div>
+  );
+}
+
 const Settings = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -38,7 +92,23 @@ const Settings = () => {
   const { currencyCode, currencies } = useCurrency();
   const { plans: subscriptionPlans, isLoading: plansLoading } = useSubscriptionPlans();
   const { subscription, isLoading: subscriptionLoading, updateSubscription } = useBusinessSubscription();
-  const { settings: reminderSettings, isLoading: reminderSettingsLoading, updateSettings: updateReminderSettings } = useReminderSettings();
+  const {
+    settings: reminderSettings,
+    isLoading: reminderSettingsLoading,
+    isError: reminderSettingsIsError,
+    error: reminderSettingsQueryError,
+    refetch: refetchReminderSettings,
+    updateSettings: updateReminderSettings,
+  } = useReminderSettings();
+
+  const reminderSettingsLoadError =
+    reminderSettingsQueryError instanceof Error
+      ? reminderSettingsQueryError
+      : reminderSettingsQueryError != null
+        ? new Error(String(reminderSettingsQueryError))
+        : reminderSettingsIsError
+          ? new Error('Unknown error loading reminder settings')
+          : null;
   const { emailConfig, smsConfig, isLoading: channelConfigLoading, saveEmail, saveSms, removeEmailConfig, removeSmsConfig, isSavingEmail, isSavingSms } = useBusinessChannelConfig();
   const [searchParams, setSearchParams] = useSearchParams();
   const [emailFromName, setEmailFromName] = useState('');
@@ -834,11 +904,12 @@ const Settings = () => {
               Automatically send reminders to customers before their appointments
             </p>
 
-            {reminderSettingsLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : reminderSettings ? (
+            <ReminderSettingsPlaceholder
+              loading={reminderSettingsLoading}
+              hasData={!!reminderSettings}
+              loadError={reminderSettingsLoadError}
+              onRetry={() => void refetchReminderSettings()}
+            >
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-secondary/50 rounded-lg">
                   <div className="flex-1">
@@ -918,11 +989,7 @@ const Settings = () => {
                   />
                 </div>
               </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Failed to load reminder settings
-              </div>
-            )}
+            </ReminderSettingsPlaceholder>
           </div>
 
           {/* Your email & SMS – use business's own Resend/Twilio */}
@@ -1078,11 +1145,12 @@ const Settings = () => {
               Configure which emails to send to customers automatically
             </p>
 
-            {reminderSettingsLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : reminderSettings ? (
+            <ReminderSettingsPlaceholder
+              loading={reminderSettingsLoading}
+              hasData={!!reminderSettings}
+              loadError={reminderSettingsLoadError}
+              onRetry={() => void refetchReminderSettings()}
+            >
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-secondary/50 rounded-lg">
                   <div className="flex-1">
@@ -1189,11 +1257,7 @@ const Settings = () => {
                   )}
                 </div>
               </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Failed to load email notification settings
-              </div>
-            )}
+            </ReminderSettingsPlaceholder>
           </div>
 
           {/* Business Notifications */}
@@ -1202,11 +1266,12 @@ const Settings = () => {
             <p className="text-sm text-muted-foreground mb-6">
               In-app notifications (bell icon) and email preferences
             </p>
-            {reminderSettingsLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : reminderSettings ? (
+            <ReminderSettingsPlaceholder
+              loading={reminderSettingsLoading}
+              hasData={!!reminderSettings}
+              loadError={reminderSettingsLoadError}
+              onRetry={() => void refetchReminderSettings()}
+            >
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1260,11 +1325,7 @@ const Settings = () => {
                   />
                 </div>
               </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Failed to load notification settings
-              </div>
-            )}
+            </ReminderSettingsPlaceholder>
           </div>
         </TabsContent>
 

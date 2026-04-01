@@ -130,7 +130,7 @@ export function useReminderSettings() {
   const { business } = useBusiness();
   const queryClient = useQueryClient();
 
-  const { data: settings, isFetching, isPending } = useQuery({
+  const { data: settings, isFetching, isPending, isError, error, refetch } = useQuery({
     queryKey: ['reminder-settings', business?.id],
     queryFn: async (): Promise<ReminderSettings> => {
       if (!business?.id) throw new Error('No business');
@@ -175,6 +175,9 @@ export function useReminderSettings() {
   return {
     settings,
     isLoading,
+    isError,
+    error,
+    refetch,
     updateSettings,
   };
 }
