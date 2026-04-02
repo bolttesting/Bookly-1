@@ -14,6 +14,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import DashboardLayout from "./layouts/DashboardLayout";
 import { PageTransition } from "@/components/PageTransition";
 import { Loader2 } from "lucide-react";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 
 // Eager load: landing + auth (critical path)
 import Landing from "./pages/Landing";
@@ -153,6 +154,7 @@ const App = () => (
             <ErrorBoundary>
               <AppRoutes />
             </ErrorBoundary>
+            <VercelAnalytics />
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
