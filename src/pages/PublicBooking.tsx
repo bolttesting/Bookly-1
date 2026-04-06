@@ -1086,6 +1086,27 @@ export default function PublicBooking() {
           cp = insertResult.data;
           customerPackageId = cp?.id ?? null;
         }
+
+        if (customerPackageId && selectedPackage) {
+          const pkgBase = Number(selectedPackage.price);
+          const pkgSub = subtotalAfterCoupon(pkgBase, appliedCoupon);
+          const { taxAmount, totalWithTax } = computeCustomerBookingTax(
+            pkgSub,
+            business.customer_booking_tax_percent,
+          );
+          const { error: purchaseUpdateErr } = await supabase
+            .from('customer_packages')
+            .update({
+              purchase_subtotal: pkgSub,
+              purchase_tax_amount: taxAmount,
+              purchase_total: totalWithTax,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', customerPackageId);
+          if (purchaseUpdateErr) {
+            logger.error('Failed to save package purchase amounts:', purchaseUpdateErr);
+          }
+        }
       }
 
       if (isPackageOnlyCheckout) {

@@ -39,11 +39,18 @@ export interface BookingConfirmationPdfInput {
   staffName?: string | null;
   locationLine?: string | null;
   appointmentStatus: string;
-  /** Service total from appointment */
+  /** Service total from appointment (tax-inclusive when business charges tax) */
   servicePrice: number | null | undefined;
   currencyCode: string;
   paymentStatus: AppointmentPaymentStatus;
   payment?: BookingConfirmationPaymentRow | null;
+  /** When set, PDF lists subtotal, tax, and total before payment status lines */
+  priceBreakdown?: {
+    subtotal: number;
+    taxAmount: number;
+    taxPercent: number;
+    total: number;
+  } | null;
 }
 
 function formatWhenLine(startIso: string, endIso?: string | null) {
@@ -77,11 +84,28 @@ function isPaidOnline(p: BookingConfirmationPaymentRow | null | undefined): bool
   return m === 'card' || m.includes('stripe');
 }
 
+function priceLinesFromBreakdown(input: BookingConfirmationPdfInput): string[] {
+  const b = input.priceBreakdown;
+  if (!b) return [];
+  const code = (input.currencyCode || 'USD').toUpperCase();
+  if (b.taxPercent > 0 && b.taxAmount > 0) {
+    return [
+      `Subtotal: ${formatCurrency(b.subtotal, code)}`,
+      `Tax (${b.taxPercent}%): ${formatCurrency(b.taxAmount, code)}`,
+      `Total: ${formatCurrency(b.total, code)}`,
+    ];
+  }
+  return [`Total: ${formatCurrency(b.total, code)}`];
+}
+
 function paymentNarrative(input: BookingConfirmationPdfInput): { title: string; lines: string[] } {
   const code = (input.currencyCode || 'USD').toUpperCase();
-  const total = toNum(input.servicePrice);
+  const total = input.priceBreakdown
+    ? toNum(input.priceBreakdown.total)
+    : toNum(input.servicePrice);
   const hasPrice = !isNaN(total) && total > 0;
   const status = (input.paymentStatus || 'pending').toLowerCase();
+  const breakdownHead = priceLinesFromBreakdown(input);
 
   if (!hasPrice) {
     return {
@@ -95,14 +119,18 @@ function paymentNarrative(input: BookingConfirmationPdfInput): { title: string; 
   if (status === 'refunded') {
     return {
       title: 'Payment',
-      lines: [`Service total: ${totalStr}`, 'Status: Refunded.'],
+      lines: [...breakdownHead, ...(breakdownHead.length ? [] : [`Total: ${totalStr}`]), 'Status: Refunded.'],
     };
   }
 
   if (status === 'failed') {
     return {
       title: 'Payment',
-      lines: [`Service total: ${totalStr}`, 'Status: Payment failed — contact the business if you need help.'],
+      lines: [
+        ...breakdownHead,
+        ...(breakdownHead.length ? [] : [`Total: ${totalStr}`]),
+        'Status: Payment failed — contact the business if you need help.',
+      ],
     };
   }
 
@@ -121,7 +149,12 @@ function paymentNarrative(input: BookingConfirmationPdfInput): { title: string; 
         : 'Payment received — confirmed by the business.';
     return {
       title: 'Payment',
-      lines: [`Service total: ${totalStr}`, `Amount recorded: ${recorded}`, confirmLine],
+      lines: [
+        ...breakdownHead,
+        ...(breakdownHead.length ? [] : [`Service total: ${totalStr}`]),
+        `Amount recorded: ${recorded}`,
+        confirmLine,
+      ],
     };
   }
 
@@ -130,7 +163,10 @@ function paymentNarrative(input: BookingConfirmationPdfInput): { title: string; 
     const partialAmt = p ? toNum(p.amount) : NaN;
     const recorded = p && !isNaN(partialAmt) ? formatCurrency(partialAmt, (p.currency || code).toUpperCase()) : null;
     const online = isPaidOnline(p);
-    const lines = [`Service total: ${totalStr}`];
+    const lines = [
+      ...breakdownHead,
+      ...(breakdownHead.length ? [] : [`Service total: ${totalStr}`]),
+    ];
     if (recorded) lines.push(`Amount recorded so far: ${recorded}`);
     lines.push(
       online
@@ -144,7 +180,8 @@ function paymentNarrative(input: BookingConfirmationPdfInput): { title: string; 
   return {
     title: 'Payment',
     lines: [
-      `Service total: ${totalStr}`,
+      ...breakdownHead,
+      ...(breakdownHead.length ? [] : [`Service total: ${totalStr}`]),
       'Payment not yet confirmed by the business.',
       'If you already paid, it may take a short time to appear. Contact the business with this confirmation if needed.',
     ],

@@ -58,6 +58,8 @@ import {
   downloadBookingConfirmationPdf,
   type BookingConfirmationPaymentRow,
 } from '@/lib/bookingConfirmationPdf';
+import { downloadPackagePurchaseReceiptPdf } from '@/lib/packagePurchaseReceiptPdf';
+import { subtotalAfterCoupon, computeCustomerBookingTax, splitInclusiveTax } from '@/lib/bookingTax';
 import { RescheduleRequestDialog } from '@/components/appointments/RescheduleRequestDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ImageSlideshow } from '@/components/ImageSlideshow';
@@ -69,6 +71,11 @@ interface Business {
   slug: string;
   currency: string | null;
   use_class_schedule?: boolean | null;
+  customer_booking_tax_percent?: number | null;
+  address?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  email?: string | null;
 }
 
 interface Service {
@@ -118,6 +125,7 @@ interface AppointmentBusinessDetails {
   reschedule_deadline_hours?: number | null;
   phone?: string | null;
   email?: string | null;
+  customer_booking_tax_percent?: number | null;
 }
 
 interface MyAppointmentRow {
@@ -249,7 +257,7 @@ export default function MyAppointments() {
 
       const { data: businessesData, error: businessError } = await supabase
         .from('businesses')
-        .select('id, name, slug, currency, use_class_schedule')
+        .select('id, name, slug, currency, use_class_schedule, customer_booking_tax_percent, address, city, phone, email')
         .in('id', businessIds);
 
       if (businessError) throw businessError;
@@ -378,7 +386,7 @@ export default function MyAppointments() {
         staffIds.length > 0 
           ? supabase.from('staff_members').select('id, name').in('id', staffIds)
           : Promise.resolve({ data: [] }),
-        supabase.from('businesses').select('id, name, address, city, currency, reschedule_deadline_hours, phone, email').in('id', businessIds),
+        supabase.from('businesses').select('id, name, address, city, currency, reschedule_deadline_hours, phone, email, customer_booking_tax_percent').in('id', businessIds),
         paymentIds.length > 0
           ? supabase
               .from('payments')
@@ -525,7 +533,9 @@ export default function MyAppointments() {
           package_templates (
             id,
             name,
-            description
+            description,
+            booking_limit,
+            price
           )
         `)
         .in('customer_id', customerIds)
@@ -883,8 +893,8 @@ export default function MyAppointments() {
       }
 
       const basePrice = Number(selectedService.price);
-      let finalPrice = basePrice;
       const usingPackage = !!selectedCustomerPackageId;
+      const taxPct = selectedBusiness.customer_booking_tax_percent ?? 0;
 
       if (usingPackage) {
         // Validate and consume one package credit
@@ -905,14 +915,12 @@ export default function MyAppointments() {
           })
           .eq('id', selectedCustomerPackageId);
         if (updateErr) throw updateErr;
-        finalPrice = 0;
-      } else if (appliedCoupon) {
-        if (appliedCoupon.discountType === 'percentage') {
-          finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
-        } else {
-          finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
-        }
       }
+
+      const subtotalAfterDisc = usingPackage
+        ? 0
+        : subtotalAfterCoupon(basePrice, appliedCoupon);
+      const { totalWithTax: finalPrice } = computeCustomerBookingTax(subtotalAfterDisc, taxPct);
 
       // If recurring, create a series instead of a single appointment
       if (isRecurring) {
@@ -957,7 +965,7 @@ export default function MyAppointments() {
 
         // Record coupon usage for recurring
         if (appliedCoupon?.couponId && customer?.id) {
-          const discountAmount = basePrice - finalPrice;
+          const discountAmount = basePrice - subtotalAfterCoupon(basePrice, appliedCoupon);
           try {
             await supabase.rpc('record_coupon_usage', {
               _coupon_id: appliedCoupon.couponId,
@@ -1068,7 +1076,7 @@ export default function MyAppointments() {
 
       // Record coupon usage for single appointment
       if (appliedCoupon?.couponId && customer?.id && appointment?.id) {
-        const discountAmount = basePrice - finalPrice;
+        const discountAmount = basePrice - subtotalAfterCoupon(basePrice, appliedCoupon);
         try {
           await supabase.rpc('record_coupon_usage', {
             _coupon_id: appliedCoupon.couponId,
@@ -1178,6 +1186,12 @@ export default function MyAppointments() {
       const duration = classSelectedSlot.service?.duration ?? 60;
       const endTime = addMinutes(startTime, duration);
       const servicePrice = safeServices.find((s) => s.id === classSelectedSlot.service_id)?.price ?? 0;
+      const classBase = Number(servicePrice);
+      const classSub = usingPackage ? 0 : subtotalAfterCoupon(classBase, appliedCoupon);
+      const { totalWithTax: classTotalPrice } = computeCustomerBookingTax(
+        classSub,
+        selectedBusiness.customer_booking_tax_percent ?? 0,
+      );
       const { data: appointment, error } = await supabase
         .from('appointments')
         .insert({
@@ -1189,7 +1203,7 @@ export default function MyAppointments() {
           facility_id: classSelectedSlot.facility_id || null,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          price: usingPackage ? 0 : Number(servicePrice),
+          price: classTotalPrice,
           status: classBookingStatus,
           notes: null,
         })
@@ -1350,11 +1364,31 @@ export default function MyAppointments() {
 
       if (error) throw error;
 
+      const { data: bizRow } = await supabase
+        .from('businesses')
+        .select('customer_booking_tax_percent')
+        .eq('id', packageTemplate.business_id)
+        .maybeSingle();
+      const basePrice = Number(packageTemplate.price);
+      const sub = subtotalAfterCoupon(
+        basePrice,
+        appliedCoupon ? { discountType: appliedCoupon.discountType, discount: appliedCoupon.discount } : null,
+      );
+      const { taxAmount, totalWithTax } = computeCustomerBookingTax(sub, bizRow?.customer_booking_tax_percent);
+      if (customerPackage?.id) {
+        await supabase
+          .from('customer_packages')
+          .update({
+            purchase_subtotal: sub,
+            purchase_tax_amount: taxAmount,
+            purchase_total: totalWithTax,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', customerPackage.id);
+      }
+
       if (appliedCoupon?.couponId && customer?.id && customerPackage?.id) {
-        const basePrice = Number(packageTemplate.price);
-        const discountAmount = appliedCoupon.discountType === 'percentage'
-          ? (basePrice * appliedCoupon.discount / 100)
-          : appliedCoupon.discount;
+        const discountAmount = basePrice - sub;
         try {
           await supabase.rpc('record_coupon_usage', {
             _coupon_id: appliedCoupon.couponId,
@@ -1413,6 +1447,54 @@ export default function MyAppointments() {
     });
   }, [myPackages, packages, selectedBusiness?.id, selectedService?.id]);
 
+  const bookServiceCheckoutPricing = useMemo(() => {
+    if (!selectedBusiness || !selectedService) {
+      return { subtotalAfterCoupon: 0, taxPercent: 0, taxAmount: 0, totalWithTax: 0 };
+    }
+    if (selectedCustomerPackageId) {
+      return {
+        subtotalAfterCoupon: 0,
+        taxPercent: Number(selectedBusiness.customer_booking_tax_percent) || 0,
+        taxAmount: 0,
+        totalWithTax: 0,
+      };
+    }
+    const base = Number(selectedService.price);
+    const sub = subtotalAfterCoupon(base, appliedCoupon);
+    return { subtotalAfterCoupon: sub, ...computeCustomerBookingTax(sub, selectedBusiness.customer_booking_tax_percent) };
+  }, [selectedBusiness, selectedService, appliedCoupon, selectedCustomerPackageId]);
+
+  const classScheduleCheckoutPricing = useMemo(() => {
+    if (!selectedBusiness?.id || !classSelectedSlot?.service_id) {
+      return { subtotalAfterCoupon: 0, taxPercent: 0, taxAmount: 0, totalWithTax: 0 };
+    }
+    if (selectedCustomerPackageId) {
+      return {
+        subtotalAfterCoupon: 0,
+        taxPercent: Number(selectedBusiness.customer_booking_tax_percent) || 0,
+        taxAmount: 0,
+        totalWithTax: 0,
+      };
+    }
+    const base = Number(services.find((s) => s.id === classSelectedSlot.service_id)?.price ?? 0);
+    const sub = subtotalAfterCoupon(base, appliedCoupon);
+    return { subtotalAfterCoupon: sub, ...computeCustomerBookingTax(sub, selectedBusiness.customer_booking_tax_percent) };
+  }, [selectedBusiness, classSelectedSlot, services, appliedCoupon, selectedCustomerPackageId]);
+
+  const buyPackagePricing = useMemo(() => {
+    if (!packageToPurchase) return null;
+    const biz = businesses.find((b) => b.id === packageToPurchase.business_id);
+    if (!biz) return null;
+    const base = Number(packageToPurchase.price);
+    const sub = subtotalAfterCoupon(
+      base,
+      buyPackageAppliedCoupon
+        ? { discountType: buyPackageAppliedCoupon.discountType, discount: buyPackageAppliedCoupon.discount }
+        : null,
+    );
+    return { subtotalAfterCoupon: sub, ...computeCustomerBookingTax(sub, biz.customer_booking_tax_percent) };
+  }, [packageToPurchase, buyPackageAppliedCoupon, businesses]);
+
   // Redirect unauthenticated users to customer login (they reach this page via a business's link)
   if (!authLoading && !user) {
     return <Navigate to="/customer-login" replace />;
@@ -1459,6 +1541,18 @@ export default function MyAppointments() {
       const locationLine = loc
         ? [loc.name, [loc.address, loc.city].filter(Boolean).join(', ')].filter(Boolean).join(' — ')
         : null;
+      const total = Number(apt.price);
+      const taxPct = apt.business?.customer_booking_tax_percent ?? 0;
+      const split = splitInclusiveTax(total, taxPct);
+      const priceBreakdown =
+        split && taxPct > 0 && total > 0
+          ? {
+              subtotal: split.subtotal,
+              taxAmount: split.taxAmount,
+              taxPercent: taxPct,
+              total,
+            }
+          : null;
       downloadBookingConfirmationPdf({
         bookingRef: apt.id.replace(/-/g, '').slice(0, 12).toUpperCase(),
         business: {
@@ -1479,6 +1573,54 @@ export default function MyAppointments() {
         currencyCode: apt.business?.currency || 'USD',
         paymentStatus: apt.payment_status,
         payment: apt.payment ?? null,
+        priceBreakdown,
+      });
+    } catch (e) {
+      console.error(e);
+      toast.error('Could not create the PDF. Please try again.');
+    }
+  };
+
+  const handleDownloadPackageReceipt = (pkg: any) => {
+    try {
+      const total = pkg.purchase_total != null ? Number(pkg.purchase_total) : null;
+      if (total == null || isNaN(total)) {
+        toast.error('No purchase amount on file for this package. Receipts are available for purchases made after this update.');
+        return;
+      }
+      const sub = pkg.purchase_subtotal != null ? Number(pkg.purchase_subtotal) : total;
+      const taxAmt = pkg.purchase_tax_amount != null ? Number(pkg.purchase_tax_amount) : 0;
+      const biz = safeBusinesses.find((b) => b.id === pkg.business_id);
+      const customerName =
+        [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim() ||
+        profile?.email ||
+        user?.email ||
+        'Customer';
+      const sessions =
+        pkg.package_templates?.booking_limit ??
+        Number(pkg.bookings_remaining ?? 0) + Number(pkg.bookings_used ?? 0);
+      const taxPct =
+        sub > 0 && taxAmt > 0
+          ? Math.round((taxAmt / sub) * 10000) / 100
+          : Number(biz?.customer_booking_tax_percent) || 0;
+      downloadPackagePurchaseReceiptPdf({
+        receiptRef: String(pkg.id).replace(/-/g, '').slice(0, 12).toUpperCase(),
+        business: {
+          name: biz?.name || 'Business',
+          address: biz?.address,
+          city: biz?.city,
+          phone: biz?.phone ?? null,
+          email: biz?.email ?? null,
+        },
+        customerName,
+        packageName: pkg.package_templates?.name || 'Package',
+        sessions: typeof sessions === 'number' && !isNaN(sessions) ? sessions : 0,
+        purchasedAtIso: pkg.purchased_at || pkg.created_at || new Date().toISOString(),
+        currencyCode: biz?.currency || 'USD',
+        subtotal: sub,
+        taxPercent: taxPct,
+        taxAmount: taxAmt,
+        total,
       });
     } catch (e) {
       console.error(e);
@@ -1592,11 +1734,27 @@ export default function MyAppointments() {
                               <Badge className={getStatusColor(apt.status)}>
                                 {apt.status}
                               </Badge>
-                              {apt.price && (
-                                <span className="whitespace-nowrap text-lg sm:text-xl font-bold text-primary ml-auto">
-                                  {formatCurrencySimple(Number(apt.price), apt.business?.currency || 'USD')}
-                                </span>
-                              )}
+                              {apt.price ? (
+                                <div className="ml-auto text-right shrink-0">
+                                  <span className="whitespace-nowrap text-lg sm:text-xl font-bold text-primary block">
+                                    {formatCurrencySimple(Number(apt.price), apt.business?.currency || 'USD')}
+                                  </span>
+                                  {(() => {
+                                    const split = splitInclusiveTax(
+                                      Number(apt.price),
+                                      apt.business?.customer_booking_tax_percent,
+                                    );
+                                    const tp = apt.business?.customer_booking_tax_percent ?? 0;
+                                    if (!split || tp <= 0) return null;
+                                    return (
+                                      <span className="text-[10px] sm:text-xs text-muted-foreground block max-w-[11rem] sm:max-w-none">
+                                        Incl. subtotal {formatCurrencySimple(split.subtotal, apt.business?.currency || 'USD')}{' '}
+                                        + tax ({tp}%)
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                              ) : null}
                             </div>
                             <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                               <span className="flex items-center gap-1">
@@ -1699,6 +1857,27 @@ export default function MyAppointments() {
                             <p className="text-xs sm:text-sm text-muted-foreground">
                               {format(new Date(apt.start_time), 'MMM d, yyyy')} at {format(new Date(apt.start_time), 'h:mm a')}
                             </p>
+                            {apt.price ? (
+                              <div className="mt-1 text-xs">
+                                <span className="font-medium text-foreground">
+                                  {formatCurrencySimple(Number(apt.price), apt.business?.currency || 'USD')}
+                                </span>
+                                {(() => {
+                                  const split = splitInclusiveTax(
+                                    Number(apt.price),
+                                    apt.business?.customer_booking_tax_percent,
+                                  );
+                                  const tp = apt.business?.customer_booking_tax_percent ?? 0;
+                                  if (!split || tp <= 0) return null;
+                                  return (
+                                    <span className="text-muted-foreground ml-1">
+                                      (subtotal {formatCurrencySimple(split.subtotal, apt.business?.currency || 'USD')} + {tp}%
+                                      tax)
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                            ) : null}
                           </div>
                           <div className="flex flex-wrap items-center gap-2 shrink-0">
                             <Badge variant="outline" className="w-fit">{apt.status}</Badge>
@@ -2116,17 +2295,52 @@ export default function MyAppointments() {
                                         {classSelectedDate && format(classSelectedDate, 'MMM d, yyyy')} at {format(new Date(`2000-01-01T${classSelectedSlot.start_time}`), 'h:mm a')}
                                       </span>
                                     </div>
-                                    <div className="flex justify-between text-sm">
-                                      <span className="text-muted-foreground">Price</span>
-                                      <span className="font-medium">
-                                        {selectedCustomerPackageId
-                                          ? (() => {
-                                              const pkg = applicablePackagesForBooking.find((cp: any) => cp.id === selectedCustomerPackageId);
-                                              return pkg ? <span className="text-primary">Using package: {pkg.package_templates?.name} (1 credit)</span> : formatCurrencySimple(0, selectedBusiness?.currency || 'USD');
-                                            })()
-                                          : formatCurrencySimple(Number(selectedService?.price ?? 0), selectedBusiness?.currency || 'USD')}
-                                      </span>
-                                    </div>
+                                    {selectedCustomerPackageId ? (
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Payment</span>
+                                        <span className="font-medium">
+                                          {(() => {
+                                            const pkg = applicablePackagesForBooking.find((cp: any) => cp.id === selectedCustomerPackageId);
+                                            return pkg ? (
+                                              <span className="text-primary">Using package: {pkg.package_templates?.name} (1 credit)</span>
+                                            ) : formatCurrencySimple(0, selectedBusiness?.currency || 'USD');
+                                          })()}
+                                        </span>
+                                      </div>
+                                    ) : null}
+                                    {!selectedCustomerPackageId && classScheduleCheckoutPricing.totalWithTax > 0 && (
+                                      <>
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                          <span>Subtotal</span>
+                                          <span>
+                                            {formatCurrencySimple(
+                                              classScheduleCheckoutPricing.subtotalAfterCoupon,
+                                              selectedBusiness?.currency || 'USD',
+                                            )}
+                                          </span>
+                                        </div>
+                                        {classScheduleCheckoutPricing.taxPercent > 0 && (
+                                          <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>Tax ({classScheduleCheckoutPricing.taxPercent}%)</span>
+                                            <span>
+                                              {formatCurrencySimple(
+                                                classScheduleCheckoutPricing.taxAmount,
+                                                selectedBusiness?.currency || 'USD',
+                                              )}
+                                            </span>
+                                          </div>
+                                        )}
+                                        <div className="flex justify-between text-sm font-semibold pt-1 border-t border-border/60">
+                                          <span>Total</span>
+                                          <span className="text-primary">
+                                            {formatCurrencySimple(
+                                              classScheduleCheckoutPricing.totalWithTax,
+                                              selectedBusiness?.currency || 'USD',
+                                            )}
+                                          </span>
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                   {Array.isArray(applicablePackagesForBooking) && applicablePackagesForBooking.length > 0 && (
                                     <div className="space-y-2 pt-2 border-t">
@@ -2334,30 +2548,19 @@ export default function MyAppointments() {
                                   {format(selectedDate, 'MMM d, yyyy')} at {format(new Date(`2000-01-01T${selectedTime}`), 'h:mm a')}
                                 </span>
                               </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Price</span>
-                                <span className="font-medium">
-                                  {selectedCustomerPackageId
-                                    ? (() => {
-                                        const pkg = applicablePackagesForBooking.find((cp: any) => cp.id === selectedCustomerPackageId);
-                                        return pkg ? (
-                                          <span className="text-primary">Using package: {pkg.package_templates?.name} (1 credit)</span>
-                                        ) : formatCurrencySimple(0, selectedBusiness?.currency || 'USD');
-                                      })()
-                                    : (() => {
-                                        const basePrice = Number(selectedService?.price ?? 0);
-                                        let finalPrice = basePrice;
-                                        if (appliedCoupon) {
-                                          if (appliedCoupon.discountType === 'percentage') {
-                                            finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
-                                          } else {
-                                            finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
-                                          }
-                                        }
-                                        return formatCurrencySimple(finalPrice, selectedBusiness?.currency || 'USD');
-                                      })()}
-                                </span>
-                              </div>
+                              {selectedCustomerPackageId ? (
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Payment</span>
+                                  <span className="font-medium">
+                                    {(() => {
+                                      const pkg = applicablePackagesForBooking.find((cp: any) => cp.id === selectedCustomerPackageId);
+                                      return pkg ? (
+                                        <span className="text-primary">Using package: {pkg.package_templates?.name} (1 credit)</span>
+                                      ) : formatCurrencySimple(0, selectedBusiness?.currency || 'USD');
+                                    })()}
+                                  </span>
+                                </div>
+                              ) : null}
                               {appliedCoupon && !selectedCustomerPackageId && (
                                 <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
                                   <span>Discount ({appliedCoupon.code})</span>
@@ -2367,6 +2570,39 @@ export default function MyAppointments() {
                                       : formatCurrencySimple(appliedCoupon.discount, selectedBusiness?.currency || 'USD')}
                                   </span>
                                 </div>
+                              )}
+                              {!selectedCustomerPackageId && bookServiceCheckoutPricing.totalWithTax > 0 && (
+                                <>
+                                  <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>Subtotal</span>
+                                    <span>
+                                      {formatCurrencySimple(
+                                        bookServiceCheckoutPricing.subtotalAfterCoupon,
+                                        selectedBusiness?.currency || 'USD',
+                                      )}
+                                    </span>
+                                  </div>
+                                  {bookServiceCheckoutPricing.taxPercent > 0 && (
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                      <span>Tax ({bookServiceCheckoutPricing.taxPercent}%)</span>
+                                      <span>
+                                        {formatCurrencySimple(
+                                          bookServiceCheckoutPricing.taxAmount,
+                                          selectedBusiness?.currency || 'USD',
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between text-sm font-semibold pt-1 border-t border-border/60">
+                                    <span>Total</span>
+                                    <span className="text-primary">
+                                      {formatCurrencySimple(
+                                        bookServiceCheckoutPricing.totalWithTax,
+                                        selectedBusiness?.currency || 'USD',
+                                      )}
+                                    </span>
+                                  </div>
+                                </>
                               )}
                             </>
                           )}
@@ -2834,6 +3070,9 @@ export default function MyAppointments() {
                 {myPackages.map((pkg: any) => {
                   const isExpired = new Date(pkg.expires_at) < new Date();
                   const isUsed = pkg.bookings_remaining === 0;
+                  const pkgBiz = safeBusinesses.find((b) => b.id === pkg.business_id);
+                  const pkgCurrency = pkgBiz?.currency || 'USD';
+                  const hasPurchase = pkg.purchase_total != null && !isNaN(Number(pkg.purchase_total));
                   
                   return (
                     <Card key={pkg.id} className="glass-card">
@@ -2866,6 +3105,38 @@ export default function MyAppointments() {
                               {format(new Date(pkg.expires_at), 'MMM d, yyyy')}
                             </span>
                           </div>
+                          {hasPurchase && (
+                            <div className="pt-2 border-t border-border/60 space-y-1 text-sm">
+                              <div className="flex justify-between text-muted-foreground">
+                                <span>Subtotal</span>
+                                <span>
+                                  {formatCurrencySimple(Number(pkg.purchase_subtotal ?? pkg.purchase_total), pkgCurrency)}
+                                </span>
+                              </div>
+                              {Number(pkg.purchase_tax_amount) > 0 && (
+                                <div className="flex justify-between text-muted-foreground">
+                                  <span>Tax</span>
+                                  <span>{formatCurrencySimple(Number(pkg.purchase_tax_amount), pkgCurrency)}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between font-semibold">
+                                <span>Total paid</span>
+                                <span className="text-primary">
+                                  {formatCurrencySimple(Number(pkg.purchase_total), pkgCurrency)}
+                                </span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="w-full mt-2"
+                                onClick={() => handleDownloadPackageReceipt(pkg)}
+                              >
+                                <FileDown className="h-4 w-4 mr-2" />
+                                Download receipt
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -3235,32 +3506,45 @@ export default function MyAppointments() {
                   {buyPackageCouponError && <p className="text-sm text-red-600 dark:text-red-400">{buyPackageCouponError}</p>}
                   {buyPackageAppliedCoupon && <p className="text-sm text-green-600 dark:text-green-400">Coupon &quot;{buyPackageAppliedCoupon.code}&quot; applied.</p>}
                   <div className="border-t pt-3 space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>Price</span>
-                      <span>{Number(packageToPurchase.price).toFixed(2)}</span>
-                    </div>
-                    {buyPackageAppliedCoupon ? (() => {
+                    {buyPackagePricing ? (() => {
+                      const pkgBiz = businesses.find((b) => b.id === packageToPurchase.business_id);
+                      const cur = pkgBiz?.currency || 'USD';
+                      const { subtotalAfterCoupon: sub, taxPercent, taxAmount, totalWithTax } = buyPackagePricing;
                       const base = Number(packageToPurchase.price);
-                      const discountAmount = buyPackageAppliedCoupon.discountType === 'percentage'
-                        ? (base * buyPackageAppliedCoupon.discount / 100)
-                        : buyPackageAppliedCoupon.discount;
-                      const total = Math.max(0, base - discountAmount);
                       return (
                         <>
-                          <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>Discount</span>
-                            <span>-{discountAmount.toFixed(2)}</span>
+                          {buyPackageAppliedCoupon && (
+                            <>
+                              <div className="flex justify-between text-sm text-muted-foreground">
+                                <span>Price</span>
+                                <span>{formatCurrencySimple(base, cur)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm text-muted-foreground">
+                                <span>Discount</span>
+                                <span>-{formatCurrencySimple(Math.max(0, base - sub), cur)}</span>
+                              </div>
+                            </>
+                          )}
+                          <div className="flex justify-between text-sm">
+                            <span>Subtotal</span>
+                            <span>{formatCurrencySimple(sub, cur)}</span>
                           </div>
-                          <div className="flex justify-between font-medium pt-1">
+                          {taxPercent > 0 && taxAmount > 0 && (
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                              <span>Tax ({taxPercent}%)</span>
+                              <span>{formatCurrencySimple(taxAmount, cur)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between font-medium pt-1 border-t border-border/60 mt-2">
                             <span>Total</span>
-                            <span>{total.toFixed(2)}</span>
+                            <span className="text-primary">{formatCurrencySimple(totalWithTax, cur)}</span>
                           </div>
                         </>
                       );
                     })() : (
                       <div className="flex justify-between font-medium pt-1">
                         <span>Total</span>
-                        <span>{Number(packageToPurchase.price).toFixed(2)}</span>
+                        <span>{formatCurrencySimple(Number(packageToPurchase.price), 'USD')}</span>
                       </div>
                     )}
                   </div>

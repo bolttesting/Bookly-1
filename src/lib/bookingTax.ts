@@ -30,3 +30,20 @@ export function computeCustomerBookingTax(
   const totalWithTax = Math.round((sub + taxAmount) * 100) / 100;
   return { taxPercent: p, taxAmount, totalWithTax };
 }
+
+/**
+ * Approximate subtotal + tax from a tax-inclusive total (for display when only total is stored).
+ * Matches typical forward calc: subtotal + round(subtotal * p/100, 2) ≈ total.
+ */
+export function splitInclusiveTax(
+  totalInclTax: number,
+  taxPercent: number | null | undefined,
+): { subtotal: number; taxAmount: number } | null {
+  const total = Number(totalInclTax);
+  const p = Math.min(100, Math.max(0, Number(taxPercent) || 0));
+  if (p <= 0 || !total || total <= 0) return null;
+  const rate = p / 100;
+  const subtotal = Math.round((total / (1 + rate)) * 100) / 100;
+  const taxAmount = Math.round((total - subtotal) * 100) / 100;
+  return { subtotal, taxAmount };
+}
