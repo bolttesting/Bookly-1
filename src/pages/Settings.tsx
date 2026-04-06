@@ -1343,6 +1343,40 @@ const Settings = () => {
               Connect your Stripe account to accept payments from customers. Payments will be deposited directly to your Stripe account.
             </p>
 
+            {/* Shown for all businesses — tax applies on public booking even without Stripe (pay at venue). */}
+            <div className="space-y-2 p-4 bg-secondary/50 rounded-lg border border-border/60 mb-6">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-primary shrink-0" />
+                <p className="text-sm font-medium">Sales tax on customer checkout</p>
+              </div>
+              <Label htmlFor="customerBookingTaxPercent">Tax rate (%)</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  id="customerBookingTaxPercent"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  value={business.customer_booking_tax_percent ?? 0}
+                  onChange={async (e) => {
+                    const v = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                    try {
+                      await updateBusiness({ customer_booking_tax_percent: v });
+                    } catch {
+                      toast.error('Failed to update tax');
+                    }
+                  }}
+                  className="max-w-32"
+                />
+                <span className="text-sm text-muted-foreground">
+                  Applied after any coupon on your booking page and class checkout (Subtotal, Tax, Total). Does not require Stripe.
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                The stored appointment total includes this tax when the rate is above 0.
+              </p>
+            </div>
+
             {business?.stripe_connected ? (
               <div className="space-y-6">
                 <div className="flex items-center gap-2 p-4 bg-success/10 border border-success/20 rounded-lg">
@@ -1371,36 +1405,6 @@ const Settings = () => {
                     Configure when and how customers pay for appointments. These settings apply to all services with a price.
                   </p>
 
-                  <div className="space-y-2 p-4 bg-secondary/50 rounded-lg border border-border/60">
-                    <p className="text-sm font-medium">Sales tax on customer checkout</p>
-                    <Label htmlFor="customerBookingTaxPercent">Tax rate (%)</Label>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Input
-                        id="customerBookingTaxPercent"
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.01}
-                        value={business.customer_booking_tax_percent ?? 0}
-                        onChange={async (e) => {
-                          const v = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
-                          try {
-                            await updateBusiness({ customer_booking_tax_percent: v });
-                          } catch {
-                            toast.error('Failed to update tax');
-                          }
-                        }}
-                        className="max-w-32"
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        Applied after any coupon, on your public booking page and class checkout. Shown as a separate line (Subtotal, Tax, Total).
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      The stored appointment total includes this tax. Your Bookly platform subscription uses the tax set in super admin, not this field.
-                    </p>
-                  </div>
-                  
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-secondary/50 rounded-lg">
                     <div className="flex-1">
                       <p className="font-medium">Require Payment for Bookings</p>
