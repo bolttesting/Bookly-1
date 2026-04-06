@@ -23,6 +23,7 @@ import { useBusinessChannelConfig } from '@/hooks/useBusinessChannelConfig';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { FunctionsHttpError } from '@supabase/supabase-js';
+import { SubscriptionInvoicesSection } from '@/components/settings/SubscriptionInvoicesSection';
 import { LocationHoursSettings } from '@/components/settings/LocationHoursSettings';
 import { LocationsSettings } from '@/components/settings/LocationsSettings';
 import { ClassScheduleSettings } from '@/components/settings/ClassScheduleSettings';
@@ -154,6 +155,7 @@ const Settings = () => {
       } else {
         queryClient.invalidateQueries({ queryKey: ['business-subscription'] });
         queryClient.invalidateQueries({ queryKey: ['business'] });
+        queryClient.invalidateQueries({ queryKey: ['platformSubscriptionInvoices'] });
         refetchBusiness();
         toast.success('Subscription upgraded successfully!');
       }
@@ -1504,6 +1506,33 @@ const Settings = () => {
                       </p>
                     </div>
                   )}
+
+                  <div className="space-y-2 p-4 bg-secondary/50 rounded-lg border border-border/60">
+                    <Label htmlFor="customerBookingTaxPercent">Customer booking tax (%)</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="customerBookingTaxPercent"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.01}
+                        value={business.customer_booking_tax_percent ?? 0}
+                        onChange={async (e) => {
+                          const v = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                          try {
+                            await updateBusiness({ customer_booking_tax_percent: v });
+                          } catch {
+                            toast.error('Failed to update tax');
+                          }
+                        }}
+                        className="max-w-32"
+                      />
+                      <span className="text-sm text-muted-foreground">applied to customer charges</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Used for class and booking invoices when you collect payment from customers. Your Bookly subscription checkout uses the tax set by the platform in super admin.
+                    </p>
+                  </div>
                 </div>
 
                 <Separator />
@@ -1623,6 +1652,10 @@ const Settings = () => {
                 </div>
               </div>
             )}
+
+            <div className="mt-6">
+              <SubscriptionInvoicesSection businessId={business?.id} />
+            </div>
 
             {/* Subscription Plans Section */}
             <div className="glass-card p-4 sm:p-6 mt-6">

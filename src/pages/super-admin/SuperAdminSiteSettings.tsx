@@ -29,6 +29,7 @@ export default function SuperAdminSiteSettings() {
   const [contactPhone, setContactPhone] = useState('');
   const [contactAddress, setContactAddress] = useState('');
   const [defaultCurrency, setDefaultCurrency] = useState('USD');
+  const [platformSubscriptionTax, setPlatformSubscriptionTax] = useState('0');
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<FooterLink | null>(null);
   const [linkLabel, setLinkLabel] = useState('');
@@ -42,18 +43,21 @@ export default function SuperAdminSiteSettings() {
       setContactPhone(settings.contact_phone ?? '');
       setContactAddress(settings.contact_address ?? '');
       setDefaultCurrency(settings.default_currency ?? 'USD');
+      setPlatformSubscriptionTax(String(settings.platform_subscription_tax_percent ?? 0));
     }
   }, [settings]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const tax = Math.min(100, Math.max(0, parseFloat(platformSubscriptionTax) || 0));
       await update({
         footer_copyright: footerCopyright || null,
         contact_email: contactEmail || null,
         contact_phone: contactPhone || null,
         contact_address: contactAddress || null,
         default_currency: defaultCurrency || 'USD',
+        platform_subscription_tax_percent: tax,
       });
       toast.success('Site settings saved');
     } catch (err: any) {
@@ -123,6 +127,22 @@ export default function SuperAdminSiteSettings() {
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 rows={3}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="platform_subscription_tax">Bookly plan checkout tax (%)</Label>
+              <Input
+                id="platform_subscription_tax"
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                value={platformSubscriptionTax}
+                onChange={(e) => setPlatformSubscriptionTax(e.target.value)}
+                placeholder="0"
+              />
+              <p className="text-xs text-muted-foreground">
+                Added as a separate line on Stripe when a business pays for a paid Bookly subscription. Use 0 if you do not charge tax.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="default_currency">Default currency (super admin)</Label>

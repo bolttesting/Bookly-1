@@ -8,6 +8,8 @@ export interface SiteSettings {
   contact_phone: string | null;
   contact_address: string | null;
   default_currency?: string | null;
+  /** Tax % added at Stripe checkout for Bookly subscription plans (business → platform). */
+  platform_subscription_tax_percent?: number | null;
   updated_at: string;
 }
 
@@ -30,7 +32,19 @@ export function useSiteSettings() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (updates: Partial<Pick<SiteSettings, 'footer_copyright' | 'contact_email' | 'contact_phone' | 'contact_address' | 'default_currency'>>) => {
+    mutationFn: async (
+      updates: Partial<
+        Pick<
+          SiteSettings,
+          | 'footer_copyright'
+          | 'contact_email'
+          | 'contact_phone'
+          | 'contact_address'
+          | 'default_currency'
+          | 'platform_subscription_tax_percent'
+        >
+      >,
+    ) => {
       if (!data?.id) throw new Error('No site settings found');
       const { data: updated, error } = await supabase
         .from('site_settings')

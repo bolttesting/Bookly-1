@@ -18,11 +18,12 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-// Create client with fallback empty strings to prevent crashes
-// The app will show errors when trying to use Supabase, but won't crash on load
+const isConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
+
+// Create client with fallback so the app loads; auth/data calls fail until .env is set (see .env.example).
 export const supabase = createClient<Database>(
-  SUPABASE_URL || 'https://placeholder.supabase.co',
-  SUPABASE_PUBLISHABLE_KEY || 'placeholder-key',
+  isConfigured ? SUPABASE_URL! : 'https://placeholder.supabase.co',
+  isConfigured ? SUPABASE_PUBLISHABLE_KEY! : 'placeholder-key',
   {
     auth: {
       storage: localStorage,

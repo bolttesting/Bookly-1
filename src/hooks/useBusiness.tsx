@@ -26,6 +26,8 @@ interface Business {
   reschedule_deadline_hours?: number | null;
   booking_theme?: 'light' | 'dark' | 'system' | null;
   use_class_schedule?: boolean | null;
+  /** Tax % for customer bookings when business collects payment (future booking invoices). */
+  customer_booking_tax_percent?: number | null;
 }
 
 type AppRole = 'owner' | 'admin' | 'staff';

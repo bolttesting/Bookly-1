@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { useBusiness } from './useBusiness';
+import { useAuth } from './useAuth';
 import { useSubscriptionPlans } from './useSubscriptionPlans';
 import { toast } from 'sonner';
 
@@ -25,6 +26,7 @@ export interface BusinessSubscription {
 
 export function useBusinessSubscription() {
   const { business } = useBusiness();
+  const { user } = useAuth();
   const { plans } = useSubscriptionPlans();
   const queryClient = useQueryClient();
 
@@ -121,11 +123,23 @@ export function useBusinessSubscription() {
 
       // If paid upgrade, redirect to Stripe Checkout
       if (requiresPayment) {
+        const customerEmail = user?.email?.trim();
+        if (!customerEmail) {
+          throw new Error('Your account must have an email address to pay and receive subscription invoices.');
+        }
+        const meta = user?.user_metadata as Record<string, unknown> | undefined;
+        const customerName =
+          (typeof meta?.full_name === 'string' && meta.full_name.trim()) ||
+          (typeof meta?.name === 'string' && meta.name.trim()) ||
+          customerEmail.split('@')[0] ||
+          '';
         const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
         const { data, error } = await supabase.functions.invoke('create-subscription-checkout', {
           body: {
             business_id: business.id,
             plan_id: planId,
+            customer_email: customerEmail,
+            customer_name: customerName,
             success_url: `${siteUrl}/settings?tab=payments&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${siteUrl}/settings?tab=payments&checkout=cancelled`,
           },
