@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { formatCurrencySimple, getCurrencyByCode } from '@/lib/currency';
+import { subtotalAfterCoupon, computeCustomerBookingTax } from '@/lib/bookingTax';
 import { PaymentForm } from '@/components/payment/PaymentForm';
 import { useAppointmentReminders } from '@/hooks/useReminders';
 import { useAuth } from '@/hooks/useAuth';
@@ -51,6 +52,8 @@ interface Business {
   use_class_schedule?: boolean | null;
   payment_timing?: 'advance' | 'on_spot' | 'partial' | null;
   partial_payment_percentage?: number | null;
+  /** Sales tax % applied to customer checkout (after coupon). */
+  customer_booking_tax_percent?: number | null;
 }
 
 interface Service {
@@ -562,6 +565,58 @@ export default function PublicBooking() {
     ? services.find(s => s.id === (selectedPackage.services![0] as { id: string })?.id) ?? null
     : selectedService;
 
+  /** Standard service/package checkout: subtotal after coupon + tax. */
+  const checkoutPricing = useMemo(() => {
+    if (!business) {
+      return {
+        basePrice: 0,
+        subtotalAfterCoupon: 0,
+        taxPercent: 0,
+        taxAmount: 0,
+        totalWithTax: 0,
+      };
+    }
+    const basePrice = Number(selectedPackage?.price ?? effectiveService?.price ?? 0);
+    const sub = subtotalAfterCoupon(basePrice, appliedCoupon);
+    const t = computeCustomerBookingTax(sub, business.customer_booking_tax_percent);
+    return { basePrice, subtotalAfterCoupon: sub, ...t };
+  }, [
+    business,
+    business?.customer_booking_tax_percent,
+    selectedPackage?.price,
+    selectedPackage?.id,
+    effectiveService?.price,
+    effectiveService?.id,
+    appliedCoupon,
+  ]);
+
+  /** Class schedule flow (confirm step). */
+  const classCheckoutPricing = useMemo(() => {
+    if (!business || !classSelectedSlot) {
+      return {
+        basePrice: 0,
+        subtotalAfterCoupon: 0,
+        taxPercent: 0,
+        taxAmount: 0,
+        totalWithTax: 0,
+      };
+    }
+    if (classSelectedPackageId) {
+      return { basePrice: 0, subtotalAfterCoupon: 0, taxPercent: 0, taxAmount: 0, totalWithTax: 0 };
+    }
+    const basePrice = Number(services.find((s) => s.id === classSelectedSlot.service_id)?.price ?? 0);
+    const sub = subtotalAfterCoupon(basePrice, appliedCoupon);
+    const t = computeCustomerBookingTax(sub, business.customer_booking_tax_percent);
+    return { basePrice, subtotalAfterCoupon: sub, ...t };
+  }, [
+    business,
+    business?.customer_booking_tax_percent,
+    classSelectedSlot,
+    classSelectedPackageId,
+    services,
+    appliedCoupon,
+  ]);
+
   const generateTimeSlotsWithAvailability = (): SlotAvailability[] => {
     if (!selectedDate || !effectiveService) return [];
 
@@ -1035,14 +1090,11 @@ export default function PublicBooking() {
 
       if (isPackageOnlyCheckout) {
         const basePrice = Number(selectedPackage!.price);
-        let finalPrice = basePrice;
-        if (appliedCoupon) {
-          if (appliedCoupon.discountType === 'percentage') {
-            finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
-          } else {
-            finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
-          }
-        }
+        const pkgSub = subtotalAfterCoupon(basePrice, appliedCoupon);
+        const { totalWithTax: finalPrice } = computeCustomerBookingTax(
+          pkgSub,
+          business.customer_booking_tax_percent,
+        );
         const hasStripe = business.stripe_connected;
         const paymentTiming = business.payment_timing || 'advance';
         const requiresPayment = business.require_payment && hasStripe && finalPrice > 0;
@@ -1088,19 +1140,15 @@ export default function PublicBooking() {
         duration: effectiveService.duration,
       });
 
-      // Calculate final price with coupon discount (package total or single service)
+      // Subtotal after coupon, then tax (same as checkout summary)
       const basePrice = selectedPackage ? Number(selectedPackage.price) : Number(effectiveService.price);
       const servicePrice = basePrice || 0;
-      let finalPrice = servicePrice;
-      
-      if (appliedCoupon) {
-        if (appliedCoupon.discountType === 'percentage') {
-          finalPrice = servicePrice - (servicePrice * appliedCoupon.discount / 100);
-        } else {
-          finalPrice = Math.max(0, servicePrice - appliedCoupon.discount);
-        }
-      }
-      
+      const subtotalAfterDisc = subtotalAfterCoupon(servicePrice, appliedCoupon);
+      const { totalWithTax: finalPrice } = computeCustomerBookingTax(
+        subtotalAfterDisc,
+        business.customer_booking_tax_percent,
+      );
+
       // Check payment requirements based on payment timing
       const hasStripe = business.stripe_connected;
       const paymentTiming = business.payment_timing || 'advance';
@@ -1188,7 +1236,7 @@ export default function PublicBooking() {
 
           // Record coupon usage for recurring series
           if (appliedCoupon?.couponId && customerId) {
-            const discountAmount = servicePrice - finalPrice;
+            const discountAmount = servicePrice - subtotalAfterDisc;
             try {
               await supabase.rpc('record_coupon_usage', {
                 _coupon_id: appliedCoupon.couponId,
@@ -1261,7 +1309,7 @@ export default function PublicBooking() {
 
       // Record coupon usage when booking completes without advance payment
       if (appliedCoupon?.couponId && customerId && !requiresAdvancePayment) {
-        const discountAmount = servicePrice - finalPrice;
+        const discountAmount = servicePrice - subtotalAfterDisc;
         try {
           await supabase.rpc('record_coupon_usage', {
             _coupon_id: appliedCoupon.couponId,
@@ -1475,9 +1523,7 @@ export default function PublicBooking() {
       // Record coupon usage when payment completes
       if (appliedCoupon?.couponId && createdCustomerId) {
         const basePrice = Number(selectedPackage?.price ?? effectiveService?.price ?? 0);
-        const discountAmount = appliedCoupon.discountType === 'percentage'
-          ? basePrice * appliedCoupon.discount / 100
-          : appliedCoupon.discount;
+        const discountAmount = basePrice - subtotalAfterCoupon(basePrice, appliedCoupon);
         try {
           await supabase.rpc('record_coupon_usage', {
             _coupon_id: appliedCoupon.couponId,
@@ -1600,18 +1646,7 @@ export default function PublicBooking() {
           <PaymentForm
             businessId={business.id}
             appointmentId={createdAppointmentId}
-            amount={(() => {
-              const basePrice = Number(selectedPackage?.price ?? effectiveService?.price);
-              let finalPrice = basePrice;
-              if (appliedCoupon) {
-                if (appliedCoupon.discountType === 'percentage') {
-                  finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
-                } else {
-                  finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
-                }
-              }
-              return finalPrice;
-            })()}
+            amount={checkoutPricing.totalWithTax}
             currency={business.currency || 'USD'}
             customerEmail={customerEmail}
             customerName={customerName}
@@ -1638,6 +1673,26 @@ export default function PublicBooking() {
                 <span className="text-muted-foreground">Time</span>
                 <span className="font-medium">
                   {selectedTime && format(new Date(`2000-01-01T${selectedTime}`), 'h:mm a')}
+                </span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-border">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium">
+                  {formatCurrencySimple(checkoutPricing.subtotalAfterCoupon, business?.currency || 'USD')}
+                </span>
+              </div>
+              {checkoutPricing.taxPercent > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tax ({checkoutPricing.taxPercent}%)</span>
+                  <span className="font-medium">
+                    {formatCurrencySimple(checkoutPricing.taxAmount, business?.currency || 'USD')}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between font-semibold">
+                <span>Amount due</span>
+                <span className="text-primary">
+                  {formatCurrencySimple(checkoutPricing.totalWithTax, business?.currency || 'USD')}
                 </span>
               </div>
             </CardContent>
@@ -1686,8 +1741,24 @@ export default function PublicBooking() {
                 </>
               )}
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Price</span>
-                <span className="font-medium">{formatCurrencySimple(Number(selectedPackage?.price ?? effectiveService?.price ?? 0), business?.currency || 'USD')}</span>
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium">
+                  {formatCurrencySimple(checkoutPricing.subtotalAfterCoupon, business?.currency || 'USD')}
+                </span>
+              </div>
+              {checkoutPricing.taxPercent > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tax ({checkoutPricing.taxPercent}%)</span>
+                  <span className="font-medium">
+                    {formatCurrencySimple(checkoutPricing.taxAmount, business?.currency || 'USD')}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between font-semibold">
+                <span className="text-muted-foreground">Total</span>
+                <span className="font-medium text-primary">
+                  {formatCurrencySimple(checkoutPricing.totalWithTax, business?.currency || 'USD')}
+                </span>
               </div>
             </div>
             <p className="text-sm text-muted-foreground text-center">
@@ -2401,20 +2472,30 @@ export default function PublicBooking() {
                             <span>-{appliedCoupon.discountType === 'percentage' ? `${appliedCoupon.discount}%` : formatCurrencySimple(appliedCoupon.discount, business?.currency || 'USD')}</span>
                           </div>
                         )}
+                        {!classSelectedPackageId && (
+                          <>
+                            <div className="flex justify-between py-2 border-b border-border">
+                              <span className="text-muted-foreground">Subtotal</span>
+                              <span className="font-medium">
+                                {formatCurrencySimple(classCheckoutPricing.subtotalAfterCoupon, business?.currency || 'USD')}
+                              </span>
+                            </div>
+                            {classCheckoutPricing.taxPercent > 0 && (
+                              <div className="flex justify-between py-2 border-b border-border">
+                                <span className="text-muted-foreground">Tax ({classCheckoutPricing.taxPercent}%)</span>
+                                <span className="font-medium">
+                                  {formatCurrencySimple(classCheckoutPricing.taxAmount, business?.currency || 'USD')}
+                                </span>
+                              </div>
+                            )}
+                          </>
+                        )}
                         <div className="flex justify-between py-2 text-lg">
                           <span className="font-semibold">Total</span>
                           <span className="font-bold text-primary">
                             {classSelectedPackageId
                               ? '1 credit from package'
-                              : (() => {
-                                  const basePrice = Number(services.find(s => s.id === classSelectedSlot.service_id)?.price ?? 0);
-                                  let finalPrice = basePrice;
-                                  if (appliedCoupon && !classSelectedPackageId) {
-                                    if (appliedCoupon.discountType === 'percentage') finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
-                                    else finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
-                                  }
-                                  return formatCurrencySimple(finalPrice, business?.currency || 'USD');
-                                })()}
+                              : formatCurrencySimple(classCheckoutPricing.totalWithTax, business?.currency || 'USD')}
                           </span>
                         </div>
                       </div>
@@ -2469,18 +2550,7 @@ export default function PublicBooking() {
                                 .eq('id', classSelectedPackageId);
                               if (updateErr) throw new Error(updateErr.message ?? 'Failed to deduct package credit');
                             }
-                            let finalPrice: number;
-                            if (usePackage) {
-                              finalPrice = 0;
-                            } else {
-                              const basePrice = Number(services.find(s => s.id === classSelectedSlot.service_id)?.price ?? 0);
-                              if (appliedCoupon) {
-                                if (appliedCoupon.discountType === 'percentage') finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
-                                else finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
-                              } else {
-                                finalPrice = basePrice;
-                              }
-                            }
+                            const finalPrice = usePackage ? 0 : classCheckoutPricing.totalWithTax;
                             const startTime = new Date(classSelectedDate!);
                             const [h, m] = String(classSelectedSlot.start_time).slice(0, 5).split(':').map(Number);
                             startTime.setHours(h, m, 0, 0);
@@ -2503,7 +2573,7 @@ export default function PublicBooking() {
                             }).select('id').single();
                             if (appliedCoupon?.couponId && customerId && newAppointment?.id) {
                               const basePrice = Number(services.find(s => s.id === classSelectedSlot.service_id)?.price ?? 0);
-                              const discountAmount = basePrice - finalPrice;
+                              const discountAmount = basePrice - subtotalAfterCoupon(basePrice, appliedCoupon);
                               try {
                                 await supabase.rpc('record_coupon_usage', {
                                   _coupon_id: appliedCoupon.couponId,
@@ -3328,21 +3398,24 @@ export default function PublicBooking() {
                         </span>
                       </div>
                     )}
+                    <div className="flex justify-between py-2 border-b border-border">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="font-medium">
+                        {formatCurrencySimple(checkoutPricing.subtotalAfterCoupon, business?.currency || 'USD')}
+                      </span>
+                    </div>
+                    {checkoutPricing.taxPercent > 0 && (
+                      <div className="flex justify-between py-2 border-b border-border">
+                        <span className="text-muted-foreground">Tax ({checkoutPricing.taxPercent}%)</span>
+                        <span className="font-medium">
+                          {formatCurrencySimple(checkoutPricing.taxAmount, business?.currency || 'USD')}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between py-2 text-lg">
                       <span className="font-semibold">Total</span>
                       <span className="font-bold text-primary">
-                        {(() => {
-                          const basePrice = Number(selectedPackage?.price ?? effectiveService?.price ?? 0);
-                          let finalPrice = basePrice;
-                          if (appliedCoupon) {
-                            if (appliedCoupon.discountType === 'percentage') {
-                              finalPrice = basePrice - (basePrice * appliedCoupon.discount / 100);
-                            } else {
-                              finalPrice = Math.max(0, basePrice - appliedCoupon.discount);
-                            }
-                          }
-                          return formatCurrencySimple(finalPrice, business?.currency || 'USD');
-                        })()}
+                        {formatCurrencySimple(checkoutPricing.totalWithTax, business?.currency || 'USD')}
                       </span>
                     </div>
                   </div>

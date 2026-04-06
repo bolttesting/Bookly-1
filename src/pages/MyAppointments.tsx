@@ -36,7 +36,8 @@ import {
   Camera,
   CalendarClock,
   Repeat,
-  CalendarIcon
+  CalendarIcon,
+  FileDown,
 } from 'lucide-react';
 import { format, isPast, isFuture, isToday, addMinutes, setHours, setMinutes, startOfDay, isBefore, isAfter, addDays, differenceInHours, startOfWeek } from 'date-fns';
 import { Switch } from '@/components/ui/switch';
@@ -53,6 +54,10 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/s
 import { CustomerDashboardSidebar, type CustomerDashboardTab } from '@/components/CustomerDashboardSidebar';
 import { AppLogoMark } from '@/components/brand/AppLogo';
 import { SITE_ORIGIN } from '@/lib/site';
+import {
+  downloadBookingConfirmationPdf,
+  type BookingConfirmationPaymentRow,
+} from '@/lib/bookingConfirmationPdf';
 import { RescheduleRequestDialog } from '@/components/appointments/RescheduleRequestDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ImageSlideshow } from '@/components/ImageSlideshow';
@@ -102,6 +107,38 @@ interface BusinessHours {
   open_time: string;
   close_time: string;
   is_closed: boolean;
+}
+
+interface AppointmentBusinessDetails {
+  id: string;
+  name: string;
+  address?: string | null;
+  city?: string | null;
+  currency?: string | null;
+  reschedule_deadline_hours?: number | null;
+  phone?: string | null;
+  email?: string | null;
+}
+
+interface MyAppointmentRow {
+  id: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  notes?: string | null;
+  price: number | null;
+  service_id: string;
+  staff_id: string | null;
+  business_id: string;
+  location_id: string | null;
+  payment_status?: string | null;
+  payment_id?: string | null;
+  service?: { id: string; name: string; duration: number; buffer_time?: number; slot_capacity?: number } | null;
+  staff?: { id: string; name: string } | null;
+  business?: AppointmentBusinessDetails | null;
+  totalPeopleInSlot?: number;
+  payment?: BookingConfirmationPaymentRow | null;
+  location?: { id: string; name: string; address?: string | null; city?: string | null } | null;
 }
 
 export default function MyAppointments() {
@@ -321,7 +358,9 @@ export default function MyAppointments() {
           service_id,
           staff_id,
           business_id,
-          location_id
+          location_id,
+          payment_status,
+          payment_id
         `)
         .in('customer_id', customerIds)
         .order('start_time', { ascending: true });
@@ -331,18 +370,33 @@ export default function MyAppointments() {
       const serviceIds = [...new Set(data.map(a => a.service_id))];
       const staffIds = [...new Set(data.map(a => a.staff_id).filter(Boolean))];
       const businessIds = [...new Set(data.map(a => a.business_id))];
+      const paymentIds = [...new Set(data.map(a => a.payment_id).filter(Boolean))] as string[];
+      const locationIds = [...new Set(data.map(a => a.location_id).filter(Boolean))] as string[];
 
-      const [servicesRes, staffRes, businessesRes] = await Promise.all([
+      const [servicesRes, staffRes, businessesRes, paymentsRes, locationsRes] = await Promise.all([
         supabase.from('services').select('id, name, duration, buffer_time, slot_capacity').in('id', serviceIds),
         staffIds.length > 0 
           ? supabase.from('staff_members').select('id, name').in('id', staffIds)
           : Promise.resolve({ data: [] }),
-        supabase.from('businesses').select('id, name, address, city, currency, reschedule_deadline_hours').in('id', businessIds),
+        supabase.from('businesses').select('id, name, address, city, currency, reschedule_deadline_hours, phone, email').in('id', businessIds),
+        paymentIds.length > 0
+          ? supabase
+              .from('payments')
+              .select('id, amount, currency, payment_method, status, stripe_charge_id, stripe_payment_intent_id')
+              .in('id', paymentIds)
+          : Promise.resolve({ data: [] }),
+        locationIds.length > 0
+          ? supabase.from('business_locations').select('id, name, address, city').in('id', locationIds)
+          : Promise.resolve({ data: [] }),
       ]);
 
       const services = servicesRes.data || [];
       const staff = staffRes.data || [];
       const businesses = businessesRes.data || [];
+      const paymentRows = paymentsRes.data || [];
+      const locationRows = locationsRes.data || [];
+      const paymentById = Object.fromEntries(paymentRows.map((p) => [p.id, p]));
+      const locationById = Object.fromEntries(locationRows.map((l) => [l.id, l]));
 
       // Get all appointments for the same slots to count people
       // Group by business_id, service_id, and start_time
@@ -380,14 +434,17 @@ export default function MyAppointments() {
       }
 
       // Map appointments with counts
-      return data.map(apt => {
+      return data.map((apt): MyAppointmentRow => {
         const slotKey = `${apt.business_id}|${apt.service_id}|${apt.start_time}`;
+        const pid = apt.payment_id as string | null | undefined;
         return {
-        ...apt,
-        service: services.find(s => s.id === apt.service_id),
-        staff: staff.find(s => s.id === apt.staff_id),
-        business: businesses.find(b => b.id === apt.business_id),
+          ...apt,
+          service: services.find(s => s.id === apt.service_id),
+          staff: staff.find(s => s.id === apt.staff_id),
+          business: businesses.find(b => b.id === apt.business_id) as AppointmentBusinessDetails | undefined,
           totalPeopleInSlot: slotCounts[slotKey] || 1,
+          payment: pid ? paymentById[pid] ?? null : null,
+          location: apt.location_id ? locationById[apt.location_id as string] ?? null : null,
         };
       });
     },
@@ -1391,6 +1448,44 @@ export default function MyAppointments() {
     }
   };
 
+  const handleDownloadBookingConfirmation = (apt: MyAppointmentRow) => {
+    try {
+      const customerName =
+        [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim() ||
+        profile?.email ||
+        user?.email ||
+        'Customer';
+      const loc = apt.location;
+      const locationLine = loc
+        ? [loc.name, [loc.address, loc.city].filter(Boolean).join(', ')].filter(Boolean).join(' — ')
+        : null;
+      downloadBookingConfirmationPdf({
+        bookingRef: apt.id.replace(/-/g, '').slice(0, 12).toUpperCase(),
+        business: {
+          name: apt.business?.name || 'Business',
+          address: apt.business?.address,
+          city: apt.business?.city,
+          phone: apt.business?.phone ?? null,
+          email: apt.business?.email ?? null,
+        },
+        customerName,
+        serviceName: apt.service?.name || 'Service',
+        startTimeIso: apt.start_time,
+        endTimeIso: apt.end_time,
+        staffName: apt.staff?.name ?? null,
+        locationLine,
+        appointmentStatus: apt.status,
+        servicePrice: apt.price,
+        currencyCode: apt.business?.currency || 'USD',
+        paymentStatus: apt.payment_status,
+        payment: apt.payment ?? null,
+      });
+    } catch (e) {
+      console.error(e);
+      toast.error('Could not create the PDF. Please try again.');
+    }
+  };
+
   const filteredServices = safeServices.filter(service => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -1526,7 +1621,17 @@ export default function MyAppointments() {
                               </p>
                             )}
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 sm:flex-initial"
+                              onClick={() => handleDownloadBookingConfirmation(apt)}
+                            >
+                              <FileDown className="h-4 w-4 mr-2" />
+                              Download confirmation
+                            </Button>
                             {(() => {
                               const deadlineHours = apt.business?.reschedule_deadline_hours ?? 24;
                               const now = new Date();
@@ -1588,14 +1693,26 @@ export default function MyAppointments() {
                   {pastAppointments.slice(0, 5).map((apt) => (
                     <Card key={apt.id} className="bg-muted/30">
                       <CardContent className="p-3 sm:p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-sm sm:text-base truncate">{apt.service?.name || 'Service'}</p>
                             <p className="text-xs sm:text-sm text-muted-foreground">
                               {format(new Date(apt.start_time), 'MMM d, yyyy')} at {format(new Date(apt.start_time), 'h:mm a')}
                             </p>
                           </div>
-                          <Badge variant="outline" className="w-fit shrink-0">{apt.status}</Badge>
+                          <div className="flex flex-wrap items-center gap-2 shrink-0">
+                            <Badge variant="outline" className="w-fit">{apt.status}</Badge>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => handleDownloadBookingConfirmation(apt)}
+                            >
+                              <FileDown className="h-3.5 w-3.5 mr-1.5" />
+                              PDF
+                            </Button>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>

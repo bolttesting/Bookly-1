@@ -14,6 +14,15 @@ interface DashboardStats {
   lastWeekCompletionRate: number;
 }
 
+interface AppointmentPaymentSnapshot {
+  amount: number;
+  currency?: string | null;
+  payment_method?: string | null;
+  status?: string | null;
+  stripe_charge_id?: string | null;
+  stripe_payment_intent_id?: string | null;
+}
+
 interface Appointment {
   id: string;
   start_time: string;
@@ -21,6 +30,9 @@ interface Appointment {
   status: string;
   price: number | null;
   notes: string | null;
+  location_id?: string | null;
+  payment_status?: string | null;
+  payment_id?: string | null;
   customer: {
     id: string;
     name: string;
@@ -33,6 +45,8 @@ interface Appointment {
     id: string;
     name: string;
   } | null;
+  payment?: AppointmentPaymentSnapshot | null;
+  location?: { id: string; name: string; address?: string | null; city?: string | null } | null;
 }
 
 interface RevenueData {
@@ -209,6 +223,9 @@ export function useDashboard() {
           status,
           price,
           notes,
+          location_id,
+          payment_status,
+          payment_id,
           customer:customers(id, name),
           service:services(id, name),
           staff:staff_members(id, name)
@@ -227,6 +244,9 @@ export function useDashboard() {
           status,
           price,
           notes,
+          location_id,
+          payment_status,
+          payment_id,
           customer:customers(id, name),
           service:services(id, name),
           staff:staff_members(id, name)
@@ -237,6 +257,34 @@ export function useDashboard() {
         .neq('status', 'cancelled')
         .order('start_time', { ascending: true })
         .limit(4);
+
+      const recentRows = (recent || []) as Appointment[];
+      const upcomingRows = (upcoming || []) as Appointment[];
+      const allDash = [...recentRows, ...upcomingRows];
+      const paymentIds = [...new Set(allDash.map((r) => r.payment_id).filter(Boolean))] as string[];
+      const locationIds = [...new Set(allDash.map((r) => r.location_id).filter(Boolean))] as string[];
+
+      const [paymentsRes, locationsRes] = await Promise.all([
+        paymentIds.length > 0
+          ? supabase
+              .from('payments')
+              .select('id, amount, currency, payment_method, status, stripe_charge_id, stripe_payment_intent_id')
+              .in('id', paymentIds)
+          : Promise.resolve({ data: [] as AppointmentPaymentSnapshot[] }),
+        locationIds.length > 0
+          ? supabase.from('business_locations').select('id, name, address, city').in('id', locationIds)
+          : Promise.resolve({ data: [] as { id: string; name: string; address?: string | null; city?: string | null }[] }),
+      ]);
+
+      const paymentById = Object.fromEntries((paymentsRes.data || []).map((p) => [p.id, p]));
+      const locationById = Object.fromEntries((locationsRes.data || []).map((l) => [l.id, l]));
+
+      const attachMeta = (rows: Appointment[]): Appointment[] =>
+        rows.map((r) => ({
+          ...r,
+          payment: r.payment_id ? paymentById[r.payment_id as string] ?? null : null,
+          location: r.location_id ? locationById[r.location_id as string] ?? null : null,
+        }));
 
       return {
         stats: {
@@ -249,8 +297,8 @@ export function useDashboard() {
           completionRate,
           lastWeekCompletionRate: 0,
         },
-        recentAppointments: (recent as unknown as Appointment[]) || [],
-        upcomingAppointments: (upcoming as unknown as Appointment[]) || [],
+        recentAppointments: attachMeta(recentRows),
+        upcomingAppointments: attachMeta(upcomingRows),
         weeklyRevenue: weeklyRevenueData,
       };
     },

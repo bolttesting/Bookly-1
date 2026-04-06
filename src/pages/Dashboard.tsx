@@ -59,7 +59,18 @@ const Dashboard = () => {
       </div>
 
       {/* Recent Appointments */}
-      <RecentAppointments appointments={recentAppointments} loading={loading} />
+      <RecentAppointments
+        appointments={recentAppointments}
+        business={{
+          name: business.name,
+          address: business.address,
+          city: business.city,
+          phone: business.phone,
+          email: business.email,
+          currency: business.currency,
+        }}
+        loading={loading}
+      />
     </div>
   );
 };

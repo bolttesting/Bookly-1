@@ -1,4 +1,4 @@
-import { MoreVertical, Edit, Trash2 } from "lucide-react";
+import { MoreVertical, Edit, Trash2, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,22 +9,38 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { format, isToday, isTomorrow } from "date-fns";
+import { format as formatDateFns, isToday, isTomorrow } from "date-fns";
 import { Link, useNavigate } from "react-router-dom";
 import { useCurrency } from "@/hooks/useCurrency";
+import { downloadBookingConfirmationPdf, type BookingConfirmationPaymentRow } from "@/lib/bookingConfirmationPdf";
 
 interface Appointment {
   id: string;
   start_time: string;
+  end_time: string;
   status: string;
   price: number | null;
+  payment_status?: string | null;
+  payment_id?: string | null;
   customer: { id: string; name: string };
   service: { id: string; name: string };
   staff: { id: string; name: string } | null;
+  payment?: BookingConfirmationPaymentRow | null;
+  location?: { id: string; name: string; address?: string | null; city?: string | null } | null;
+}
+
+interface RecentAppointmentsBusiness {
+  name: string;
+  address?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  currency?: string | null;
 }
 
 interface RecentAppointmentsProps {
   appointments: Appointment[];
+  business: RecentAppointmentsBusiness;
   loading?: boolean;
 }
 
@@ -32,7 +48,7 @@ function formatDate(dateString: string) {
   const date = new Date(dateString);
   if (isToday(date)) return "Today";
   if (isTomorrow(date)) return "Tomorrow";
-  return format(date, "MMM d");
+  return formatDateFns(date, "MMM d");
 }
 
 function getStatusColor(status: string) {
@@ -48,8 +64,8 @@ function getStatusColor(status: string) {
   }
 }
 
-export function RecentAppointments({ appointments, loading }: RecentAppointmentsProps) {
-  const { format } = useCurrency();
+export function RecentAppointments({ appointments, business, loading }: RecentAppointmentsProps) {
+  const { format: formatMoney } = useCurrency();
   const navigate = useNavigate();
   
   if (loading) {
@@ -107,14 +123,14 @@ export function RecentAppointments({ appointments, loading }: RecentAppointments
                   <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{apt.service?.name || 'Unknown'}</TableCell>
                   <TableCell className="text-xs sm:text-sm hidden md:table-cell">{apt.staff?.name || 'Unassigned'}</TableCell>
                   <TableCell className="text-xs sm:text-sm">
-                    {formatDate(apt.start_time)}, {format(new Date(apt.start_time), "h:mm a")}
+                    {formatDate(apt.start_time)}, {formatDateFns(new Date(apt.start_time), "h:mm a")}
                   </TableCell>
                   <TableCell>
                     <Badge className={`${getStatusColor(apt.status)} text-xs`}>
                       {apt.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{format(apt.price || 0)}</TableCell>
+                  <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{formatMoney(apt.price || 0)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -123,6 +139,38 @@ export function RecentAppointments({ appointments, loading }: RecentAppointments
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="glass-card">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            const loc = apt.location;
+                            const locationLine = loc
+                              ? [loc.name, [loc.address, loc.city].filter(Boolean).join(", ")].filter(Boolean).join(" — ")
+                              : null;
+                            downloadBookingConfirmationPdf({
+                              bookingRef: apt.id.replace(/-/g, "").slice(0, 12).toUpperCase(),
+                              business: {
+                                name: business.name,
+                                address: business.address,
+                                city: business.city,
+                                phone: business.phone ?? null,
+                                email: business.email ?? null,
+                              },
+                              customerName: apt.customer?.name || "Customer",
+                              serviceName: apt.service?.name || "Service",
+                              startTimeIso: apt.start_time,
+                              endTimeIso: apt.end_time,
+                              staffName: apt.staff?.name ?? null,
+                              locationLine,
+                              appointmentStatus: apt.status,
+                              servicePrice: apt.price,
+                              currencyCode: business.currency || "USD",
+                              paymentStatus: apt.payment_status,
+                              payment: apt.payment ?? null,
+                            });
+                          }}
+                        >
+                          <FileDown className="h-4 w-4 mr-2" />
+                          Download confirmation
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => navigate(`/calendar?appointment=${apt.id}`)}>
                           <Edit className="h-4 w-4 mr-2" />
                           View Details

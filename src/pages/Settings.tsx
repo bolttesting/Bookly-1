@@ -1370,6 +1370,36 @@ const Settings = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     Configure when and how customers pay for appointments. These settings apply to all services with a price.
                   </p>
+
+                  <div className="space-y-2 p-4 bg-secondary/50 rounded-lg border border-border/60">
+                    <p className="text-sm font-medium">Sales tax on customer checkout</p>
+                    <Label htmlFor="customerBookingTaxPercent">Tax rate (%)</Label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        id="customerBookingTaxPercent"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.01}
+                        value={business.customer_booking_tax_percent ?? 0}
+                        onChange={async (e) => {
+                          const v = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                          try {
+                            await updateBusiness({ customer_booking_tax_percent: v });
+                          } catch {
+                            toast.error('Failed to update tax');
+                          }
+                        }}
+                        className="max-w-32"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        Applied after any coupon, on your public booking page and class checkout. Shown as a separate line (Subtotal, Tax, Total).
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      The stored appointment total includes this tax. Your Bookly platform subscription uses the tax set in super admin, not this field.
+                    </p>
+                  </div>
                   
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-secondary/50 rounded-lg">
                     <div className="flex-1">
@@ -1507,32 +1537,6 @@ const Settings = () => {
                     </div>
                   )}
 
-                  <div className="space-y-2 p-4 bg-secondary/50 rounded-lg border border-border/60">
-                    <Label htmlFor="customerBookingTaxPercent">Customer booking tax (%)</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="customerBookingTaxPercent"
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.01}
-                        value={business.customer_booking_tax_percent ?? 0}
-                        onChange={async (e) => {
-                          const v = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
-                          try {
-                            await updateBusiness({ customer_booking_tax_percent: v });
-                          } catch {
-                            toast.error('Failed to update tax');
-                          }
-                        }}
-                        className="max-w-32"
-                      />
-                      <span className="text-sm text-muted-foreground">applied to customer charges</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Used for class and booking invoices when you collect payment from customers. Your Bookly subscription checkout uses the tax set by the platform in super admin.
-                    </p>
-                  </div>
                 </div>
 
                 <Separator />
