@@ -134,6 +134,24 @@ export function useBusiness() {
 
     if (roleError) throw roleError;
 
+    if (defaultPlan?.id) {
+      const meta = user.user_metadata as Record<string, unknown> | undefined;
+      const accountName =
+        (typeof meta?.full_name === 'string' && meta.full_name.trim()) ||
+        (typeof meta?.name === 'string' && meta.name.trim()) ||
+        user.email?.split('@')[0] ||
+        null;
+      const { error: freeInvErr } = await supabase.rpc('record_free_platform_subscription_invoice', {
+        p_business_id: newBusiness.id,
+        p_plan_id: defaultPlan.id,
+        p_account_email: user.email ?? null,
+        p_account_name: accountName,
+      });
+      if (freeInvErr) {
+        console.warn('[createBusiness] record_free_platform_subscription_invoice:', freeInvErr);
+      }
+    }
+
     queryClient.setQueryData(['business', user.id], { business: newBusiness, role: 'owner' });
     return newBusiness;
   };

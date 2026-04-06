@@ -226,10 +226,30 @@ export function useBusinessSubscription() {
           // Don't throw - subscription update succeeded
         }
       }
+
+      // $0 plans (e.g. Starter): store a platform invoice with zero totals (no Stripe session)
+      if (plan.price <= 0) {
+        const meta = user?.user_metadata as Record<string, unknown> | undefined;
+        const accountName =
+          (typeof meta?.full_name === 'string' && meta.full_name.trim()) ||
+          (typeof meta?.name === 'string' && meta.name.trim()) ||
+          user?.email?.split('@')[0] ||
+          null;
+        const { error: freeInvErr } = await supabase.rpc('record_free_platform_subscription_invoice', {
+          p_business_id: business.id,
+          p_plan_id: planId,
+          p_account_email: user?.email ?? null,
+          p_account_name: accountName,
+        });
+        if (freeInvErr) {
+          console.error('record_free_platform_subscription_invoice:', freeInvErr);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['business-subscription'] });
       queryClient.invalidateQueries({ queryKey: ['business'] });
+      queryClient.invalidateQueries({ queryKey: ['platformSubscriptionInvoices'] });
       toast.success('Subscription updated successfully!');
     },
     onError: (error: Error) => {

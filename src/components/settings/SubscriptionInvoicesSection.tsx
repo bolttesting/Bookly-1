@@ -35,8 +35,8 @@ export function SubscriptionInvoicesSection({ businessId }: Props) {
             <CardTitle>Bookly subscription invoices</CardTitle>
           </div>
           <CardDescription>
-            Invoices for your paid Bookly plan upgrades. Each successful Stripe checkout creates one invoice for that
-            billing period.
+            Invoices for your Bookly plan (free and paid). Amounts use each plan&apos;s currency; paid upgrades also
+            create a Stripe receipt when available.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -46,7 +46,8 @@ export function SubscriptionInvoicesSection({ businessId }: Props) {
             </div>
           ) : invoices.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">
-              No paid subscription checkouts yet. When you upgrade to a paid plan, your invoice will appear here.
+              No subscription invoices yet. Choosing a free plan or completing a paid upgrade creates an invoice here,
+              including zero totals in that plan&apos;s currency (e.g. AED 0.00 or USD 0.00).
             </p>
           ) : (
             <div className="rounded-md border overflow-x-auto">

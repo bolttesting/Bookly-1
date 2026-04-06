@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CreditCard, Check, Plus, Pencil, Trash2, ExternalLink, Loader2, Package } from 'lucide-react';
 import { toast } from 'sonner';
-import { CURRENCIES } from '@/lib/currency';
+import { CURRENCIES, getCurrencyByCode } from '@/lib/currency';
 import { SubscriptionPlanDialog } from '@/components/subscriptions/SubscriptionPlanDialog';
 
 export default function SuperAdminPlans() {
@@ -247,7 +247,7 @@ export default function SuperAdminPlans() {
             ) : (
               <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {subscriptionPlans.map((plan) => {
-                  const currency = CURRENCIES.find(c => c.code === plan.currency) || CURRENCIES[0];
+                  const currency = getCurrencyByCode(plan.currency);
                   return (
                     <Card
                       key={plan.id}

@@ -18,7 +18,7 @@ export const CURRENCIES: Currency[] = [
   { code: 'CNY', symbol: '¥', name: 'Chinese Yuan', locale: 'zh-CN' },
   { code: 'INR', symbol: '₹', name: 'Indian Rupee', locale: 'en-IN' },
   { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar', locale: 'en-SG' },
-  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham', locale: 'ar-AE' },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham', locale: 'en-AE' },
   { code: 'SAR', symbol: '﷼', name: 'Saudi Riyal', locale: 'ar-SA' },
   { code: 'PKR', symbol: '₨', name: 'Pakistani Rupee', locale: 'en-PK' },
   { code: 'BRL', symbol: 'R$', name: 'Brazilian Real', locale: 'pt-BR' },
@@ -26,35 +26,37 @@ export const CURRENCIES: Currency[] = [
 ];
 
 export function getCurrencyByCode(code: string): Currency {
-  return CURRENCIES.find(c => c.code === code) || CURRENCIES[0];
+  const upper = (code || 'USD').toUpperCase();
+  return CURRENCIES.find((c) => c.code === upper) || CURRENCIES[0];
 }
 
 export function formatCurrency(amount: number | null | undefined, currencyCode: string = 'USD'): string {
-  const currency = getCurrencyByCode(currencyCode);
-  
-  // For currencies without decimals (like JPY)
-  const decimals = ['JPY', 'KRW'].includes(currencyCode) ? 0 : 2;
-  
-  // Handle null, undefined, or non-number values
+  const code = (currencyCode || 'USD').toUpperCase();
+  const known = CURRENCIES.find((c) => c.code === code);
+
+  const decimals = ['JPY', 'KRW'].includes(code) ? 0 : 2;
   const numAmount = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
-  
-  // Use Intl.NumberFormat for proper formatting
-  try {
-    return new Intl.NumberFormat(currency.locale, {
-      style: 'currency',
-      currency: currencyCode,
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    }).format(numAmount);
-  } catch {
-    // Fallback if locale is not supported
-    return `${currency.symbol}${numAmount.toFixed(decimals)}`;
+
+  const locales = known ? [known.locale, 'en-US'] : ['en-US'];
+  for (const locale of locales) {
+    try {
+      return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }).format(numAmount);
+    } catch {
+      /* try next locale */
+    }
   }
+  return `${known?.symbol ?? code} ${numAmount.toFixed(decimals)}`;
 }
 
 export function formatCurrencySimple(amount: number | null | undefined, currencyCode: string = 'USD'): string {
-  const currency = getCurrencyByCode(currencyCode);
-  const decimals = ['JPY', 'KRW'].includes(currencyCode) ? 0 : 2;
+  const code = (currencyCode || 'USD').toUpperCase();
+  const currency = getCurrencyByCode(code);
+  const decimals = ['JPY', 'KRW'].includes(code) ? 0 : 2;
   // Handle null, undefined, or non-number values
   const numAmount = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
   return `${currency.symbol}${numAmount.toFixed(decimals)}`;
