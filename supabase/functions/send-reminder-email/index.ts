@@ -1,8 +1,10 @@
+// @ts-nocheck - Supabase Edge Function (Deno); IDE may not have Deno types
 // Supabase Edge Function to send reminder emails
 // Uses business's own Resend if configured, else platform RESEND_API_KEY
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { emailBrandFooterHtml, emailBrandHeaderImgHtml } from "./email-brand.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -89,6 +91,7 @@ serve(async (req) => {
       <body>
         <div class="container">
           <div class="header">
+            ${emailBrandHeaderImgHtml()}
             <h1>Appointment Reminder</h1>
           </div>
           <div class="content">
@@ -124,6 +127,7 @@ serve(async (req) => {
             <p>${businessName}</p>
             <p>This is an automated reminder email.</p>
           </div>
+          ${emailBrandFooterHtml()}
         </div>
       </body>
       </html>

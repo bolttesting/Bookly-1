@@ -5,6 +5,7 @@
  */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { emailBrandFooterHtml, emailBrandHeaderImgHtml } from "./email-brand.ts";
 
 const PLATFORM_RESEND_KEY = Deno.env.get("RESEND_API_KEY");
 const DEFAULT_FROM = "Bookly <noreply@bookly.my>";
@@ -103,6 +104,7 @@ const handler = async (req: Request): Promise<Response> => {
       <body>
         <div class="container">
           <div class="header">
+            ${emailBrandHeaderImgHtml()}
             <h1>Appointment Confirmed!</h1>
           </div>
           <div class="content">
@@ -137,6 +139,7 @@ const handler = async (req: Request): Promise<Response> => {
             <p>${businessName}</p>
             <p>This is an automated confirmation email.</p>
           </div>
+          ${emailBrandFooterHtml()}
         </div>
       </body>
       </html>

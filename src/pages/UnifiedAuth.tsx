@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Loader2, Calendar, Building2, Eye, EyeOff, Home, KeyRound } from 'lucide-react';
+import { AppLogo } from '@/components/brand/AppLogo';
+import { Loader2, Building2, Eye, EyeOff, Home, KeyRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import {
@@ -241,10 +242,10 @@ export default function UnifiedAuth() {
         <div className="absolute inset-0 bg-gradient-to-br from-background via-background/50 to-transparent" />
         <div className="relative z-10 flex flex-col justify-center px-8 xl:px-16 2xl:px-24">
           <div className="flex items-center gap-3 mb-6 xl:mb-8">
-            <div className="h-10 w-10 xl:h-12 xl:w-12 rounded-xl bg-primary flex items-center justify-center glow">
-              <Calendar className="h-5 w-5 xl:h-6 xl:w-6 text-primary-foreground" />
-            </div>
-            <span className="text-2xl xl:text-3xl font-display font-bold gradient-text">Bookly</span>
+            <AppLogo
+              iconClassName="h-10 w-10 xl:h-12 xl:w-12 glow"
+              wordmarkClassName="text-2xl xl:text-3xl gradient-text"
+            />
           </div>
           <h1 className="text-3xl xl:text-4xl 2xl:text-5xl font-display font-bold text-foreground mb-4 xl:mb-6 leading-tight">
             Streamline your booking business
@@ -260,10 +261,7 @@ export default function UnifiedAuth() {
         <div className="w-full max-w-md">
           {/* Mobile branding */}
           <div className="flex lg:hidden items-center gap-3 mb-8 justify-center">
-            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center glow">
-              <Calendar className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="text-2xl font-display font-bold gradient-text">Bookly</span>
+            <AppLogo iconClassName="h-10 w-10 glow" wordmarkClassName="text-2xl gradient-text" />
           </div>
 
           {fromLanding && user && !authLoading && !isRecovery && (

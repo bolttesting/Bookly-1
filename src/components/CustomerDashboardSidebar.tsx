@@ -1,3 +1,4 @@
+import { AppLogoMark } from '@/components/brand/AppLogo';
 import {
   CalendarPlus,
   Calendar,
@@ -51,18 +52,12 @@ export function CustomerDashboardSidebar({ activeTab, onTabChange }: CustomerDas
       collapsible="icon"
     >
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary glow shrink-0">
-            <Calendar className="h-5 w-5 text-primary-foreground" />
-          </div>
+        <div className={cn('flex min-w-0 items-center gap-3', collapsed && 'justify-center')}>
+          <AppLogoMark decorative={!collapsed} className="h-10 w-10 shrink-0 glow" />
           {!collapsed && (
-            <div className="flex flex-col min-w-0">
-              <span className="font-display text-lg font-bold text-foreground truncate">
-                Bookly
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Appointments & bookings
-              </span>
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate font-display text-lg font-bold text-foreground">Bookly</span>
+              <span className="text-xs text-muted-foreground">Appointments & bookings</span>
             </div>
           )}
         </div>

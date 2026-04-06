@@ -32,6 +32,7 @@ import { notifyBusinessUsers } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import { ImageSlideshow } from '@/components/ImageSlideshow';
+import { PoweredByBookly } from '@/components/brand/PoweredByBookly';
 
 interface Business {
   id: string;
@@ -3590,14 +3591,7 @@ export default function PublicBooking() {
         )}
       </main>
 
-      {/* Footer - hidden in embed mode */}
-      {!isEmbedded && (
-        <footer className="border-t border-border/50 py-6 mt-12">
-          <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-            <p>Powered by <span className="font-semibold gradient-text">Bookly</span></p>
-          </div>
-        </footer>
-      )}
+      <PoweredByBookly compact={isEmbedded} />
     </div>
   );
 }

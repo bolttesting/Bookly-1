@@ -1,7 +1,9 @@
+// @ts-nocheck - Supabase Edge Function (Deno); IDE may not have Deno types
 // Send daily booking summary email to business owners/admins
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { emailBrandFooterHtml, emailBrandHeaderImgHtml } from "./email-brand.ts";
 
 const PLATFORM_RESEND_KEY = Deno.env.get("RESEND_API_KEY");
 const DEFAULT_FROM = "Bookly <noreply@bookly.my>";
@@ -102,6 +104,7 @@ serve(async (req) => {
       <body>
         <div class="container">
           <div class="header">
+            ${emailBrandHeaderImgHtml()}
             <h1>Daily Booking Summary</h1>
           </div>
           <div class="content">
@@ -127,6 +130,7 @@ serve(async (req) => {
             <p>${businessName}</p>
             <p>This is an automated daily summary from Bookly.</p>
           </div>
+          ${emailBrandFooterHtml()}
         </div>
       </body>
       </html>

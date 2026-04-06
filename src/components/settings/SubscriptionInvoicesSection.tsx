@@ -19,6 +19,7 @@ import {
 } from '@/lib/subscriptionInvoiceDisplay';
 import { Check, ChevronDown, FileDown, FileText, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AppLogo } from '@/components/brand/AppLogo';
 
 type Props = {
   businessId: string | undefined;
@@ -124,7 +125,12 @@ export function SubscriptionInvoicesSection({ businessId }: Props) {
             </DialogDescription>
           </DialogHeader>
 
-          <p className="mb-5 text-center text-lg font-semibold tracking-tight text-white">Bookly</p>
+          <div className="mb-5 flex justify-center">
+            <AppLogo
+              iconClassName="h-9 w-9 shadow-md"
+              wordmarkClassName="text-lg font-semibold tracking-tight text-white"
+            />
+          </div>
 
           {viewing && (
             <div className="w-full rounded-xl bg-white px-6 pb-8 pt-9 text-neutral-900 shadow-2xl ring-1 ring-black/5 sm:px-8">

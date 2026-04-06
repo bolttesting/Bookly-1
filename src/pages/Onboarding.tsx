@@ -15,7 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Calendar, Building2, ArrowRight, LogOut } from 'lucide-react';
+import { AppLogo } from '@/components/brand/AppLogo';
+import { Loader2, Building2, ArrowRight, LogOut } from 'lucide-react';
 
 const businessSchema = z.object({
   name: z.string().trim().min(2, 'Business name must be at least 2 characters').max(100, 'Business name is too long'),
@@ -99,10 +100,10 @@ export default function Onboarding() {
         <div className="absolute inset-0 bg-gradient-to-br from-background via-background/50 to-transparent" />
         <div className="relative z-10 flex flex-col justify-center px-16 xl:px-24">
           <div className="flex items-center gap-3 mb-8">
-            <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center glow">
-              <Calendar className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <span className="text-2xl sm:text-3xl font-display font-bold gradient-text">Bookly</span>
+            <AppLogo
+              iconClassName="h-12 w-12 glow"
+              wordmarkClassName="text-2xl sm:text-3xl gradient-text"
+            />
           </div>
           <h1 className="text-4xl xl:text-5xl font-display font-bold text-foreground mb-6 leading-tight">
             Let's set up your <br />
@@ -138,10 +139,7 @@ export default function Onboarding() {
         <div className="w-full max-w-md">
           {/* Mobile branding */}
           <div className="flex lg:hidden items-center gap-3 mb-8 justify-center">
-            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center glow">
-              <Calendar className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="text-2xl font-display font-bold gradient-text">Bookly</span>
+            <AppLogo iconClassName="h-10 w-10 glow" wordmarkClassName="text-2xl gradient-text" />
           </div>
 
           <Card className="glass-card border-border/50">

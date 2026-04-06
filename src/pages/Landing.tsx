@@ -24,8 +24,8 @@ import { DEFAULT_SUPPORT_EMAIL } from "@/lib/site";
 import { useSeo } from "@/hooks/useSeo";
 import { buildLandingJsonLd, DEFAULT_SEO_DESCRIPTION, DEFAULT_SEO_TITLE, injectJsonLd, removeJsonLd } from "@/lib/seo";
 import { Loader2 } from "lucide-react";
+import { AppLogo } from '@/components/brand/AppLogo';
 import { 
-  Calendar, 
   CheckCircle, 
   ArrowRight,
   Sparkles,
@@ -109,10 +109,7 @@ const Landing = () => {
       <nav className={`fixed top-0 left-0 right-0 z-50 glass-card border-b border-border/50 backdrop-blur-xl transition-all duration-300 ${navScrolled ? 'shadow-lg' : ''}`}>
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
-            </div>
-            <span className="text-lg sm:text-xl font-display font-bold">Bookly</span>
+            <AppLogo wordmarkClassName="text-lg sm:text-xl text-foreground" />
           </Link>
           
           {/* Desktop Navigation - full nav from md (768px) up */}
@@ -204,10 +201,7 @@ const Landing = () => {
               <div className="flex flex-col h-full">
                 <div className="flex items-center mb-6">
                   <Link to="/" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
-                    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                      <Calendar className="w-5 h-5 text-primary-foreground" />
-                    </div>
-                    <span className="text-xl font-display font-bold">Bookly</span>
+                    <AppLogo iconClassName="h-8 w-8" wordmarkClassName="text-xl text-foreground" />
                   </Link>
                 </div>
 

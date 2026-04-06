@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, Calendar, User, Eye, EyeOff, Home, KeyRound } from 'lucide-react';
+import { AppLogo } from '@/components/brand/AppLogo';
+import { Loader2, User, Eye, EyeOff, Home, KeyRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   Dialog,
@@ -212,10 +213,7 @@ export default function CustomerAuth() {
         <div className="absolute inset-0 bg-gradient-to-br from-background via-background/50 to-transparent" />
         <div className="relative z-10 flex flex-col justify-center px-16 xl:px-24">
           <div className="flex items-center gap-3 mb-8">
-            <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center glow">
-              <Calendar className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <span className="text-3xl font-display font-bold gradient-text">Bookly</span>
+            <AppLogo iconClassName="h-12 w-12 glow" wordmarkClassName="text-3xl gradient-text" />
           </div>
           <h1 className="text-4xl xl:text-5xl font-display font-bold text-foreground mb-6 leading-tight">
             Your appointments, <br />
@@ -232,10 +230,7 @@ export default function CustomerAuth() {
         <div className="w-full max-w-md">
           {/* Mobile branding */}
           <div className="flex lg:hidden items-center gap-3 mb-8 justify-center">
-            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center glow">
-              <Calendar className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="text-2xl font-display font-bold gradient-text">Bookly</span>
+            <AppLogo iconClassName="h-10 w-10 glow" wordmarkClassName="text-2xl gradient-text" />
           </div>
 
           {isRecovery ? (

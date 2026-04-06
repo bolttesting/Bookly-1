@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { Calendar, Mail, Phone, MapPin, Facebook, Instagram, Linkedin } from "lucide-react";
+import { Mail, Phone, MapPin, Facebook, Instagram, Linkedin } from "lucide-react";
+import { AppLogo } from "@/components/brand/AppLogo";
 import { TextHoverEffect, FooterBackgroundGradient } from "@/components/ui/hover-footer";
 import {
   Accordion,
@@ -168,10 +169,10 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
         {/* Brand — mobile only (desktop uses first grid column) */}
         <div className="flex flex-col space-y-4 pb-4 mb-2 md:hidden">
           <Link to="/" className="flex items-center gap-2 w-fit">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
-              <Calendar className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="text-2xl sm:text-3xl font-display font-bold text-foreground">Bookly</span>
+            <AppLogo
+              iconClassName="h-10 w-10"
+              wordmarkClassName="text-2xl sm:text-3xl text-foreground"
+            />
           </Link>
           <p className="text-sm text-muted-foreground leading-relaxed max-w-md">
             The all-in-one booking platform for service businesses. Manage appointments, clients, and staff from one
@@ -211,10 +212,10 @@ export function LandingHoverFooter({ footerLinks, siteSettings, hasBlog }: Landi
         <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-5 gap-10 md:gap-x-12 md:gap-y-10 lg:gap-12 pb-6 lg:pb-10">
           <div className="flex flex-col space-y-4 md:col-span-2 lg:col-span-1 lg:max-w-sm">
             <Link to="/" className="flex items-center gap-2 w-fit">
-              <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                <Calendar className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-2xl sm:text-3xl font-display font-bold text-foreground">Bookly</span>
+              <AppLogo
+                iconClassName="h-10 w-10"
+                wordmarkClassName="text-2xl sm:text-3xl text-foreground"
+              />
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed">
               The all-in-one booking platform for service businesses. Manage appointments, clients, and staff from one

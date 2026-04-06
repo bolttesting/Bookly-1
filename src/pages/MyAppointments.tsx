@@ -51,6 +51,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { CustomerDashboardSidebar, type CustomerDashboardTab } from '@/components/CustomerDashboardSidebar';
+import { AppLogoMark } from '@/components/brand/AppLogo';
+import { SITE_ORIGIN } from '@/lib/site';
 import { RescheduleRequestDialog } from '@/components/appointments/RescheduleRequestDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ImageSlideshow } from '@/components/ImageSlideshow';
@@ -1434,9 +1436,19 @@ export default function MyAppointments() {
           {/* Header */}
           <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-40 shrink-0">
             <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-3 sm:py-4 min-w-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <SidebarTrigger className="lg:hidden" />
-                <span className="text-lg sm:text-xl font-display font-bold truncate">My Dashboard</span>
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+                <SidebarTrigger className="shrink-0 lg:hidden" />
+                <span className="truncate font-display text-lg font-bold sm:text-xl">My Dashboard</span>
+                <a
+                  href={SITE_ORIGIN}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1 hidden items-center gap-1.5 rounded-md text-muted-foreground transition-colors hover:text-foreground md:inline-flex"
+                  title="Bookly"
+                >
+                  <AppLogoMark className="h-5 w-5" decorative />
+                  <span className="text-xs font-medium">Bookly</span>
+                </a>
               </div>
               <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                 <ThemeToggle />
