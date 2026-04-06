@@ -6,7 +6,7 @@ export interface PlatformSubscriptionInvoice {
   business_id: string;
   subscription_plan_id: string | null;
   plan_name: string;
-  stripe_checkout_session_id: string;
+  stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
   stripe_charge_id: string | null;
   stripe_customer_id: string | null;
