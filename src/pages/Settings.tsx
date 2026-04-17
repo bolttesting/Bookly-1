@@ -89,7 +89,7 @@ function ReminderSettingsPlaceholder({
 const Settings = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { business, updateBusiness, refetch: refetchBusiness } = useBusiness();
+  const { business, role, updateBusiness, refetch: refetchBusiness } = useBusiness();
   const { uploadImages, isUploading: isLogoUploading } = useBusinessImageUpload();
   const { currencyCode, currencies } = useCurrency();
   const { plans: subscriptionPlans, isLoading: plansLoading } = useSubscriptionPlans();
@@ -120,6 +120,7 @@ const Settings = () => {
   const [logoDragActive, setLogoDragActive] = useState(false);
   const [stripeConnectEmail, setStripeConnectEmail] = useState('');
   const qrRef = useRef<HTMLDivElement>(null);
+  const canManageStripe = role === 'owner' || role === 'admin';
 
   useEffect(() => {
     if (!stripeConnectEmail && (user?.email || business?.email)) {
@@ -129,6 +130,7 @@ const Settings = () => {
 
   // Handle subscription checkout redirect from Stripe
   const processedCheckoutRef = useRef<string | null>(null);
+  const processedStripeReturnRef = useRef<string | null>(null);
   useEffect(() => {
     const checkout = searchParams.get('checkout');
     const sessionId = searchParams.get('session_id');
@@ -166,6 +168,48 @@ const Settings = () => {
       });
     })();
   }, [searchParams, queryClient, setSearchParams, refetchBusiness]);
+
+  // Handle Stripe Connect return (from account onboarding)
+  useEffect(() => {
+    if (!business?.id) return;
+    const stripeSuccess = searchParams.get('stripe_success');
+    const stripeRefresh = searchParams.get('stripe_refresh');
+
+    if (!stripeSuccess && !stripeRefresh) return;
+    const marker = `${business.id}:${stripeSuccess ? 'success' : 'refresh'}`;
+    if (processedStripeReturnRef.current === marker) return;
+    processedStripeReturnRef.current = marker;
+
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('stripe-connect', {
+          body: { action: 'status', business_id: business.id },
+        });
+
+        if (error || data?.error) {
+          toast.error(data?.error || error?.message || 'Failed to verify Stripe connection status');
+          return;
+        }
+
+        queryClient.invalidateQueries({ queryKey: ['business'] });
+        await refetchBusiness();
+
+        if (data?.connected) {
+          toast.success('Stripe connected successfully. You can now accept payments.');
+        } else if (stripeRefresh) {
+          toast.info('Stripe onboarding is not complete yet. Please finish all required steps in Stripe.');
+        } else {
+          toast.info('Stripe account created, but onboarding is not complete yet. Finish Stripe verification to accept payments.');
+        }
+      } finally {
+        setSearchParams((p) => {
+          p.delete('stripe_success');
+          p.delete('stripe_refresh');
+          return p;
+        });
+      }
+    })();
+  }, [business?.id, searchParams, setSearchParams, queryClient, refetchBusiness]);
 
   useEffect(() => {
     if (emailConfig) {
@@ -1547,7 +1591,12 @@ const Settings = () => {
 
                 <Button
                   variant="outline"
+                  disabled={!canManageStripe}
                   onClick={async () => {
+                    if (!canManageStripe) {
+                      toast.error('Only owners and admins can manage Stripe connection');
+                      return;
+                    }
                     if (!business?.id) return;
                     const { error } = await supabase
                       .from('businesses')
@@ -1590,8 +1639,13 @@ const Settings = () => {
                     </p>
                   </div>
                   <Button
+                    disabled={!canManageStripe}
                     onClick={async () => {
                       try {
+                        if (!canManageStripe) {
+                          toast.error('Only owners and admins can manage Stripe connection');
+                          return;
+                        }
                         if (!business?.id) {
                           toast.error('Business not found');
                           return;
@@ -1649,6 +1703,11 @@ const Settings = () => {
                     <CreditCard className="h-4 w-4" />
                     Connect Stripe Account
                   </Button>
+                  {!canManageStripe && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Only business owners/admins can connect or disconnect Stripe.
+                    </p>
+                  )}
                 </div>
                 <div className="text-sm text-muted-foreground space-y-2">
                   <p className="font-medium">What you'll need:</p>

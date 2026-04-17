@@ -35,24 +35,42 @@ serve(async (req) => {
   }
 
   try {
-    let body: { business_id?: string; email?: string; user_id?: string };
+    let body: { action?: string; business_id?: string; email?: string; user_id?: string };
     try {
       body = await req.json();
     } catch {
       return jsonResponse({ error: "Invalid JSON body" }, 400);
     }
-    const { business_id, email: bodyEmail, user_id: bodyUserId } = body || {};
+    const { action, business_id, email: bodyEmail, user_id: bodyUserId } = body || {};
 
     if (!business_id) {
       return jsonResponse({ error: "business_id is required" }, 400);
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseAnonKey || !supabaseServiceKey) {
+      return jsonResponse({ error: "Supabase keys are not configured for function authorization." }, 500);
+    }
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return jsonResponse({ error: "Missing Authorization header." }, 401);
+    }
+
+    const callerClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user: caller }, error: authError } = await callerClient.auth.getUser();
+    if (authError || !caller) {
+      return jsonResponse({ error: "Unauthorized request." }, 401);
     }
 
     const stripe = new Stripe(stripeKey, {
       apiVersion: "2026-01-28.clover",
     });
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const siteUrl = Deno.env.get("SITE_URL") || "https://bookly.my";
     if (!Deno.env.get("SITE_URL")) {
       console.warn("SITE_URL secret not set; using default https://bookly.my. Set SITE_URL in Edge Function secrets for staging or http://localhost:8081 for local.");
@@ -63,11 +81,64 @@ serve(async (req) => {
     // Check if business already has Stripe account, and fetch email if needed
     if (supabaseServiceKey) {
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      const { data: roleRow } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", caller.id)
+        .eq("business_id", business_id)
+        .maybeSingle();
+      if (!roleRow || !["owner", "admin"].includes(roleRow.role)) {
+        return jsonResponse({ error: "Forbidden. Only owners/admins can manage Stripe for this business." }, 403);
+      }
+
       const { data: biz } = await supabase
         .from("businesses")
         .select("stripe_account_id, email")
         .eq("id", business_id)
         .single();
+      if (action === "status") {
+        if (!biz?.stripe_account_id) {
+          await supabase
+            .from("businesses")
+            .update({
+              stripe_connected: false,
+              stripe_onboarding_complete: false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", business_id);
+          return jsonResponse({
+            connected: false,
+            onboarding_complete: false,
+            account_id: null,
+            reason: "no_stripe_account",
+          });
+        }
+
+        const account = await stripe.accounts.retrieve(biz.stripe_account_id);
+        const hasRequirementsDue = (account.requirements?.currently_due?.length || 0) > 0;
+        const onboardingComplete = Boolean(account.details_submitted) && !hasRequirementsDue;
+        const connected = Boolean(account.charges_enabled && account.payouts_enabled);
+
+        await supabase
+          .from("businesses")
+          .update({
+            stripe_connected: connected,
+            stripe_onboarding_complete: onboardingComplete,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", business_id);
+
+        return jsonResponse({
+          connected,
+          onboarding_complete: onboardingComplete,
+          account_id: biz.stripe_account_id,
+          charges_enabled: account.charges_enabled,
+          payouts_enabled: account.payouts_enabled,
+          details_submitted: account.details_submitted,
+          requirements_due_count: account.requirements?.currently_due?.length || 0,
+        });
+      }
+
       if (biz?.stripe_account_id) {
         const accountLink = await stripe.accountLinks.create({
           account: biz.stripe_account_id,
