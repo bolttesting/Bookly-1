@@ -32,6 +32,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { notifyBusinessUsers } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/logger';
+import { applySeo, buildBusinessJsonLd, injectJsonLd, removeJsonLd } from '@/lib/seo';
 import { ImageSlideshow } from '@/components/ImageSlideshow';
 import { PoweredByBookly } from '@/components/brand/PoweredByBookly';
 
@@ -246,6 +247,54 @@ export default function PublicBooking() {
     else if (bt === 'dark') setEffectiveTheme('dark');
     else setEffectiveTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   }, [business?.id, business?.booking_theme]);
+
+  // SEO: per-business title/meta + LocalBusiness structured data for the public booking page
+  useEffect(() => {
+    if (!business || !slug) return;
+
+    const locationLabel = business.city ? ` in ${business.city}` : '';
+    const serviceLabel = business.industry ? business.industry.toLowerCase() : 'appointments';
+    const description = `Book ${serviceLabel} online with ${business.name}${locationLabel}. Check real-time availability and reserve your spot in seconds.`;
+
+    applySeo({
+      title: `${business.name} — Book Online`,
+      description,
+      path: `/book/${slug}`,
+      ogImage: business.logo_url || undefined,
+    });
+
+    injectJsonLd(
+      'bookly-booking-jsonld',
+      buildBusinessJsonLd({
+        name: business.name,
+        slug,
+        description,
+        logoUrl: business.logo_url,
+        phone: business.phone,
+        email: business.email,
+        address: business.address,
+        city: business.city,
+        currency: business.currency,
+        locations,
+        hours: businessHours,
+      })
+    );
+
+    return () => removeJsonLd('bookly-booking-jsonld');
+  }, [
+    business?.id,
+    business?.name,
+    business?.logo_url,
+    business?.phone,
+    business?.email,
+    business?.address,
+    business?.city,
+    business?.currency,
+    business?.industry,
+    slug,
+    locations,
+    businessHours,
+  ]);
 
   // Class schedule: default to today and show week view (no calendar step)
   useEffect(() => {

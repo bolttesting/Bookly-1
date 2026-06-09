@@ -1,0 +1,36 @@
+# Bookly
+
+> Bookly is online appointment booking software for service businesses such as salons, clinics, spas, gyms, and consultants. It provides online scheduling, client management, staff and team tools, automated reminders, payments, and a branded public booking page for each business.
+
+Bookly is a multi-tenant SaaS. Each business gets its own branded booking page at https://bookly.my/book/{business-slug} where customers can view services, check real-time availability, and book or pay online.
+
+## Product
+
+- [Home](https://bookly.my/): Overview of Bookly's appointment booking platform and features.
+- [Sign up / Log in](https://bookly.my/auth): Create a business account or sign in to the dashboard.
+- [Customer login](https://bookly.my/customer-login): Where customers sign in to view and manage their appointments.
+
+## Key features
+
+- Online scheduling with real-time availability and time-slot capacity.
+- Client/customer database and history.
+- Staff and team management with roles.
+- Automated email reminders and notifications.
+- Online payments and deposits via Stripe (advance, partial, or on-spot).
+- Coupons, packages, and recurring appointments.
+- A branded, mobile-friendly public booking page per business.
+- Class/group scheduling for studios and gyms.
+
+## Content
+
+- [Blog](https://bookly.my/blog): Guides and articles on booking, scheduling, and running a service business.
+
+## Legal
+
+- [Privacy Policy](https://bookly.my/privacy)
+- [Terms of Service](https://bookly.my/terms)
+- [Cookie Policy](https://bookly.my/cookies)
+
+## Contact
+
+- Support: support@bookly.my

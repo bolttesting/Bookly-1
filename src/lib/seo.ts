@@ -91,6 +91,91 @@ export function removeJsonLd(id: string) {
   document.getElementById(id)?.remove();
 }
 
+export type BusinessSeoInput = {
+  name: string;
+  slug: string;
+  description?: string | null;
+  logoUrl?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  city?: string | null;
+  currency?: string | null;
+  locations?: Array<{
+    address: string | null;
+    city: string | null;
+    phone: string | null;
+    is_primary?: boolean;
+  }>;
+  /** Business hours; day_of_week is 0=Sunday … 6=Saturday */
+  hours?: Array<{
+    day_of_week: number;
+    open_time: string;
+    close_time: string;
+    is_closed: boolean;
+  }>;
+};
+
+const SCHEMA_DAYS = [
+  "https://schema.org/Sunday",
+  "https://schema.org/Monday",
+  "https://schema.org/Tuesday",
+  "https://schema.org/Wednesday",
+  "https://schema.org/Thursday",
+  "https://schema.org/Friday",
+  "https://schema.org/Saturday",
+];
+
+/**
+ * Builds LocalBusiness JSON-LD for a tenant's public booking page (/book/:slug).
+ * Only includes fields that are actually present so the markup stays valid.
+ */
+export function buildBusinessJsonLd(b: BusinessSeoInput) {
+  const url = `${SITE_ORIGIN}/book/${b.slug}`;
+  const primaryLocation = b.locations?.find((l) => l.is_primary) ?? b.locations?.[0];
+  const streetAddress = b.address ?? primaryLocation?.address ?? undefined;
+  const addressLocality = b.city ?? primaryLocation?.city ?? undefined;
+  const telephone = b.phone ?? primaryLocation?.phone ?? undefined;
+
+  const data: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "@id": `${url}#business`,
+    name: b.name,
+    url,
+  };
+
+  if (b.description) data.description = b.description;
+  if (b.logoUrl) {
+    data.image = b.logoUrl;
+    data.logo = b.logoUrl;
+  }
+  if (telephone) data.telephone = telephone;
+  if (b.email) data.email = b.email;
+  if (b.currency) data.currenciesAccepted = b.currency;
+
+  if (streetAddress || addressLocality) {
+    data.address = {
+      "@type": "PostalAddress",
+      ...(streetAddress ? { streetAddress } : {}),
+      ...(addressLocality ? { addressLocality } : {}),
+    };
+  }
+
+  const openingHours = (b.hours ?? [])
+    .filter((h) => !h.is_closed && h.open_time && h.close_time)
+    .map((h) => ({
+      "@type": "OpeningHoursSpecification",
+      dayOfWeek: SCHEMA_DAYS[h.day_of_week],
+      opens: h.open_time.slice(0, 5),
+      closes: h.close_time.slice(0, 5),
+    }))
+    .filter((h) => Boolean(h.dayOfWeek));
+  if (openingHours.length) data.openingHoursSpecification = openingHours;
+
+  return data;
+}
+
 export function buildLandingJsonLd() {
   const org = {
     "@type": "Organization",

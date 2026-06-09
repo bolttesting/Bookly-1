@@ -11,6 +11,15 @@ interface Business {
   phone: string | null;
   city: string | null;
   created_at: string;
+  subscription_plan_id: string | null;
+}
+
+interface SubscriptionPlanLite {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  billing_period: string;
 }
 
 interface Package {
@@ -85,6 +94,26 @@ export function useSuperAdmin() {
       return data as Business[];
     },
     enabled: !!isSuperAdmin,
+  });
+
+  const { data: subscriptionPlans = [], isLoading: loadingPlans } = useQuery({
+    queryKey: ['superadmin-subscription-plans'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('subscription_plans')
+        .select('id, name, price, currency, billing_period');
+
+      if (error) throw error;
+      return (data ?? []).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        price: Number(p.price) || 0,
+        currency: p.currency ?? 'USD',
+        billing_period: p.billing_period ?? 'month',
+      })) as SubscriptionPlanLite[];
+    },
+    enabled: !!isSuperAdmin,
+    staleTime: 5 * 60_000,
   });
 
   const { data: allPackages = [], isLoading: loadingPackages } = useQuery({
@@ -175,7 +204,8 @@ export function useSuperAdmin() {
     allPackages,
     allCustomers,
     allAppointments,
+    subscriptionPlans,
     stats,
-    loading: loadingBusinesses || loadingPackages || loadingCustomers || loadingAppointments,
+    loading: loadingBusinesses || loadingPackages || loadingCustomers || loadingAppointments || loadingPlans,
   };
 }
